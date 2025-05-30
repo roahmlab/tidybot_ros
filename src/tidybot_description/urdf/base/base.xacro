@@ -152,11 +152,20 @@
                 <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
             </inertial>
         </link>
-        <joint type="fixed" name="joint_x">
+        <joint type="prismatic" name="joint_x">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="world"/>
             <child link="joint_x_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <axis xyz="1 0 0" />
+            <limit lower="-2.0" upper="2.0" effort="100" velocity="1" />
         </joint>
+        <transmission name="joint_x_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}joint_x" />
+            <actuator name="joint_x_motor">
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
         <link name="joint_y_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -164,11 +173,20 @@
                 <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
             </inertial>
         </link>
-        <joint type="fixed" name="joint_y">
+        <joint type="prismatic" name="joint_y">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_x_jointbody"/>
             <child link="joint_y_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <axis xyz="0 1 0" />
+            <limit lower="-2.0" upper="2.0" effort="100" velocity="1" />
         </joint>
+        <transmission name="joint_y_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}joint_y" />
+            <actuator name="joint_y_motor">
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
         <link name="joint_th_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -177,16 +195,25 @@
             </inertial>
         </link>
         <joint type="revolute" name="joint_th">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_y_jointbody"/>
             <child link="joint_th_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <axis xyz="0.0 0.0 1.0"/>
-            <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
+            <limit lower="-3.14" upper="3.14" effort="100" velocity="1"/>
         </joint>
+        <transmission name="joint_th_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}joint_th" />
+            <actuator name="joint_th_motor">
+                <mechanicalReduction>1</mechanicalReduction>
+            </actuator>
+        </transmission>
         <joint type="fixed" name="joint_th_offset">
+            <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_th_jointbody"/>
             <child link="base_link"/>
-            <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
+            <axis xyz="0.0 0.0 1.0"/>
+            <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
         </joint>
         <material name="white">
             <color rgba="1 1 1 1"/>
