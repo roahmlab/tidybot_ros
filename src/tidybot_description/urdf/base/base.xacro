@@ -1,0 +1,196 @@
+<?xml version="1.0"?>
+
+<robot name="tidybot_base" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:property name="last_base_link" value="base_link"/>
+
+    <xacro:macro name="load_base" params="parent:='' prefix">
+        <link name="world">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        </link>
+        <link name="${prefix}base_link">
+            <inertial>
+                <origin xyz="0.0 0.0 0.035" rpy="0.0 0.0 0.0"/>
+                <mass value="60.0"/>
+                <inertia ixx="0.001" iyy="0.001" izz="0.001" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+            <visual name="bumper">
+                <origin xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055" rpy="-2.442021632452952 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bumper.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="bumper">
+                <origin xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055" rpy="-2.442021632452952 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bumper.stl"/>
+                </geometry>
+            </collision>
+            <visual name="bottom_plate">
+                <origin xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373" rpy="1.6659662035857206 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bottom_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="bottom_plate">
+                <origin xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373" rpy="1.6659662035857206 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bottom_plate.stl"/>
+                </geometry>
+            </collision>
+            <visual name="body">
+                <origin xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052" rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/body.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="body">
+                <origin xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052" rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/body.stl"/>
+                </geometry>
+            </collision>
+            <visual name="top_plate">
+                <origin xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373" rpy="1.6906681075416252 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/top_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="top_plate">
+                <origin xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373" rpy="1.6906681075416252 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/top_plate.stl"/>
+                </geometry>
+            </collision>
+            <visual name="arm_plate">
+                <origin xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684" rpy="1.5707963267948966 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/arm_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="arm_plate">
+                <origin xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684" rpy="1.5707963267948966 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/arm_plate.stl"/>
+                </geometry>
+            </collision>
+            <visual name="bumper">
+                <origin xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055" rpy="-2.442021632452952 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bumper.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="bumper">
+                <origin xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055" rpy="-2.442021632452952 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bumper.stl"/>
+                </geometry>
+            </collision>
+            <visual name="bottom_plate">
+                <origin xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373" rpy="1.6659662035857206 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bottom_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="bottom_plate">
+                <origin xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373" rpy="1.6659662035857206 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/bottom_plate.stl"/>
+                </geometry>
+            </collision>
+            <visual name="body">
+                <origin xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052" rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/body.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="body">
+                <origin xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052" rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/body.stl"/>
+                </geometry>
+            </collision>
+            <visual name="top_plate">
+                <origin xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373" rpy="1.6906681075416252 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/top_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="top_plate">
+                <origin xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373" rpy="1.6906681075416252 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/top_plate.stl"/>
+                </geometry>
+            </collision>
+            <visual name="arm_plate">
+                <origin xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684" rpy="1.5707963267948966 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/arm_plate.stl"/>
+                </geometry>
+                <material name="white"/>
+            </visual>
+            <collision name="arm_plate">
+                <origin xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684" rpy="1.5707963267948966 -1.5707963267948966 0.0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/arm_plate.stl"/>
+                </geometry>
+            </collision>
+        </link>
+        <link name="joint_x_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="fixed" name="joint_x">
+            <parent link="world"/>
+            <child link="joint_x_jointbody"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        </joint>
+        <link name="joint_y_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="fixed" name="joint_y">
+            <parent link="joint_x_jointbody"/>
+            <child link="joint_y_jointbody"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+        </joint>
+        <link name="joint_th_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="revolute" name="joint_th">
+            <parent link="joint_y_jointbody"/>
+            <child link="joint_th_jointbody"/>
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <axis xyz="0.0 0.0 1.0"/>
+            <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
+        </joint>
+        <joint type="fixed" name="joint_th_offset">
+            <parent link="joint_th_jointbody"/>
+            <child link="base_link"/>
+            <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
+        </joint>
+        <material name="white">
+            <color rgba="1 1 1 1"/>
+        </material>
+    </xacro:macro>
+    <!-- <xacro:load_base prefix=""/> -->
+</robot>
