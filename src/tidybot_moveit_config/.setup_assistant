@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: tidybot_description
+    relative_path: urdf/tidybot.xacro
+  srdf:
+    relative_path: config/tidybot.srdf
+  package_settings:
+    author_name: janchen
+    author_email: janchen@umich.edu
+    generated_timestamp: 1748308873
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity

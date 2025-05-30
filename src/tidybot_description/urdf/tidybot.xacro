@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:arg name="arm" default="gen3_lite" />
+    <xacro:arg name="gripper" default="gen3_lite_2f" />
+    <xacro:arg name="vision" default="false" />
+    <xacro:arg name="prefix" default="" />
+
+    <xacro:include filename="$(find tidybot_description)/urdf/bot.xacro" />
+
+    <!-- load the robot -->
+    <xacro:load_bot arm="$(arg arm)" gripper="$(arg gripper)" vision="$(arg vision)" prefix="$(arg prefix)" />
+
+</robot>
