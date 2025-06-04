@@ -1,14 +1,93 @@
 <?xml version="1.0"?>
-<robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
 
+<robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
     <xacro:arg name="arm" default="gen3_lite" />
     <xacro:arg name="gripper" default="gen3_lite_2f" />
     <xacro:arg name="vision" default="false" />
     <xacro:arg name="prefix" default="" />
+    <xacro:arg name="ros2_control_config_path" default="UNSET"/>
 
     <xacro:include filename="$(find tidybot_description)/urdf/bot.xacro" />
 
     <!-- load the robot -->
     <xacro:load_bot arm="$(arg arm)" gripper="$(arg gripper)" vision="$(arg vision)" prefix="$(arg prefix)" />
 
+    <ros2_control name="GazeboSystem" type="system">
+    <hardware>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+
+    <joint name="joint_x">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_y">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_th">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_1">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_2">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_3">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_4">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_5">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="joint_6">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="right_finger_bottom_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="right_finger_tip_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="left_finger_bottom_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    <joint name="left_finger_tip_joint">
+        <command_interface name="position"/>
+        <state_interface name="position"/>
+        <state_interface name="velocity"/>
+    </joint>
+    </ros2_control>
+
+    <gazebo>
+        <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
+        <parameters>$(find tidybot_description)/urdf/ros2_control.yaml</parameters>
+        <robot_description_param>robot_description</robot_description_param>
+        </plugin>
+    </gazebo>
 </robot>

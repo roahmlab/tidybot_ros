@@ -21,10 +21,7 @@ DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
 DOCKER_OPTIONS+="--name $CONTAINER_NAME "
 DOCKER_OPTIONS+="--privileged "
-DOCKER_OPTIONS+="--gpus=all "
-DOCKER_OPTIONS+="-e NVIDIA_DRIVER_CAPABILITIES=all "
 DOCKER_OPTIONS+="--net=host "
-DOCKER_OPTIONS+="--runtime=nvidia "
 DOCKER_OPTIONS+="-e SDL_VIDEODRIVER=x11 "
 DOCKER_OPTIONS+="-u $(id -u):$(id -g) "
 DOCKER_OPTIONS+="--shm-size 32G "
@@ -44,7 +41,6 @@ elif [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then # If container isn't 
     
     # If it exists, but needs to be started
     if [  "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-
           echo "Resuming Container"
           docker start $CONTAINER_NAME
           docker exec -it $CONTAINER_NAME /entrypoint.sh

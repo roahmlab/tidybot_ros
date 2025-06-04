@@ -1,60 +1,66 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import SetEnvironmentVariable, IncludeLaunchDescription
+from launch.actions import SetEnvironmentVariable, IncludeLaunchDescription, TimerAction
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PathJoinSubstitution, Command
 from launch_ros.substitutions import FindPackageShare
-from launch.substitutions import LaunchConfiguration
-from launch.substitutions import Command
-from launch_ros.parameter_descriptions import ParameterValue
 
 def generate_launch_description():
-    ros_gz_sim_pkg_path = FindPackageShare('ros_gz_sim')
-    sim_pkg_path = FindPackageShare('tidybot_description')  
-    gz_launch_path = PathJoinSubstitution([ros_gz_sim_pkg_path, 'launch', 'gz_sim.launch.py'])
+    ros_gz_sim_pkg = FindPackageShare('ros_gz_sim')
+    tidybot_pkg = FindPackageShare('tidybot_description')
+    xacro_file = PathJoinSubstitution([
+        FindPackageShare('tidybot_description'),
+        'urdf', 'tidybot.xacro'
+    ])
 
-    ld = LaunchDescription()
-    ld.add_action(SetEnvironmentVariable(
-        'GZ_SIM_RESOURCE_PATH',
-        PathJoinSubstitution([sim_pkg_path, 'urdf'])
-    ))
-    ld.add_action(SetEnvironmentVariable(
-        'GZ_SIM_PLUGIN_PATH',
-        PathJoinSubstitution([sim_pkg_path, 'plugins'])
-    ))
-    ld.add_action(IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(gz_launch_path),
-        launch_arguments={
-            'gz_args': '-r empty.sdf',
-            'on_exit_shutdown': 'True'
-        }.items(),
-    ))
-    ld.add_action(IncludeLaunchDescription(
-        PathJoinSubstitution([sim_pkg_path, 'launch', 'display.launch.py']),
-    ))
-    ld.add_action(Node(
-        package='ros_gz_sim',
-        executable='create',
-        parameters=[{
-            'name': 'tidybot',
-            'topic': 'robot_description',
-        }],
-        output='screen',
-    ))
-
-    ld.add_action(Node(
-        package='ros_gz_bridge',
-        executable='parameter_bridge',
-        arguments=[
-            # Clock (Gazebo -> ROS2)
-            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
-            # Joint states (Gazebo -> ROS2)
-            '/world/empty/model/tidybot/joint_state@sensor_msgs/msg/JointState@gz.msgs.Model',
-        ],
-        remappings=[
-            ('/world/empty/model/rrbot/joint_state', 'joint_states'),
-        ],
-        output='screen'
-    ))
-
-    return ld
+    return LaunchDescription([
+        SetEnvironmentVariable(
+            'GZ_SIM_RESOURCE_PATH',
+            PathJoinSubstitution([tidybot_pkg, 'urdf'])
+        ),
+        SetEnvironmentVariable(
+            'GZ_SIM_PLUGIN_PATH',
+            PathJoinSubstitution([tidybot_pkg, 'plugins'])
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([ros_gz_sim_pkg, 'launch', 'gz_sim.launch.py'])
+            ),
+            launch_arguments={'gz_args': '-r empty.sdf'}.items()
+        ),
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([tidybot_pkg, 'launch', 'display.launch.py'])
+            )
+        ),
+        Node(
+            package='ros_gz_sim',
+            executable='create',
+            arguments=['-name', 'tidybot', '-topic', 'robot_description'],
+            output='screen',
+        ),
+        Node(
+            package='ros_gz_bridge',
+            executable='parameter_bridge',
+            arguments=[
+                '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+                '/world/empty/model/tidybot/joint_state@sensor_msgs/msg/JointState[gz.msgs.JointState',
+            ],
+            remappings=[
+                ('/world/empty/model/tidybot/joint_state', '/joint_states'),
+            ],
+            output='screen'
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['joint_state_broadcaster'],
+            output='screen',
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['joint_trajectory_controller'],
+            output='screen',
+        ),
+    ])
