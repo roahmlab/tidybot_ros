@@ -4,12 +4,24 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
+    - tidybot_base_controller
     - gen3_lite_controller
     - gen3_lite_2f_controller
 
+  tidybot_base_controller:
+    type: FollowJointTrajectory
+    joints:
+      - joint_x
+      - joint_y
+      - joint_th
+    action_ns: follow_joint_trajectory
+    default: true
   gen3_lite_controller:
     type: FollowJointTrajectory
     joints:
+      - joint_x
+      - joint_y
+      - joint_th
       - joint_1
       - joint_2
       - joint_3

@@ -8,10 +8,6 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     ros_gz_sim_pkg = FindPackageShare('ros_gz_sim')
     tidybot_pkg = FindPackageShare('tidybot_description')
-    xacro_file = PathJoinSubstitution([
-        FindPackageShare('tidybot_description'),
-        'urdf', 'tidybot.xacro'
-    ])
 
     return LaunchDescription([
         SetEnvironmentVariable(
