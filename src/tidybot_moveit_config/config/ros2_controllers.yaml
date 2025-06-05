@@ -3,9 +3,11 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-    gen3_lite_controller:
+    tidybot_base_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
+    gen3_lite_controller:
+      type: joint_trajectory_controller/JointTrajectoryController
 
     gen3_lite_2f_controller:
       type: position_controllers/GripperActionController
@@ -14,6 +16,17 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
+tidybot_base_controller:
+  ros__parameters:
+    joints:
+      - joint_x
+      - joint_y
+      - joint_th
+    command_interfaces:
+      - position
+    state_interfaces:
+      - position
+      - velocity
 gen3_lite_controller:
   ros__parameters:
     joints:

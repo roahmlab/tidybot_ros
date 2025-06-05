@@ -157,7 +157,7 @@
             <parent link="world"/>
             <child link="joint_x_jointbody"/>
             <axis xyz="1 0 0" />
-            <limit lower="-2.0" upper="2.0" effort="100" velocity="1" />
+            <limit lower="-10.0" upper="10.0" effort="100" velocity="1" />
         </joint>
         <transmission name="joint_x_trans">
             <type>transmission_interface/SimpleTransmission</type>
@@ -178,7 +178,7 @@
             <parent link="joint_x_jointbody"/>
             <child link="joint_y_jointbody"/>
             <axis xyz="0 1 0" />
-            <limit lower="-2.0" upper="2.0" effort="100" velocity="1" />
+            <limit lower="-10.0" upper="10.0" effort="100" velocity="1" />
         </joint>
         <transmission name="joint_y_trans">
             <type>transmission_interface/SimpleTransmission</type>
