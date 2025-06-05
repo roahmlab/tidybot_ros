@@ -24,10 +24,18 @@ def generate_launch_description():
             ),
             launch_arguments={'gz_args': '-r empty.sdf'}.items()
         ),
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([tidybot_pkg, 'launch', 'display.launch.py'])
-            )
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            parameters=[{
+                'robot_description': Command([
+                    'xacro ',
+                    PathJoinSubstitution([tidybot_pkg, 'urdf', 'tidybot.xacro'])
+                ]),
+                'use_sim_time': True
+            }],
+            output='screen',
         ),
         Node(
             package='ros_gz_sim',

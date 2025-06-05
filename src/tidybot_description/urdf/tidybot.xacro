@@ -23,7 +23,7 @@
     </xacro:macro>
     <ros2_control name="GazeboSystem" type="system">
     <hardware>
-        <plugin>mock_components/GenericSystem</plugin>
+        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
     </hardware>
     <xacro:add_joint name="joint_x" gain="0.1"/>
     <xacro:add_joint name="joint_y" gain="0.1"/>
