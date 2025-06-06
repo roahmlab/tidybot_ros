@@ -67,4 +67,10 @@ def generate_launch_description():
             arguments=['joint_trajectory_controller'],
             output='screen',
         ),
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["base_controller"],
+            output='screen',
+        )
     ])
