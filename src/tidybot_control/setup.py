@@ -1,5 +1,8 @@
 from setuptools import find_packages, setup
 
+from glob import glob
+import os
+
 package_name = 'tidybot_control'
 
 setup(
@@ -10,6 +13,8 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch/', glob('launch/*')),
+        ('share/' + package_name + '/config/', glob('config/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -21,6 +26,7 @@ setup(
     entry_points={
         'console_scripts': [
             'joint_states_listener = tidybot_control.joint_states_listener:main',
+            'twist_to_multiarray = tidybot_control.twist_to_multiarray:main',
         ],
     },
 )
