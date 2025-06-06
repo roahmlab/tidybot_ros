@@ -5,7 +5,7 @@
     <xacro:arg name="gripper" default="gen3_lite_2f" />
     <xacro:arg name="vision" default="false" />
     <xacro:arg name="prefix" default="" />
-    <xacro:arg name="ros2_control_config_path" default="UNSET"/>
+    <xacro:arg name="ros2_control_config_path" default="$(find tidybot_description)/config/tidybot_controllers.yaml"/>
 
     <xacro:include filename="$(find tidybot_description)/urdf/bot.xacro" />
 
@@ -13,38 +13,6 @@
     <xacro:load_bot arm="$(arg arm)" gripper="$(arg gripper)" vision="$(arg vision)" prefix="$(arg prefix)" />
 
     <!-- configure ros2_control joints -->
-    <xacro:macro name="add_joint" params="name gain">
-        <joint name="${name}">
-            <command_interface name="position"/>
-            <state_interface name="position"/>
-            <state_interface name="velocity"/>
-            <param name="position_proportional_gain">${gain}</param>
-        </joint>
-    </xacro:macro>
-    <ros2_control name="GazeboSystem" type="system">
-    <hardware>
-        <plugin>gz_ros2_control/GazeboSimSystem</plugin>
-    </hardware>
-    <xacro:add_joint name="joint_x" gain="0.1"/>
-    <xacro:add_joint name="joint_y" gain="0.1"/>
-    <xacro:add_joint name="joint_th" gain="0.1"/>
-    <xacro:add_joint name="joint_1" gain="0.1"/>
-    <xacro:add_joint name="joint_2" gain="0.1"/>
-    <xacro:add_joint name="joint_3" gain="0.1"/>
-    <xacro:add_joint name="joint_4" gain="0.1"/>
-    <xacro:add_joint name="joint_5" gain="0.1"/>
-    <xacro:add_joint name="joint_6" gain="0.1"/>
-    <xacro:add_joint name="right_finger_bottom_joint" gain="0.1"/>
-    <xacro:add_joint name="right_finger_tip_joint" gain="0.1"/>
-    <xacro:add_joint name="left_finger_bottom_joint" gain="0.1"/>
-    <xacro:add_joint name="left_finger_tip_joint" gain="0.1"/>
-    </ros2_control>
-
-    <gazebo>
-        <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
-            <parameters>$(find tidybot_description)/urdf/ros2_control.yaml</parameters>
-            <robot_description_param>robot_description</robot_description_param>
-        </plugin>
-        <self_collide>true</self_collide>
-    </gazebo>
+    <xacro:include filename="$(find tidybot_description)/urdf/ros2_control.xacro" />
+    <xacro:load_ros2_control config_path="$(arg ros2_control_config_path)"/>
 </robot>
