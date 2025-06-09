@@ -31,7 +31,8 @@ def generate_launch_description():
             parameters=[{
                 'robot_description': Command([
                     'xacro ',
-                    PathJoinSubstitution([tidybot_pkg, 'urdf', 'tidybot.xacro'])
+                    PathJoinSubstitution([tidybot_pkg, 'urdf', 'tidybot.xacro']),
+                    ' hardware_plugin:=gz_ros2_control/GazeboSimSystem'
                 ]),
                 'use_sim_time': True
             }],
@@ -46,6 +47,7 @@ def generate_launch_description():
         Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
+            parameters=[{'use_sim_time': True}],
             arguments=[
                 '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
                 '/world/empty/model/tidybot/joint_state@sensor_msgs/msg/JointState[gz.msgs.JointState',
@@ -62,15 +64,21 @@ def generate_launch_description():
             output='screen',
         ),
         Node(
-            package='controller_manager',
-            executable='spawner',
-            arguments=['joint_trajectory_controller'],
+            package="controller_manager",
+            executable="spawner",
+            arguments=["tidybot_base_controller"],
             output='screen',
         ),
         Node(
-            package="controller_manager",
-            executable="spawner",
-            arguments=["base_controller"],
+            package='controller_manager',
+            executable='spawner',
+            arguments=['gen3_lite_controller'],
             output='screen',
-        )
+        ),
+        Node(
+            package='controller_manager',
+            executable='spawner',
+            arguments=['gen3_lite_2f_controller'],
+            output='screen',
+        ),
     ])
