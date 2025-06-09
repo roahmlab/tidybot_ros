@@ -3,33 +3,15 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-    tidybot_base_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
 
     gen3_lite_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gen3_lite_2f_controller:
-      type: position_controllers/GripperActionController
-
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
-
-    joint_trajectory_controller:
       type: joint_trajectory_controller/JointTrajectoryController
-  
-tidybot_base_controller:
-  ros__parameters:
-    joints:
-      - joint_x
-      - joint_y
-      - joint_th
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-      
+
 gen3_lite_controller:
   ros__parameters:
     joints:
@@ -48,20 +30,7 @@ gen3_lite_controller:
 
 gen3_lite_2f_controller:
   ros__parameters:
-    joint: right_finger_bottom_joint
-  
-joint_trajectory_controller:
-  ros__parameters:
-    joints:
-      - joint_x
-      - joint_y
-      - joint_th
-      - joint_1
-      - joint_2
-      - joint_3
-      - joint_4
-      - joint_5
-      - joint_6
+    joints: 
       - right_finger_bottom_joint
       - right_finger_tip_joint
       - left_finger_bottom_joint
@@ -71,6 +40,4 @@ joint_trajectory_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 50
-    action_monitor_rate: 20.0
-    allow_partial_joints_goal: false
+    allow_nonzero_velocity_at_trajectory_end: true
