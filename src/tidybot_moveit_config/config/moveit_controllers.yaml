@@ -4,26 +4,12 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
-    - tidybot_base_controller
     - gen3_lite_controller
     - gen3_lite_2f_controller
-    - joint_trajectory_controller
-
-  tidybot_base_controller:
-    type: FollowJointTrajectory
-    joints:
-      - joint_x
-      - joint_y
-      - joint_th
-    action_ns: follow_joint_trajectory
-    default: true
 
   gen3_lite_controller:
     type: FollowJointTrajectory
     joints:
-      - joint_x
-      - joint_y
-      - joint_th
       - joint_1
       - joint_2
       - joint_3
@@ -34,24 +20,8 @@ moveit_simple_controller_manager:
     default: true
 
   gen3_lite_2f_controller:
-    type: GripperCommand
-    joints:
-      - right_finger_bottom_joint
-    action_ns: gripper_cmd
-    default: true
-
-  joint_trajectory_controller:
     type: FollowJointTrajectory
     joints:
-      - joint_x
-      - joint_y
-      - joint_th
-      - joint_1
-      - joint_2
-      - joint_3
-      - joint_4
-      - joint_5
-      - joint_6
       - right_finger_bottom_joint
       - right_finger_tip_joint
       - left_finger_bottom_joint
