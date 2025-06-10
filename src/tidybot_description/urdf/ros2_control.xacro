@@ -2,7 +2,7 @@
 
 <robot name="ros2_control" xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_ros2_control" params="config_path">
+    <xacro:macro name="load_ros2_control" params="config_path hardware_plugin">
         <xacro:macro name="add_joint" params="name gain cmd_interface">
             <joint name="${name}">
                 <command_interface name="${cmd_interface}"/>
@@ -13,7 +13,7 @@
         </xacro:macro>
         <ros2_control name="GazeboSystem" type="system">
         <hardware>
-            <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+            <plugin>${hardware_plugin}</plugin>
         </hardware>
         <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="velocity"/>
         <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="velocity"/>

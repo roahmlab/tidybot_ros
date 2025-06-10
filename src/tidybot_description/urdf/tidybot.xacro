@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 
 <robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
+    <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem" />
     <xacro:arg name="arm" default="gen3_lite" />
     <xacro:arg name="gripper" default="gen3_lite_2f" />
     <xacro:arg name="vision" default="false" />
@@ -14,5 +15,5 @@
 
     <!-- configure ros2_control joints -->
     <xacro:include filename="$(find tidybot_description)/urdf/ros2_control.xacro" />
-    <xacro:load_ros2_control config_path="$(arg ros2_control_config_path)"/>
+    <xacro:load_ros2_control config_path="$(arg ros2_control_config_path)" hardware_plugin="$(arg hardware_plugin)" />
 </robot>
