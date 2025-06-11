@@ -147,13 +147,21 @@ Visualization Manager:
       Value: true
       Visual Enabled: true
     - Class: rviz_default_plugins/TF
+<<<<<<< HEAD
       Enabled: false
+=======
+      Enabled: true
+>>>>>>> master
       Filter (blacklist): ""
       Filter (whitelist): ""
       Frame Timeout: 15
       Frames:
         All Enabled: true
+<<<<<<< HEAD
       Marker Scale: 1
+=======
+      Marker Scale: 0.5
+>>>>>>> master
       Name: TF
       Show Arrows: true
       Show Axes: true
@@ -165,7 +173,11 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
+<<<<<<< HEAD
     Fixed Frame: base_link
+=======
+    Fixed Frame: world
+>>>>>>> master
     Frame Rate: 30
   Name: root
   Tools:
