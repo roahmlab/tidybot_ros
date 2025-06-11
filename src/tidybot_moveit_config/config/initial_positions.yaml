@@ -1,12 +1,9 @@
 # Default initial positions for tidybot's ros2_control fake system
 
 initial_positions:
-<<<<<<< HEAD
-=======
   joint_x: 0
   joint_y: 0
   joint_th: 0
->>>>>>> master
   joint_1: 0
   joint_2: 0
   joint_3: 0

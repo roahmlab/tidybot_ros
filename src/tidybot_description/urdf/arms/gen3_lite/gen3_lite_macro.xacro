@@ -69,9 +69,6 @@
       <child link="${prefix}shoulder_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.69" upper="2.69" effort="10" velocity="1.6" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint1_trans">
@@ -81,7 +78,6 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
     <link name="${prefix}arm_link">
       <inertial>
         <origin xyz="0.02998299 0.21154808 0.0453031" rpy="0 0 0" />
@@ -113,9 +109,6 @@
       <child link="${prefix}arm_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.69" upper="2.69" effort="14" velocity="1.6" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint2_trans">
@@ -125,7 +118,6 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
     <link name="${prefix}forearm_link">
       <inertial>
         <origin xyz="0.0301559 0.09502206 0.0073555" rpy="0 0 0" />
@@ -157,9 +149,6 @@
       <child link="${prefix}forearm_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.69" upper="2.69" effort="10" velocity="1.6" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint3_trans">
@@ -169,7 +158,6 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
     <link name="${prefix}lower_wrist_link">
       <inertial>
         <origin xyz="0.00575149 0.01000443 0.08719207" rpy="0 0 0" />
@@ -201,9 +189,6 @@
       <child link="${prefix}lower_wrist_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.59" upper="2.59" effort="7" velocity="1.6" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint4_trans">
@@ -213,7 +198,6 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
     <link name="${prefix}upper_wrist_link">
       <inertial>
         <origin xyz="0.08056517 0.00980409 0.01872799" rpy="0 0 0" />
@@ -245,9 +229,6 @@
       <child link="${prefix}upper_wrist_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.57" upper="2.57" effort="7" velocity="1.6" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint5_trans">
@@ -257,7 +238,6 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
     <link name="${prefix}end_effector_link" />
     <joint name="${prefix}joint_6" type="revolute">
       <origin xyz="-0.105 0 0.0285" rpy="0 -1.5708 0" />
@@ -265,9 +245,6 @@
       <child link="${prefix}end_effector_link" />
       <axis xyz="0 0 1" />
       <limit lower="-2.59" upper="2.59" effort="7" velocity="3.2" />
-<<<<<<< HEAD
-    </joint>
-=======
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
     <transmission name="joint6_trans">
@@ -277,6 +254,5 @@
         <mechanicalReduction>1</mechanicalReduction>
       </actuator>
     </transmission>
->>>>>>> master
   </xacro:macro>
 </robot>

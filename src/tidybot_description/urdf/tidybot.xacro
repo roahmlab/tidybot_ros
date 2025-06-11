@@ -1,30 +1,19 @@
 <?xml version="1.0"?>
-<<<<<<< HEAD
-<robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
-
-=======
 
 <robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
     <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem" />
->>>>>>> master
     <xacro:arg name="arm" default="gen3_lite" />
     <xacro:arg name="gripper" default="gen3_lite_2f" />
     <xacro:arg name="vision" default="false" />
     <xacro:arg name="prefix" default="" />
-<<<<<<< HEAD
-=======
     <xacro:arg name="ros2_control_config_path" default="$(find tidybot_description)/config/tidybot_controllers.yaml"/>
->>>>>>> master
 
     <xacro:include filename="$(find tidybot_description)/urdf/bot.xacro" />
 
     <!-- load the robot -->
     <xacro:load_bot arm="$(arg arm)" gripper="$(arg gripper)" vision="$(arg vision)" prefix="$(arg prefix)" />
 
-<<<<<<< HEAD
-=======
     <!-- configure ros2_control joints -->
     <xacro:include filename="$(find tidybot_description)/urdf/ros2_control.xacro" />
     <xacro:load_ros2_control config_path="$(arg ros2_control_config_path)" hardware_plugin="$(arg hardware_plugin)" />
->>>>>>> master
 </robot>
