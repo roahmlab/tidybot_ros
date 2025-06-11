@@ -3,18 +3,6 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-<<<<<<< HEAD
-    gen3_lite_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
-    gen3_lite_2f_controller:
-      type: position_controllers/GripperActionController
-
-
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
-=======
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -23,7 +11,6 @@ controller_manager:
 
     gen3_lite_2f_controller:
       type: joint_trajectory_controller/JointTrajectoryController
->>>>>>> master
 
 gen3_lite_controller:
   ros__parameters:
@@ -40,11 +27,6 @@ gen3_lite_controller:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
-<<<<<<< HEAD
-gen3_lite_2f_controller:
-  ros__parameters:
-    joint: right_finger_bottom_joint
-=======
 
 gen3_lite_2f_controller:
   ros__parameters:
@@ -59,4 +41,3 @@ gen3_lite_2f_controller:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
->>>>>>> master

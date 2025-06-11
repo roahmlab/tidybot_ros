@@ -14,20 +14,9 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Basic packages
 RUN apt-get -y update \
     && apt-get -y install \
-<<<<<<< HEAD
-      python3-pip \
-      sudo \
-      vim \
-      wget \
-      curl \
-      software-properties-common \
-      doxygen \
-      git \
-=======
       python3-pip sudo vim wget \
       curl software-properties-common \
       doxygen git tmux \
->>>>>>> master
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get -y update \
@@ -69,11 +58,7 @@ USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_ws
  
 # Setup ROS 2 Jazzy
-<<<<<<< HEAD
-RUN sudo apt-get update && sudo apt-get upgrade && sudo apt-get install software-properties-common -y && \
-=======
 RUN sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
->>>>>>> master
     sudo apt-add-repository universe 
 
 RUN sudo apt-get update && sudo apt-get install curl -y && \
@@ -101,6 +86,9 @@ RUN sudo apt-get update && sudo apt-get upgrade && sudo apt-get install ros-jazz
 
 # Setup MoveIt2 
 RUN sudo apt-get install ros-jazzy-moveit -y
+
+# Setup Teleop
+RUN sudo apt-get install python3-flask python3-flask-socketio -y
 
 # Build the workspace
 COPY ./src ./src

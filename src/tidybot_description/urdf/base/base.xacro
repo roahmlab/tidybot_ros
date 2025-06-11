@@ -152,13 +152,6 @@
                 <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
             </inertial>
         </link>
-<<<<<<< HEAD
-        <joint type="fixed" name="joint_x">
-            <parent link="world"/>
-            <child link="joint_x_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
-        </joint>
-=======
         <joint type="prismatic" name="joint_x">
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="world"/>
@@ -174,7 +167,6 @@
                 <mechanicalReduction>1</mechanicalReduction>
             </actuator>
         </transmission>
->>>>>>> master
         <link name="joint_y_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -182,13 +174,6 @@
                 <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
             </inertial>
         </link>
-<<<<<<< HEAD
-        <joint type="fixed" name="joint_y">
-            <parent link="joint_x_jointbody"/>
-            <child link="joint_y_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
-        </joint>
-=======
         <joint type="prismatic" name="joint_y">
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_x_jointbody"/>
@@ -204,7 +189,6 @@
                 <mechanicalReduction>1</mechanicalReduction>
             </actuator>
         </transmission>
->>>>>>> master
         <link name="joint_th_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -213,18 +197,6 @@
             </inertial>
         </link>
         <joint type="revolute" name="joint_th">
-<<<<<<< HEAD
-            <parent link="joint_y_jointbody"/>
-            <child link="joint_th_jointbody"/>
-            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
-            <axis xyz="0.0 0.0 1.0"/>
-            <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
-        </joint>
-        <joint type="fixed" name="joint_th_offset">
-            <parent link="joint_th_jointbody"/>
-            <child link="base_link"/>
-            <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
-=======
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_y_jointbody"/>
             <child link="joint_th_jointbody"/>
@@ -245,15 +217,10 @@
             <child link="base_link"/>
             <axis xyz="0.0 0.0 1.0"/>
             <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
->>>>>>> master
         </joint>
         <material name="white">
             <color rgba="1 1 1 1"/>
         </material>
     </xacro:macro>
     <!-- <xacro:load_base prefix=""/> -->
-<<<<<<< HEAD
 </robot>
-=======
-</robot>
->>>>>>> master
