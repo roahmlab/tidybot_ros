@@ -18,9 +18,22 @@ moveit_simple_controller_manager:
       - joint_6
     action_ns: follow_joint_trajectory
     default: true
+<<<<<<< HEAD
   gen3_lite_2f_controller:
     type: GripperCommand
     joints:
       - right_finger_bottom_joint
     action_ns: gripper_cmd
     default: true
+=======
+
+  gen3_lite_2f_controller:
+    type: FollowJointTrajectory
+    joints:
+      - right_finger_bottom_joint
+      - right_finger_tip_joint
+      - left_finger_bottom_joint
+      - left_finger_tip_joint
+    action_ns: follow_joint_trajectory
+    default: true
+>>>>>>> master

@@ -1,30 +1,35 @@
-# This config file is used by ros2_control
 controller_manager:
   ros__parameters:
-    update_rate: 100  # Hz
-
-<<<<<<< HEAD
-    gen3_lite_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
-    gen3_lite_2f_controller:
-      type: position_controllers/GripperActionController
-
+    use_sim_time: true
+    update_rate: 100
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
-=======
-    joint_state_broadcaster:
-      type: joint_state_broadcaster/JointStateBroadcaster
+
+    tidybot_base_controller:
+      type: velocity_controllers/JointGroupVelocityController
 
     gen3_lite_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gen3_lite_2f_controller:
       type: joint_trajectory_controller/JointTrajectoryController
->>>>>>> master
-
+  
+tidybot_base_controller:
+  ros__parameters:
+    joints:
+      - joint_x
+      - joint_y
+      - joint_th
+    command_interfaces:
+      - velocity
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+    
 gen3_lite_controller:
   ros__parameters:
     joints:
@@ -39,16 +44,13 @@ gen3_lite_controller:
     state_interfaces:
       - position
       - velocity
-    allow_nonzero_velocity_at_trajectory_end: true
-<<<<<<< HEAD
-gen3_lite_2f_controller:
-  ros__parameters:
-    joint: right_finger_bottom_joint
-=======
+    state_publish_rate: 50
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
 
 gen3_lite_2f_controller:
   ros__parameters:
-    joints: 
+    joints:
       - right_finger_bottom_joint
       - right_finger_tip_joint
       - left_finger_bottom_joint
@@ -58,5 +60,6 @@ gen3_lite_2f_controller:
     state_interfaces:
       - position
       - velocity
-    allow_nonzero_velocity_at_trajectory_end: true
->>>>>>> master
+    state_publish_rate: 50
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
