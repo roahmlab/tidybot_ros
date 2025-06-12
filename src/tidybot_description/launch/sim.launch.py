@@ -1,8 +1,8 @@
 from launch import LaunchDescription
 from launch_ros.actions import Node
-from launch.actions import SetEnvironmentVariable, IncludeLaunchDescription, TimerAction
+from launch.actions import SetEnvironmentVariable, IncludeLaunchDescription, TimerAction, DeclareLaunchArgument
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution, Command
+from launch.substitutions import PathJoinSubstitution, Command, LaunchConfiguration
 from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
@@ -18,25 +18,31 @@ def generate_launch_description():
             'GZ_SIM_PLUGIN_PATH',
             PathJoinSubstitution([tidybot_pkg, 'plugins'])
         ),
+        DeclareLaunchArgument(
+            'use_rviz',
+            default_value='true',
+            description='Flag to enable RViz'
+        ),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
                 PathJoinSubstitution([ros_gz_sim_pkg, 'launch', 'gz_sim.launch.py'])
             ),
             launch_arguments={'gz_args': '-r empty.sdf'}.items()
         ),
-        Node(
-            package='robot_state_publisher',
-            executable='robot_state_publisher',
-            name='robot_state_publisher',
-            parameters=[{
-                'robot_description': Command([
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([tidybot_pkg, 'launch', 'display.launch.py'])
+            ),
+            launch_arguments={
+                'robot_description_content': Command([
                     'xacro ',
                     PathJoinSubstitution([tidybot_pkg, 'urdf', 'tidybot.xacro']),
                     ' hardware_plugin:=gz_ros2_control/GazeboSimSystem'
                 ]),
-                'use_sim_time': True
-            }],
-            output='screen',
+                'use_sim_time': 'true',
+                'use_rviz': LaunchConfiguration('use_rviz'),
+                'jsp_gui': 'false',
+            }.items()
         ),
         Node(
             package='ros_gz_sim',
