@@ -6,7 +6,7 @@ from queue import Queue
 import threading
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import String
+from tidybot_msgs.msg import WSMsg
 import json
 
 import os
@@ -38,7 +38,6 @@ class WebServer:
 
             # Add data to queue for processing
             self.queue.put(data)
-            print(f"Received data: {data}")
 
         # Reduce verbose Flask log output
         logging.getLogger("werkzeug").setLevel(logging.WARNING)
@@ -61,7 +60,7 @@ class WebServerPublisher(Node):
     def __init__(self, queue):
         super().__init__("ws_bridge_publisher")
         self.pub = self.create_publisher(
-            String, "/ws_commands", 10
+            WSMsg, "/ws_commands", 10
         )
         self.queue = queue
 
@@ -75,10 +74,25 @@ class WebServerPublisher(Node):
                 data = self.queue.get()
             else:
                 continue
-            msg = String()
-            msg.data = json.dumps(data)
+            msg = WSMsg()
+            msg.timestamp = data["timestamp"]
+            if "state_update" in data:
+                msg.state_update = data["state_update"]
+            else:
+                msg.device_id = data["device_id"]
+                if "teleop_mode" in data:
+                    msg.teleop_mode = data["teleop_mode"]
+                    msg.pos_x = float(data["position"]["x"])
+                    msg.pos_y = float(data["position"]["y"])
+                    msg.pos_z = float(data["position"]["z"])
+                    msg.or_x = float(data["orientation"]["x"])
+                    msg.or_y = float(data["orientation"]["y"])
+                    msg.or_z = float(data["orientation"]["z"])
+                    msg.or_w = float(data["orientation"]["w"])
+                if "gripper_delta" in data:
+                    msg.gripper_delta = float(data["gripper_delta"])
             self.pub.publish(msg)
-            self.get_logger().info(f"Published message: {msg.data}")
+            self.get_logger().info(f"Published message: {msg.device_id} at {msg.timestamp}")
 
 
     def stop(self):
@@ -98,7 +112,6 @@ def main():
     web_server_publisher = WebServerPublisher(queue)
 
     webserver = WebServer(queue)
-    webserver.run()
 
     try:
         webserver.run()

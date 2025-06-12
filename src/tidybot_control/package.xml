@@ -7,6 +7,9 @@
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <license>Apache 2License 2.0</license>
 
+  <buildtool_depend>ament_python</buildtool_depend>
+  <build_depend>tidybot_msgs</build_depend>
+
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>
   <test_depend>ament_pep257</test_depend>
@@ -25,6 +28,8 @@
   <exec_depend>json</exec_depend>
   <exec_depend>os</exec_depend>
   <exec_depend>threading</exec_depend>
+  <exec_depend>tidybot_msgs</exec_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
