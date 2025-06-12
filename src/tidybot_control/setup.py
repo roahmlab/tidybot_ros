@@ -16,17 +16,20 @@ setup(
         ('share/' + package_name + '/launch/', glob('launch/*')),
         ('share/' + package_name + '/config/', glob('config/*')),
     ],
-    install_requires=['setuptools'],
+    install_requires=['setuptools',
+                      'flask',
+                      'flask_socketio',],
     zip_safe=True,
     maintainer='janchen',
     maintainer_email='janchen@umich.edu',
-    description='TODO: Package description',
+    description='Tidybot remote control package for ROS2',
     license='Apache License 2.0',
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'joint_states_listener = tidybot_control.joint_states_listener:main',
             'twist_to_multiarray = tidybot_control.twist_to_multiarray:main',
+            'web_server_publisher = tidybot_control.web_server_publisher:main',
         ],
     },
 )
