@@ -3,6 +3,7 @@ FROM ${BASE_IMAGE}
 
 ARG USER_NAME=default
 ARG USER_ID=1000
+ARG ROS_DISTRO=jazzy
 
 # Prevent anything requiring user input
 ENV DEBIAN_FRONTEND=noninteractive
@@ -21,15 +22,9 @@ RUN apt-get -y update \
 
 RUN apt-get -y update \
     && apt-get -y install \
-        libglew-dev \
-        libassimp-dev \
-        libboost-all-dev \
-        libgtk-3-dev \
-        libglfw3-dev \
-        libavdevice-dev \
-        libavcodec-dev \
-        libeigen3-dev \
-        libxxf86vm-dev \
+        libglew-dev libassimp-dev libboost-all-dev \
+        libgtk-3-dev libglfw3-dev libavdevice-dev \
+        libavcodec-dev libeigen3-dev libxxf86vm-dev \
         libembree-dev \
     && rm -rf /var/lib/apt/lists/*
 
@@ -37,7 +32,6 @@ RUN apt-get -y update \
     && apt-get -y install \ 
         cmake \
     && rm -rf /var/lib/apt/lists/*
-
 
 RUN set -eux; \
     # find the username for TARGET_UID (empty if none)
@@ -57,7 +51,7 @@ RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_ws
  
-# Setup ROS 2 Jazzy
+# Setup ROS 2 Jazzy + ROS 2 Control
 RUN sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
     sudo apt-add-repository universe 
 
@@ -73,30 +67,37 @@ RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.ke
     http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \ 
     | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-RUN sudo apt-get update && sudo apt-get install ros-dev-tools -y
-
-RUN sudo apt-get update && sudo apt-get upgrade && \
-    sudo apt-get install ros-jazzy-desktop -y
-
-RUN sudo apt-get install python3-colcon-common-extensions \
-    python3-rosdep -y
+RUN sudo apt-get update && sudo apt-get upgrade -y && \
+    sudo apt-get install -y \
+        ros-dev-tools \
+        ros-${ROS_DISTRO}-desktop \
+        python3-colcon-common-extensions \
+        python3-rosdep \
+        ros-${ROS_DISTRO}-ros2-control \
+        ros-${ROS_DISTRO}-ros2-controllers \
+        ros-${ROS_DISTRO}-joint-state-broadcaster \
+        ros-${ROS_DISTRO}-joint-trajectory-controller \
+        ros-${ROS_DISTRO}-rqt-controller-manager \
+        ros-${ROS_DISTRO}-rqt-joint-trajectory-controller && \
+    sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo
-RUN sudo apt-get update && sudo apt-get upgrade && sudo apt-get install ros-jazzy-ros-gz -y
+RUN sudo apt-get update && sudo apt-get upgrade && \
+    sudo apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
 
 # Setup MoveIt2 
-RUN sudo apt-get install ros-jazzy-moveit -y
+RUN sudo apt-get install ros-${ROS_DISTRO}-moveit -y
 
 # Setup Teleop
 RUN sudo apt-get install python3-flask python3-flask-socketio -y
 
 # Build the workspace
 COPY ./src ./src
-RUN . /opt/ros/jazzy/setup.sh && sudo rosdep init && \
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
     colcon build
 
-RUN echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 
 RUN sudo chown -R ${USER_NAME} /home/${USER_NAME}
 
