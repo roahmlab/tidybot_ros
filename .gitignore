@@ -2,6 +2,7 @@
 /log
 /install
 src/.vscode
+.vscode
 src/build
 /src/log
 /src/install
