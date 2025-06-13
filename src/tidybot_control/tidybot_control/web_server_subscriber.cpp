@@ -2,33 +2,30 @@
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
-#include "tidybot_msgs/msg/ws_msg.hpp"
+#include <geometry_msgs/msg/pose.hpp>
+#include "std_msgs/msg/float32.hpp"
 
 using moveit::planning_interface::MoveGroupInterface;
 
 class WebServerSubscriber : public rclcpp::Node {
     public:
     WebServerSubscriber() : Node("web_server_subscriber") {
-        subscriber_ = this->create_subscription<tidybot_msgs::msg::WSMsg>(
-            "/ws_commands", 10,
+        base_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
+            "/ws_base_command", 1,
+            std::bind(&WebServerSubscriber::pose_callback, this, std::placeholders::_1));
+        arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
+            "/ws_arm_command", 1,
+            std::bind(&WebServerSubscriber::pose_callback, this, std::placeholders::_1));
+        gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float32>(
+            "/ws_gripper_command", 1,
             std::bind(&WebServerSubscriber::pose_callback, this, std::placeholders::_1));
     }
 
-    void pose_callback(const tidybot_msgs::msg::WSMsg &WSMsg) {
-        auto const target_pos = [WSMsg]{
-            geometry_msgs::msg::Pose target_pose;
-            if (WSMsg.teleop_mode == "arm") {
-                target_pose.position.x = WSMsg.pos_x;
-                target_pose.position.y = WSMsg.pos_y;
-                target_pose.position.z = WSMsg.pos_z;
-                target_pose.orientation.x = WSMsg.or_x;
-                target_pose.orientation.y = WSMsg.or_y;
-                target_pose.orientation.z = WSMsg.or_z;
-                target_pose.orientation.w = WSMsg.or_w;
-            }
-            return target_pose;
-        }();
+    void base_callback(const geometry_msgs::msg::Pose &msg) {
+        return;
+    }
 
+    void arm_callback(const geometry_msgs::msg::Pose &msg) {
         auto arm_move_group_interface = moveit::planning_interface::MoveGroupInterface(this->shared_from_this(), "gen3_lite");
         arm_move_group_interface.setPoseTarget(target_pos);
 
@@ -51,9 +48,14 @@ class WebServerSubscriber : public rclcpp::Node {
         else RCLCPP_ERROR(logger, "Planning failed");
     }
 
+    void gripper_callback(const std_msgs::msg::Float32 &msg) {
+        return;
+    }
 
     private:
-    rclcpp::Subscription<tidybot_msgs::msg::WSMsg>::SharedPtr subscriber_;
+    rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr base_subscriber_;
+    rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
+    rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr gripper_subscriber_;
     rclcpp::Logger logger = rclcpp::get_logger("web_server_subscriber");
 };
 
