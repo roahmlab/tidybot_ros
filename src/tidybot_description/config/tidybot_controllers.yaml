@@ -6,8 +6,11 @@ controller_manager:
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
-    tidybot_base_controller:
+    tidybot_base_vel_controller:
       type: velocity_controllers/JointGroupVelocityController
+
+    tidybot_base_pos_controller:
+      type: position_controllers/JointGroupPositionController
 
     gen3_lite_controller:
       type: joint_trajectory_controller/JointTrajectoryController
@@ -15,7 +18,7 @@ controller_manager:
     gen3_lite_2f_controller:
       type: joint_trajectory_controller/JointTrajectoryController
   
-tidybot_base_controller:
+tidybot_base_vel_controller:
   ros__parameters:
     joints:
       - joint_x
@@ -23,6 +26,21 @@ tidybot_base_controller:
       - joint_th
     command_interfaces:
       - velocity
+    state_interfaces:
+      - position
+      - velocity
+    state_publish_rate: 50
+    action_monitor_rate: 20.0
+    allow_partial_joints_goal: false
+
+tidybot_base_pos_controller:
+  ros__parameters:
+    joints:
+      - joint_x
+      - joint_y
+      - joint_th
+    command_interfaces:
+      - position
     state_interfaces:
       - position
       - velocity
