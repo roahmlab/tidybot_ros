@@ -1,5 +1,6 @@
 import rclpy
 from rclpy.node import Node
+from geometry_msgs.msg import Pose
 from std_msgs.msg import Float64MultiArray, String
 from tidybot_msgs.msg import WSMsg
 from sensor_msgs.msg import JointState
@@ -10,7 +11,7 @@ class WSRelay(Node):
     def __init__(self):
         super().__init__("ws_relay")
         self.base_pub = self.create_publisher(Float64MultiArray, "/base_controller/command", 10)
-        self.arm_pub = self.create_publisher(Float64MultiArray, "/arm_controller/command", 10)
+        self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
         self.gripper_pub = self.create_publisher(
             Float64MultiArray, "/gripper_controller/command", 10
         )
@@ -34,8 +35,7 @@ class WSRelay(Node):
 
         # Observed position
         self.base_obs = np.array([0.0, 0.0, 0.0])  # [x, y, theta]
-        # TODO
-        self.arm_obs = []
+        self.arm_obs = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) # [x, y, z, ]
         self.gripper_obs = []
 
     def ws_callback(self, msg):
@@ -68,6 +68,21 @@ class WSRelay(Node):
                     base_command.data = self.base_ref + (np.array([msg.pos_x, msg.pos_z, euler[0]]) - self.base_xr_ref)
                     self.base_pub.publish(base_command)
                     return
+                case "arm":
+                    if self.arm_xr_ref is None:
+                        self.arm_xr_ref = np.array([msg.pos_x, msg.pos_y, msg.pos_z, msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                        self.arm_ref = self.arm_obs.copy()
+                    arm_command = Pose()
+                    arm_command.position.x = self.arm_ref[0] + msg.pos_x - self.arm_xr_ref[0]
+                    arm_command.position.y = self.arm_ref[1] + msg.pos_y - self.arm_xr_ref[1]
+                    arm_command.position.z = self.arm_ref[2] + msg.pos_z - self.arm_xr_ref[2]
+                    arm_command.orientation.x = self.arm_ref[3] + msg.or_x - self.arm_xr_ref[3]
+                    arm_command.orientation.y = self.arm_ref[4] + msg.or_y - self.arm_xr_ref[4]
+                    arm_command.orientation.z = self.arm_ref[5] + msg.or_z - self.arm_xr_ref[5]
+                    arm_command.orientation.w = self.arm_ref[6] + msg.or_w - self.arm_xr_ref[6]
+                    self.arm_pub.publish(arm_command)
+                    return
+
                 
         elif self.enable_counts[msg.device_id] == 0:
             self.base_xr_ref = None

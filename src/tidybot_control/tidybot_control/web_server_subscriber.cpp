@@ -9,7 +9,9 @@ using moveit::planning_interface::MoveGroupInterface;
 
 class WebServerSubscriber : public rclcpp::Node {
     public:
-    WebServerSubscriber() : Node("web_server_subscriber") {
+    WebServerSubscriber() 
+        : Node("web_server_subscriber"),
+          arm_move_group_interface(this->shared_from_this(), "gen3_lite") {
         base_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/ws_base_command", 1,
             std::bind(&WebServerSubscriber::pose_callback, this, std::placeholders::_1));
@@ -26,8 +28,9 @@ class WebServerSubscriber : public rclcpp::Node {
     }
 
     void arm_callback(const geometry_msgs::msg::Pose &msg) {
-        auto arm_move_group_interface = moveit::planning_interface::MoveGroupInterface(this->shared_from_this(), "gen3_lite");
         arm_move_group_interface.setPoseTarget(target_pos);
+        move_group.set_max_velocity_scaling_factor(1.0)  
+        move_group.set_max_acceleration_scaling_factor(1.0)
 
         auto const [success, plan] = [&arm_move_group_interface]() {
             moveit::planning_interface::MoveGroupInterface::Plan plan;
