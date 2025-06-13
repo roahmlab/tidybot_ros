@@ -18,108 +18,136 @@ from launch.conditions import IfCondition, UnlessCondition
 
 
 def generate_launch_description():
+    ld = LaunchDescription()
     ros_gz_sim_pkg = FindPackageShare("ros_gz_sim")
     tidybot_pkg = FindPackageShare("tidybot_description")
-
-    return LaunchDescription(
-        [
-            SetEnvironmentVariable(
-                "GZ_SIM_RESOURCE_PATH", PathJoinSubstitution([tidybot_pkg, "urdf"])
-            ),
-            SetEnvironmentVariable(
-                "GZ_SIM_PLUGIN_PATH", PathJoinSubstitution([tidybot_pkg, "plugins"])
-            ),
-            DeclareLaunchArgument(
-                "use_rviz", default_value="true", description="Flag to enable RViz"
-            ),
-            DeclareLaunchArgument(
-                "base_mode",
-                default_value="position",
-                description='Base control mode: "position" for position control, "velocity" for velocity control',
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution([ros_gz_sim_pkg, "launch", "gz_sim.launch.py"])
-                ),
-                launch_arguments={"gz_args": "-r empty.sdf"}.items(),
-            ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution([tidybot_pkg, "launch", "display.launch.py"])
-                ),
-                launch_arguments={
-                    "robot_description_content": Command(
-                        [
-                            "xacro ",
-                            PathJoinSubstitution(
-                                [tidybot_pkg, "urdf", "tidybot.xacro"]
-                            ),
-                            " hardware_plugin:=gz_ros2_control/GazeboSimSystem",
-                        ]
-                    ),
-                    "use_sim_time": "true",
-                    "use_rviz": LaunchConfiguration("use_rviz"),
-                    "jsp_gui": "false",
-                }.items(),
-            ),
-            Node(
-                package="ros_gz_sim",
-                executable="create",
-                arguments=["-name", "tidybot", "-topic", "robot_description"],
-                output="screen",
-            ),
-            Node(
-                package="ros_gz_bridge",
-                executable="parameter_bridge",
-                parameters=[{"use_sim_time": True}],
-                arguments=[
-                    "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-                    "/world/empty/model/tidybot/joint_state@sensor_msgs/msg/JointState[gz.msgs.JointState",
-                ],
-                remappings=[
-                    ("/world/empty/model/tidybot/joint_state", "/joint_states"),
-                ],
-                output="screen",
-            ),
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                arguments=["joint_state_broadcaster"],
-                output="screen",
-            ),
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                arguments=["tidybot_base_pos_controller"],
-                output="screen",
-                condition=IfCondition(
-                    PythonExpression(
-                        ['"', LaunchConfiguration("base_mode"), '" == "position"']
-                    )
-                ),
-            ),
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                arguments=["tidybot_base_vel_controller"],
-                output="screen",
-                condition=IfCondition(
-                    PythonExpression(
-                        ['"', LaunchConfiguration("base_mode"), '" == "velocity"']
-                    )
-                ),
-            ),
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                arguments=["gen3_lite_controller"],
-                output="screen",
-            ),
-            Node(
-                package="controller_manager",
-                executable="spawner",
-                arguments=["gen3_lite_2f_controller"],
-                output="screen",
-            ),
-        ]
+    ld.add_action(
+        SetEnvironmentVariable(
+            "GZ_SIM_RESOURCE_PATH", PathJoinSubstitution([tidybot_pkg, "urdf"])
+        )
     )
+    ld.add_action(
+        SetEnvironmentVariable(
+            "GZ_SIM_SYSTEM_PLUGIN_PATH", "/opt/ros/jazzy/lib/"
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            "use_rviz", default_value="true", description="Flag to enable RViz"
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            "base_mode",
+            default_value="position",
+            description='Base control mode: "position" for position control, "velocity" for velocity control',
+        )
+    )
+    ld.add_action(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([ros_gz_sim_pkg, "launch", "gz_sim.launch.py"])
+            ),
+            launch_arguments={"gz_args": "-r empty.sdf"}.items(),
+        )
+    )
+    ld.add_action(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([tidybot_pkg, "launch", "display.launch.py"])
+            ),
+            launch_arguments={
+                "robot_description_content": Command(
+                    [
+                        "xacro ",
+                        PathJoinSubstitution([tidybot_pkg, "urdf", "tidybot.xacro"]),
+                        " hardware_plugin:=gz_ros2_control/GazeboSimSystem",
+                    ]
+                ),
+                "use_sim_time": "true",
+                "use_rviz": LaunchConfiguration("use_rviz"),
+                "jsp_gui": "false",
+            }.items(),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="ros_gz_sim",
+            executable="create",
+            arguments=["-name", "tidybot", "-topic", "robot_description"],
+            output="screen",
+        )
+    )
+    gz_topic = '/model/tidybot'
+    joint_state_gz_topic = '/world/empty' + gz_topic + '/joint_state'
+    link_pose_gz_topic = gz_topic + '/pose'
+    ld.add_action(
+        Node(
+            package="ros_gz_bridge",
+            executable="parameter_bridge",
+            parameters=[{"use_sim_time": True}],
+            arguments=[
+                "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
+                joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.JointState",
+                link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
+                link_pose_gz_topic + "_static@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
+            ],
+            remappings=[
+                (joint_state_gz_topic, "/joint_states"),
+                (link_pose_gz_topic, "/tf"),
+                (link_pose_gz_topic + "_static", "/tf_static"),
+            ],
+            output="screen",
+        )
+    )
+    ld.add_action(
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["joint_state_broadcaster"],
+            output="screen",
+        )
+    )
+    ld.add_action(
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["tidybot_base_pos_controller"],
+            output="screen",
+            condition=IfCondition(
+                PythonExpression(
+                    ['"', LaunchConfiguration("base_mode"), '" == "position"']
+                )
+            ),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["tidybot_base_vel_controller"],
+            output="screen",
+            condition=IfCondition(
+                PythonExpression(
+                    ['"', LaunchConfiguration("base_mode"), '" == "velocity"']
+                )
+            ),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["gen3_lite_controller"],
+            output="screen",
+        )
+    )
+    ld.add_action(
+        Node(
+            package="controller_manager",
+            executable="spawner",
+            arguments=["gen3_lite_2f_controller"],
+            output="screen",
+        )
+    )
+    return ld

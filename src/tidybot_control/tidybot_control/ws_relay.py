@@ -9,7 +9,7 @@ import numpy as np
 class WSRelay(Node):
     def __init__(self):
         super().__init__("ws_relay")
-        self.base_pub = self.create_publisher(Float64MultiArray, "/base_controller/command", 10)
+        self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         self.arm_pub = self.create_publisher(Float64MultiArray, "/arm_controller/command", 10)
         self.gripper_pub = self.create_publisher(
             Float64MultiArray, "/gripper_controller/command", 10
@@ -40,7 +40,9 @@ class WSRelay(Node):
 
     def ws_callback(self, msg):
         if msg.state_update:
-            self.state_pub.publish(msg.state_update)
+            state_command = String()
+            state_command.data = msg.state_update
+            self.state_pub.publish(state_command)
             self.get_logger().info(f"State update: {msg.state_update}")
             return
         else:
@@ -61,11 +63,11 @@ class WSRelay(Node):
                     )
                     euler = r.as_euler("xyz", degrees=False)
                     if self.base_xr_ref is None:
-                        self.base_xr_ref = np.array([msg.pos_x, msg.pos_z, euler[0]])
+                        self.base_xr_ref = np.array([msg.pos_x, msg.pos_z, euler[1]])
                         self.base_ref = self.base_obs.copy()
                 
                     base_command = Float64MultiArray()
-                    base_command.data = self.base_ref + (np.array([msg.pos_x, msg.pos_z, euler[0]]) - self.base_xr_ref)
+                    base_command.data = (self.base_ref + (np.array([msg.pos_x, msg.pos_z, euler[1]]) - self.base_xr_ref)).tolist()
                     self.base_pub.publish(base_command)
                     return
                 
