@@ -54,8 +54,8 @@ class WebServer:
         finally:
             s.close()
         print(f"Starting server at {address}:5000")
-        self.socketio.run(self.app, host="0.0.0.0")
-
+        self.socketio.run(self.app, host="0.0.0.0", allow_unsafe_werkzeug=True)
+        
 class WebServerPublisher(Node):
     def __init__(self, queue):
         super().__init__("ws_bridge_publisher")
