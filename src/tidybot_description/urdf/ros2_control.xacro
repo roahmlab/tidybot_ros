@@ -16,8 +16,11 @@
             <plugin>${hardware_plugin}</plugin>
         </hardware>
         <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_1" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_2" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_3" gain="0.1" cmd_interface="position"/>

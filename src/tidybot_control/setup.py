@@ -31,6 +31,7 @@ setup(
             'joint_states_listener = tidybot_control.joint_states_listener:main',
             'twist_to_multiarray = tidybot_control.twist_to_multiarray:main',
             'web_server_publisher = tidybot_control.web_server_publisher:main',
+            'ws_relay = tidybot_control.ws_relay:main',
         ],
     },
 )
