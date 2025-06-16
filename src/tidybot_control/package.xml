@@ -8,7 +8,6 @@
   <license>Apache 2License 2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
-  <!-- <buildtool_depend>ament_cmake</buildtool_depend> -->
   <build_depend>tidybot_msgs</build_depend>
   
   <test_depend>ament_copyright</test_depend>
