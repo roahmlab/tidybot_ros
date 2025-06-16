@@ -5,8 +5,10 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(moveit_ros_planning_interface REQUIRED)
 find_package(moveit_visual_tools REQUIRED)
+find_package(tidybot_msgs REQUIRED)
 
 add_executable(demo_plan src/demo_plan.cpp)
+add_executable(web_server_subscriber src/web_server_subscriber.cpp)
 
 target_include_directories(demo_plan PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -17,7 +19,13 @@ ament_target_dependencies(demo_plan
   "moveit_ros_planning_interface"
   "moveit_visual_tools")
 
-install(TARGETS demo_plan
+ament_target_dependencies(web_server_subscriber
+  "rclcpp"
+  "moveit_ros_planning_interface"
+  "moveit_visual_tools"
+  "tidybot_msgs")
+
+install(TARGETS demo_plan web_server_subscriber
   DESTINATION lib/${PROJECT_NAME})
 
 

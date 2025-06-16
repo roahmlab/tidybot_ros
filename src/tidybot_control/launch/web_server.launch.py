@@ -43,11 +43,11 @@ def generate_launch_description():
     )
 
     web_server_subscriber = Node(
-        package="tidybot_control",
+        package="tidybot_moveit_config",
         executable="web_server_subscriber",
         name="web_server_subscriber",
         output="screen",
-        parameters=[kinematics_config],
+        parameters=[{"robot_description_kinematics": kinematics_config}],
     )
 
     delayed_nodes = TimerAction(
