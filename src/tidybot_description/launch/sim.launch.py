@@ -66,6 +66,7 @@ def generate_launch_description():
                 ),
                 "use_sim_time": "true",
                 "use_rviz": LaunchConfiguration("use_rviz"),
+                "jsp": "false",
                 "jsp_gui": "false",
             }.items(),
         )
@@ -74,7 +75,13 @@ def generate_launch_description():
         Node(
             package="ros_gz_sim",
             executable="create",
-            arguments=["-name", "tidybot", "-topic", "robot_description"],
+            arguments=["-world", "empty", 
+                       "-entity", "tidybot", 
+                       "-topic", "robot_description",
+                       "-x", "0.0",
+                       "-y", "0.0",
+                       "-z", "0.0",
+                       "-Y", "0.0"],
             output="screen",
         )
     )
@@ -88,14 +95,8 @@ def generate_launch_description():
             parameters=[{"use_sim_time": True}],
             arguments=[
                 "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
-                joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.JointState",
+                joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.Model",
                 link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
-                link_pose_gz_topic + "_static@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
-            ],
-            remappings=[
-                (joint_state_gz_topic, "/joint_states"),
-                (link_pose_gz_topic, "/tf"),
-                (link_pose_gz_topic + "_static", "/tf_static"),
             ],
             output="screen",
         )
