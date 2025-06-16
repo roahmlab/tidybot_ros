@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+<xacro:macro name="load_gazebo_plugins" params="config_path">
+
+  <gazebo>
+      <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
+          <parameters>${config_path}</parameters>
+          <robot_description_param>robot_description</robot_description_param>
+      </plugin>
+      <self_collide>true</self_collide>
+  </gazebo>
+
+  <gazebo>
+    <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher"/>
+
+    <plugin
+        filename="ignition-gazebo-pose-publisher-system"
+        name="ignition::gazebo::systems::PosePublisher">
+        <publish_link_pose>true</publish_link_pose>
+
+        <use_pose_vector_msg>true</use_pose_vector_msg>
+    </plugin>
+
+  </gazebo>
+
+</xacro:macro>
+</robot>
