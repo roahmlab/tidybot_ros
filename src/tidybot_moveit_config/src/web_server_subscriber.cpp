@@ -15,13 +15,11 @@
 #include <moveit/kinematics_plugin_loader/kinematics_plugin_loader.hpp>
 
 using moveit::planning_interface::MoveGroupInterface;
+#include "sensor_msgs/msg/joint_state.hpp"
 
 class WebServerSubscriber : public rclcpp::Node {
     public:
     WebServerSubscriber() : Node("web_server_subscriber") {
-        base_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
-            "/base_controller/command", 1,
-            std::bind(&WebServerSubscriber::base_callback, this, std::placeholders::_1));
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/arm_controller/command", 1,
             std::bind(&WebServerSubscriber::arm_callback, this, std::placeholders::_1));
@@ -31,6 +29,11 @@ class WebServerSubscriber : public rclcpp::Node {
 
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_lite_controller/joint_trajectory", 10);
+
+        joint_state_pub = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
+        joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
+            "/joint_states", 1,
+            std::bind(&WebServerSubscriber::joint_state_callback, this, std::placeholders::_1));
     }
     
     void initialize_moveit() {
@@ -39,9 +42,9 @@ class WebServerSubscriber : public rclcpp::Node {
         robot_state = std::make_shared<moveit::core::RobotState>(robot_model);
         arm_joint_model_group = robot_model->getJointModelGroup("gen3_lite");
     }
-    
-    void base_callback(const geometry_msgs::msg::Pose &msg) {
-        return;
+
+    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
+        last_joint_state = *msg;
     }
 
     void arm_callback(const geometry_msgs::msg::Pose &msg)
@@ -62,6 +65,35 @@ class WebServerSubscriber : public rclcpp::Node {
         std::vector<double> joint_values;
         robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
         const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
+        
+        // // Preview
+        // sensor_msgs::msg::JointState joint_state_msg;
+        // joint_state_msg.header.stamp = this->now();
+        // joint_state_msg.name = joint_names;
+        // joint_state_msg.position = joint_values;
+
+        // std::vector<std::string> extra_joint_names = {
+        //     "joint_x", "joint_y", "joint_th", 
+        //     "left_finger_bottom_joint", "left_finger_tip_joint",
+        //     "right_finger_bottom_joint", "right_finger_tip_joint"
+        // };
+        // std::vector<double> extra_joint_positions = {
+        //     0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+        // };
+
+        // joint_state_msg.name.insert(
+        //     joint_state_msg.name.end(),
+        //     extra_joint_names.begin(),
+        //     extra_joint_names.end()
+        // );
+
+        // joint_state_msg.position.insert(
+        //     joint_state_msg.position.end(),
+        //     extra_joint_positions.begin(),
+        //     extra_joint_positions.end()
+        // );
+
+        // joint_state_pub->publish(joint_state_msg);
 
         // Create trajectory message
         trajectory_msgs::msg::JointTrajectory traj;
@@ -78,7 +110,7 @@ class WebServerSubscriber : public rclcpp::Node {
         // End point
         trajectory_msgs::msg::JointTrajectoryPoint end_point;
         end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.1);
+        end_point.time_from_start = rclcpp::Duration::from_seconds(0.5);
         traj.points.push_back(end_point);
 
         // Publish trajectory
@@ -95,12 +127,16 @@ class WebServerSubscriber : public rclcpp::Node {
     moveit::core::RobotStatePtr robot_state;
     rclcpp::Logger logger = rclcpp::get_logger("web_server_subscriber");
 
-    rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr base_subscriber_;
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float32>::SharedPtr gripper_subscriber_;
 
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub;
     const moveit::core::JointModelGroup* arm_joint_model_group;
+
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub;
+
+    sensor_msgs::msg::JointState last_joint_state;
 };
 
 int main(int argc, char * argv[]) {

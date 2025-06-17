@@ -15,22 +15,22 @@
         <hardware>
             <plugin>${hardware_plugin}</plugin>
         </hardware>
-        <xacro:add_joint name="joint_x" gain="50" cmd_interface="velocity"/>
-        <xacro:add_joint name="joint_x" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_y" gain="50" cmd_interface="velocity"/>
-        <xacro:add_joint name="joint_y" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_th" gain="50" cmd_interface="velocity"/>
-        <xacro:add_joint name="joint_th" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_1" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_2" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_3" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_4" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_5" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="joint_6" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="right_finger_bottom_joint" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="right_finger_tip_joint" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="left_finger_bottom_joint" gain="50" cmd_interface="position"/>
-        <xacro:add_joint name="left_finger_tip_joint" gain="50" cmd_interface="position"/>
+        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="velocity"/>
+        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_1" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_2" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_3" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_4" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_5" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="joint_6" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="right_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="right_finger_tip_joint" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="left_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
+        <xacro:add_joint name="left_finger_tip_joint" gain="0.1" cmd_interface="position"/>
         </ros2_control>
     </xacro:macro>
 

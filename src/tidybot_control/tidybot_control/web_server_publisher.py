@@ -44,8 +44,11 @@ class WebServer:
         logging.getLogger("werkzeug").setLevel(logging.WARNING)
         self.run()
         # Start the Flask server in a separate thread
-        threading.Thread(target=self.socketio.run, args=(self.app, "0.0.0.0"), daemon=True).start()
-
+        threading.Thread(
+            target=lambda: self.socketio.run(self.app, host="0.0.0.0", allow_unsafe_werkzeug=True),
+            daemon=True
+        ).start()
+        
     def run(self):
         # Get IP address
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

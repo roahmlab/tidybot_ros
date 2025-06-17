@@ -73,6 +73,7 @@ RUN sudo apt-get update && sudo apt-get upgrade -y && \
         ros-${ROS_DISTRO}-desktop \
         python3-colcon-common-extensions \
         python3-rosdep \
+        ros-${ROS_DISTRO}-tf-transformations \
         ros-${ROS_DISTRO}-ros2-control \
         ros-${ROS_DISTRO}-ros2-controllers \
         ros-${ROS_DISTRO}-joint-state-broadcaster \

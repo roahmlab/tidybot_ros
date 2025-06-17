@@ -14,7 +14,8 @@ import math
 class WSRelay(Node):
     def __init__(self):
         super().__init__("ws_relay")
-        self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
+        self.get_logger().info('Web server relay initialized')
+        self.base_pub = self.create_publisher(Float64MultiArray, "/base_controller/command", 10)
         self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
         self.gripper_pub = self.create_publisher(
             Float64MultiArray, "/gripper_controller/command", 10
@@ -32,7 +33,8 @@ class WSRelay(Node):
         # WebXR reference position
         self.base_xr_ref_pos = None
         self.base_xr_ref_quat = None
-        self.arm_xr_ref = None
+        self.arm_xr_ref_pos = None
+        self.arm_xr_ref_quat = None
 
         # Robot reference position
         self.base_ref = None
@@ -41,8 +43,13 @@ class WSRelay(Node):
 
         # Observed position
         self.base_obs = np.array([0.0, 0.0, 0.0])  # [x, y, theta]
-        self.arm_obs = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]) # [x, y, z, ]
+        self.arm_obs = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]) # [x, y, z, ]
         self.gripper_obs = []
+
+        # Publish frequency
+        self.last_publish_time = self.get_clock().now()
+        self.publish_interval = rclpy.duration.Duration(seconds=0.2)  # 10 Hz
+
 
     def ws_callback(self, msg):
         if msg.state_update:
@@ -83,41 +90,47 @@ class WSRelay(Node):
                             yaw + self.base_ref[2]
                         ]
                         self.base_pub.publish(command)
+                        return
 
-                        # t = TransformStamped()
-                        # t.header.frame_id = 'world'           # choose fixed parent
-                        # t.child_frame_id = 'quat_frame'        # will appear in RViz
-                        # t.transform.rotation = Quaternion(x=delta_quat[0],
-                        #                                   y=delta_quat[1],
-                        #                                   z=delta_quat[2],
-                        #                                   w=delta_quat[3])
-                        # t.transform.translation = Vector3(
-                        #     x=delta_pos[0] + self.base_ref[0],
-                        #     y=delta_pos[1] + self.base_ref[1],
-                        #     z=0.0
-                        # )
-                        # self.rc_br.sendTransform(t)
                 case "arm":
-                    if self.arm_xr_ref is None:
-                        self.arm_xr_ref = np.array([msg.pos_x, msg.pos_y, msg.pos_z, msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                    xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
+                    xr_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                    if self.arm_xr_ref_pos is None:
+                        self.arm_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
+                        self.arm_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
                         self.arm_ref = self.arm_obs.copy()
+                        self.r = R.from_quat(self.arm_xr_ref_quat)
+                    
+                    now = self.get_clock().now()
+                    if (now - self.last_publish_time) < self.publish_interval:
+                        return 
+                    self.last_publish_time = now
+
+                    # convert the incoming position and orientation wrt world frame to the wx_ref frame
+                    delta_quat = quaternion_multiply(
+                        quaternion_inverse(self.arm_xr_ref_quat),
+                        xr_quat
+                    )
+                    delta_pos =  xr_pos - self.arm_xr_ref_pos
+                    delta_pos = self.r.inv().apply(delta_pos)
+
                     arm_command = Pose()
-                    arm_command.position.x = self.arm_ref[0] + msg.pos_x - self.arm_xr_ref[0]
-                    arm_command.position.y = self.arm_ref[1] + msg.pos_y - self.arm_xr_ref[1]
-                    arm_command.position.z = self.arm_ref[2] + msg.pos_z - self.arm_xr_ref[2]
-                    arm_command.orientation.x = self.arm_ref[3] + msg.or_x - self.arm_xr_ref[3]
-                    arm_command.orientation.y = self.arm_ref[4] + msg.or_y - self.arm_xr_ref[4]
-                    arm_command.orientation.z = self.arm_ref[5] + msg.or_z - self.arm_xr_ref[5]
-                    arm_command.orientation.w = self.arm_ref[6] + msg.or_w - self.arm_xr_ref[6]
+                    arm_command.position.x = delta_pos[0] + self.arm_ref[0]
+                    arm_command.position.y = delta_pos[1] + self.arm_ref[1]
+                    arm_command.position.z = delta_pos[2] + self.arm_ref[2]
+                    arm_command.orientation.x = delta_quat[0] + self.arm_ref[3]
+                    arm_command.orientation.y = delta_quat[1] + self.arm_ref[4]
+                    arm_command.orientation.z = delta_quat[2] + self.arm_ref[5]
+                    arm_command.orientation.w = delta_quat[3] + self.arm_ref[6]
                     self.arm_pub.publish(arm_command)
                     return
-
 
         elif self.enable_counts[msg.device_id] == 0:
             self.base_xr_ref_pos = None
             self.base_xr_ref_quat = None
             self.base_ref = None
-            self.arm_xr_ref = None
+            self.arm_xr_ref_pos = None
+            self.arm_xr_ref_quat = None
             self.arm_ref = None
             self.gripper_xr_ref = None
             self.gripper_ref = None
@@ -129,7 +142,6 @@ class WSRelay(Node):
 
 def main():
     rclpy.init()
-
     ws_relay = WSRelay()
     rclpy.spin(ws_relay)
     ws_relay.destroy_node()
