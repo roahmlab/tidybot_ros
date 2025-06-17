@@ -18,6 +18,14 @@ def generate_launch_description():
 
     ld.add_action(
         DeclareLaunchArgument(
+            name="jsp",
+            default_value="true",
+            choices=["true", "false"],
+            description="Flag to enable joint_state_publisher",
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
             name="jsp_gui",
             default_value="true",
             choices=["true", "false"],
@@ -80,7 +88,7 @@ def generate_launch_description():
         Node(
             package="joint_state_publisher",
             executable="joint_state_publisher",
-            condition=UnlessCondition(LaunchConfiguration("jsp_gui")),
+            condition=IfCondition(LaunchConfiguration("jsp")),
         )
     )
 
@@ -98,7 +106,10 @@ def generate_launch_description():
             executable="rviz2",
             output="screen",
             arguments=["-d", LaunchConfiguration("rviz_config")],
-            condition=IfCondition(LaunchConfiguration("use_rviz"))
+            condition=IfCondition(LaunchConfiguration("use_rviz")),
+            parameters=[
+                {"use_sim_time": LaunchConfiguration("use_sim_time")},
+            ]
         )
     )
     return ld

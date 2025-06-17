@@ -26,6 +26,7 @@ class WebServer:
         )
         self.socketio = SocketIO(self.app)
         self.queue = queue
+        self.address = None
 
         @self.app.route("/")
         def index():
@@ -41,6 +42,9 @@ class WebServer:
 
         # Reduce verbose Flask log output
         logging.getLogger("werkzeug").setLevel(logging.WARNING)
+        self.run()
+        # Start the Flask server in a separate thread
+        threading.Thread(target=self.socketio.run, args=(self.app, "0.0.0.0"), daemon=True).start()
 
     def run(self):
         # Get IP address
@@ -48,32 +52,28 @@ class WebServer:
         s.settimeout(0)
         try:
             s.connect(("8.8.8.8", 1))
-            address = s.getsockname()[0]
+            self.address = s.getsockname()[0]
         except Exception:
-            address = "127.0.0.1"
+            self.address = "127.0.0.1"
         finally:
             s.close()
-        print(f"Starting server at {address}:5000")
-        self.socketio.run(self.app, host="0.0.0.0", allow_unsafe_werkzeug=True)
-        
+        print(f"Starting server at {self.address}:5000")
+
 class WebServerPublisher(Node):
     def __init__(self, queue):
         super().__init__("ws_bridge_publisher")
         self.pub = self.create_publisher(
             WSMsg, "/ws_commands", 10
         )
-        self.queue = queue
 
-        self._stop_event = threading.Event()
-        self.thread = threading.Thread(target=self._publish_loop)
-        self.thread.start()
+        self.queue = queue
+        self.create_timer(0.0001, self._publish_loop)
 
     def _publish_loop(self):
-        while rclpy.ok() and not self._stop_event.is_set():
             if not self.queue.empty():
                 data = self.queue.get()
             else:
-                continue
+                return
             msg = WSMsg()
             msg.timestamp = data["timestamp"]
             if "state_update" in data:
@@ -92,17 +92,6 @@ class WebServerPublisher(Node):
                 if "gripper_delta" in data:
                     msg.gripper_delta = float(data["gripper_delta"])
             self.pub.publish(msg)
-            self.get_logger().info(f"Published message: {msg.device_id} at {msg.timestamp}")
-
-
-    def stop(self):
-        self._stop_event.set()
-        self.thread.join()
-            
-
-    def destroy_node(self):
-        self.thread.join()
-        super().destroy_node()
 
 def main():
     rclpy.init()
@@ -112,15 +101,11 @@ def main():
     web_server_publisher = WebServerPublisher(queue)
 
     webserver = WebServer(queue)
+    web_server_publisher.get_logger().info(f"Web server publisher node started at {webserver.address}:5000")
 
-    try:
-        webserver.run()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        web_server_publisher.stop()
-        web_server_publisher.destroy_node()
-        rclpy.shutdown()
+    rclpy.spin(web_server_publisher)
+    web_server_publisher.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == "__main__":
     main()

@@ -2,7 +2,7 @@
 
 <robot name="ros2_control" xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_ros2_control" params="config_path hardware_plugin">
+    <xacro:macro name="load_ros2_control" params="hardware_plugin">
         <xacro:macro name="add_joint" params="name gain cmd_interface">
             <joint name="${name}">
                 <command_interface name="${cmd_interface}"/>
@@ -32,14 +32,6 @@
         <xacro:add_joint name="left_finger_bottom_joint" gain="50" cmd_interface="position"/>
         <xacro:add_joint name="left_finger_tip_joint" gain="50" cmd_interface="position"/>
         </ros2_control>
-
-        <gazebo>
-            <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
-                <parameters>${config_path}</parameters>
-                <robot_description_param>robot_description</robot_description_param>
-            </plugin>
-            <self_collide>true</self_collide>
-        </gazebo>
     </xacro:macro>
 
 </robot>
