@@ -26,6 +26,7 @@ class WebServer:
         )
         self.socketio = SocketIO(self.app)
         self.queue = queue
+        self.address = None
 
         @self.app.route("/")
         def index():
@@ -41,7 +42,9 @@ class WebServer:
 
         # Reduce verbose Flask log output
         logging.getLogger("werkzeug").setLevel(logging.WARNING)
-        threading.Thread(target=self.run, daemon=True).start()
+        self.run()
+        # Start the Flask server in a separate thread
+        threading.Thread(target=self.socketio.run, args=(self.app, "0.0.0.0"), daemon=True).start()
 
     def run(self):
         # Get IP address
@@ -49,13 +52,12 @@ class WebServer:
         s.settimeout(0)
         try:
             s.connect(("8.8.8.8", 1))
-            address = s.getsockname()[0]
+            self.address = s.getsockname()[0]
         except Exception:
-            address = "127.0.0.1"
+            self.address = "127.0.0.1"
         finally:
             s.close()
-        print(f"Starting server at {address}:5000")
-        self.socketio.run(self.app, host="0.0.0.0")
+        print(f"Starting server at {self.address}:5000")
 
 class WebServerPublisher(Node):
     def __init__(self, queue):
@@ -99,6 +101,7 @@ def main():
     web_server_publisher = WebServerPublisher(queue)
 
     webserver = WebServer(queue)
+    web_server_publisher.get_logger().info(f"Web server publisher node started at {webserver.address}:5000")
 
     rclpy.spin(web_server_publisher)
     web_server_publisher.destroy_node()
