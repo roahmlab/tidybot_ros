@@ -3,8 +3,12 @@ from rclpy.node import Node
 from std_msgs.msg import Float64MultiArray, String
 from tidybot_msgs.msg import WSMsg
 from sensor_msgs.msg import JointState
+from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
 from scipy.spatial.transform import Rotation as R
+from tf_transformations import quaternion_multiply, quaternion_inverse
+from tf2_ros import TransformBroadcaster
 import numpy as np
+import math
 
 class WSRelay(Node):
     def __init__(self):
@@ -14,6 +18,7 @@ class WSRelay(Node):
         self.gripper_pub = self.create_publisher(
             Float64MultiArray, "/gripper_controller/command", 10
         )
+        self.rc_br = TransformBroadcaster(self)
         self.state_pub = self.create_publisher(String, "/ws_state", 10)
         self.ws_sub = self.create_subscription(
             WSMsg, "/ws_commands", self.ws_callback, 10
@@ -24,7 +29,8 @@ class WSRelay(Node):
         self.enable_counts = {}
 
         # WebXR reference position
-        self.base_xr_ref = None
+        self.base_xr_ref_pos = None
+        self.base_xr_ref_quat = None
         self.arm_xr_ref = None
 
         # Robot reference position
@@ -53,26 +59,48 @@ class WSRelay(Node):
         if self.enable_counts[msg.device_id] > 2:
             match msg.teleop_mode:
                 case "base":
-                    r = R.from_quat(
-                        [
-                            msg.or_x,
-                            msg.or_y,
-                            msg.or_z,
-                            msg.or_w,
-                        ]
-                    )
-                    euler = r.as_euler("xyz", degrees=False)
-                    if self.base_xr_ref is None:
-                        self.base_xr_ref = np.array([msg.pos_x, msg.pos_z, euler[1]])
+                    xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
+                    xr_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                    if self.base_xr_ref_pos is None:
+                        self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
+                        self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
                         self.base_ref = self.base_obs.copy()
-                
-                    base_command = Float64MultiArray()
-                    base_command.data = (self.base_ref + (np.array([msg.pos_x, msg.pos_z, euler[1]]) - self.base_xr_ref)).tolist()
-                    self.base_pub.publish(base_command)
-                    return
-                
+                        self.r = R.from_quat(self.base_xr_ref_quat)
+                    else:
+                        # convert the incoming position and orientation wrt world frame to the wx_ref frame
+                        delta_quat = quaternion_multiply(
+                            quaternion_inverse(self.base_xr_ref_quat),
+                            xr_quat
+                        )
+                        delta_pos =  xr_pos - self.base_xr_ref_pos
+                        delta_pos = self.r.inv().apply(delta_pos)
+                        yaw = math.atan2(2 * (delta_quat[3] * delta_quat[2] + delta_quat[0] * delta_quat[1]),
+                                         delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
+                        command = Float64MultiArray()
+                        command.data = [
+                            delta_pos[0] + self.base_ref[0],
+                            delta_pos[1] + self.base_ref[1],
+                            yaw + self.base_ref[2]
+                        ]
+                        self.base_pub.publish(command)
+
+                        # t = TransformStamped()
+                        # t.header.frame_id = 'world'           # choose fixed parent
+                        # t.child_frame_id = 'quat_frame'        # will appear in RViz
+                        # t.transform.rotation = Quaternion(x=delta_quat[0],
+                        #                                   y=delta_quat[1],
+                        #                                   z=delta_quat[2],
+                        #                                   w=delta_quat[3])
+                        # t.transform.translation = Vector3(
+                        #     x=delta_pos[0] + self.base_ref[0],
+                        #     y=delta_pos[1] + self.base_ref[1],
+                        #     z=0.0
+                        # )
+                        # self.rc_br.sendTransform(t)
+
         elif self.enable_counts[msg.device_id] == 0:
-            self.base_xr_ref = None
+            self.base_xr_ref_pos = None
+            self.base_xr_ref_quat = None
             self.base_ref = None
             self.arm_xr_ref = None
             self.arm_ref = None

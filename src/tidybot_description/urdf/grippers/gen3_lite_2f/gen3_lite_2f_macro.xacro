@@ -35,7 +35,7 @@
           <color rgba="0.803 0.824 0.820 1" />
         </material>
       </visual>
-      <!-- TODO: replace with simplified mesh -->
+      <!-- Need to be replaced with simplified mesh -->
       <!-- <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
