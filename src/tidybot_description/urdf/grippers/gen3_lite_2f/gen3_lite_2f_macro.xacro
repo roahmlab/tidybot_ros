@@ -35,12 +35,13 @@
           <color rgba="0.803 0.824 0.820 1" />
         </material>
       </visual>
-      <collision>
+      <!-- Need to be replaced with simplified mesh -->
+      <!-- <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <mesh filename="file://$(find tidybot_description)/meshes/grippers/gen3_lite_2f/gripper_base_link.STL" />
         </geometry>
-      </collision>
+      </collision> -->
     </link>
     <gazebo reference="${prefix}gripper_base_link">
       <material>Gazebo/Gray</material>
@@ -61,12 +62,12 @@
           <color rgba="0.803 0.824 0.820 1" />
       </material>
     </visual>
-    <collision>
+    <!-- <collision>
       <origin xyz="0 0 0" rpy="0 0 0" />
       <geometry>
         <mesh filename="file://$(find tidybot_description)/meshes/grippers/gen3_lite_2f/right_finger_prox_link.STL" />
       </geometry>
-    </collision>
+    </collision> -->
     </link>
     <gazebo reference="${prefix}right_finger_prox_link">
       <material>Gazebo/Gray</material>
@@ -101,12 +102,12 @@
           <color rgba="0 0.055 0.525 1" />
         </material>
       </visual>
-      <collision>
+      <!-- <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <mesh filename="file://$(find tidybot_description)/meshes/grippers/gen3_lite_2f/right_finger_dist_link.STL" />
         </geometry>
-      </collision>
+      </collision> -->
     </link>
     <gazebo reference="${prefix}right_finger_dist_link">
       <material>Gazebo/Blue</material>
@@ -143,12 +144,12 @@
           <color rgba="0.803 0.824 0.820 1" />
         </material>
       </visual>
-      <collision>
+      <!-- <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <mesh filename="file://$(find tidybot_description)/meshes/grippers/gen3_lite_2f/left_finger_prox_link.STL" />
         </geometry>
-      </collision>
+      </collision> -->
     </link>
     <gazebo reference="${prefix}left_finger_prox_link">
       <material>Gazebo/Gray</material>
@@ -184,12 +185,12 @@
           <color rgba="0 0.055 0.525 1" />
         </material>
       </visual>
-      <collision>
+      <!-- <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
           <mesh filename="file://$(find tidybot_description)/meshes/grippers/gen3_lite_2f/left_finger_dist_link.STL" />
         </geometry>
-      </collision>
+      </collision> -->
     </link>
     <gazebo reference="${prefix}left_finger_dist_link">
       <material>Gazebo/Blue</material>

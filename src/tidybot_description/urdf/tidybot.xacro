@@ -14,6 +14,11 @@
     <xacro:load_bot arm="$(arg arm)" gripper="$(arg gripper)" vision="$(arg vision)" prefix="$(arg prefix)" />
 
     <!-- configure ros2_control joints -->
-    <xacro:include filename="$(find tidybot_description)/urdf/ros2_control.xacro" />
-    <xacro:load_ros2_control config_path="$(arg ros2_control_config_path)" hardware_plugin="$(arg hardware_plugin)" />
+    <xacro:include filename="$(find tidybot_description)/urdf/tidybot.ros2_control.xacro" />
+    <xacro:load_ros2_control hardware_plugin="$(arg hardware_plugin)" />
+
+    <!-- load gazebo plugins -->
+    <xacro:include filename="$(find tidybot_description)/urdf/tidybot.gazebo.xacro" />
+    <xacro:load_gazebo_plugins config_path="$(arg ros2_control_config_path)" />
+
 </robot>
