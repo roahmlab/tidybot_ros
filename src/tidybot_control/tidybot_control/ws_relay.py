@@ -50,7 +50,6 @@ class WSRelay(Node):
             state_command = String()
             state_command.data = msg.state_update
             self.state_pub.publish(state_command)
-            self.get_logger().info(f"State update: {msg.state_update}")
             return
         else:
             self.enable_counts[msg.device_id] = (
