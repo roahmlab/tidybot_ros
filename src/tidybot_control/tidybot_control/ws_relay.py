@@ -34,7 +34,8 @@ class WSRelay(Node):
         self.arm_xr_ref = None
 
         # Robot reference position
-        self.base_ref = None
+        self.base_ref_pos = None
+        self.base_ref_quat = None
         self.arm_ref = None
         self.gripper_ref = None
 
@@ -64,8 +65,10 @@ class WSRelay(Node):
                     if self.base_xr_ref_pos is None:
                         self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
                         self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
-                        self.base_ref = self.base_obs.copy()
-                        self.r = R.from_quat(self.base_xr_ref_quat)
+                        self.base_ref_pos = np.array([self.base_obs[0], self.base_obs[1], 0.0])
+                        self.base_ref_quat = np.array([0.0, 0.0, self.base_obs[2], 1.0])
+                        self.xr_ref_r = R.from_quat(self.base_xr_ref_quat)
+                        self.base_re_r =  R.from_quat(self.base_ref_quat)
                     else:
                         # convert the incoming position and orientation wrt world frame to the wx_ref frame
                         delta_quat = quaternion_multiply(
@@ -73,14 +76,15 @@ class WSRelay(Node):
                             xr_quat
                         )
                         delta_pos =  xr_pos - self.base_xr_ref_pos
-                        delta_pos = self.r.inv().apply(delta_pos)
+                        delta_pos = self.xr_ref_r.inv().apply(delta_pos)
+                        delta_pos = self.base_re_r.apply(delta_pos)
                         yaw = math.atan2(2 * (delta_quat[3] * delta_quat[2] + delta_quat[0] * delta_quat[1]),
                                          delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
                         command = Float64MultiArray()
                         command.data = [
-                            delta_pos[0] + self.base_ref[0],
-                            delta_pos[1] + self.base_ref[1],
-                            yaw + self.base_ref[2]
+                            delta_pos[0] + self.base_ref_pos[0],
+                            delta_pos[1] + self.base_ref_pos[1],
+                            yaw + self.base_ref_quat[2]
                         ]
                         self.base_pub.publish(command)
 
@@ -101,7 +105,8 @@ class WSRelay(Node):
         elif self.enable_counts[msg.device_id] == 0:
             self.base_xr_ref_pos = None
             self.base_xr_ref_quat = None
-            self.base_ref = None
+            self.base_ref_pos = None
+            self.base_ref_quat = None
             self.arm_xr_ref = None
             self.arm_ref = None
             self.gripper_xr_ref = None
