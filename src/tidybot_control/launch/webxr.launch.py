@@ -19,7 +19,14 @@ def generate_launch_description():
         name='ws_relay',
     )
 
+    state_controller = Node(
+        package='tidybot_control',
+        executable='state_controller',
+        name='state_controller',
+    )
+
     return LaunchDescription([
         ws_publisher,
         ws_relay,
+        state_controller
     ])
