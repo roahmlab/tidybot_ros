@@ -37,29 +37,22 @@ def generate_launch_description():
 
     web_server_relay = Node(
         package="tidybot_control",
-        executable="web_server_relay",
-        name="web_server_relay",
+        executable="ws_relay",
+        name="ws_relay",
         output="screen",
     )
 
-    web_server_subscriber = Node(
+    web_server_moveit = Node(
         package="tidybot_moveit_config",
-        executable="web_server_subscriber",
-        name="web_server_subscriber",
+        executable="web_server_moveit",
+        name="web_server_moveit",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
     )
 
-    delayed_nodes = TimerAction(
-        period=5.0,
-        actions=[
-            web_server_publisher,
-            web_server_relay,
-            web_server_subscriber
-        ]
-    )
-
     return LaunchDescription([
         moveit_launch,
-        delayed_nodes
+        web_server_publisher,
+        web_server_relay,
+        web_server_moveit
     ])

@@ -1,4 +1,5 @@
 #include <memory>
+#include <cmath>
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
@@ -17,15 +18,16 @@
 using moveit::planning_interface::MoveGroupInterface;
 #include "sensor_msgs/msg/joint_state.hpp"
 
-class WebServerSubscriber : public rclcpp::Node {
+class WebServerMoveit : public rclcpp::Node {
     public:
-    WebServerSubscriber() : Node("web_server_subscriber") {
+    WebServerMoveit() : Node("web_server_subscriber") {
+        sensitivity = 0.03; // Incoming pose must not be within 3cm of previous pose
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/arm_controller/command", 1,
-            std::bind(&WebServerSubscriber::arm_callback, this, std::placeholders::_1));
+            std::bind(&WebServerMoveit::arm_callback, this, std::placeholders::_1));
         gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float32>(
             "/gripper_controller/command", 1,
-            std::bind(&WebServerSubscriber::gripper_callback, this, std::placeholders::_1));
+            std::bind(&WebServerMoveit::gripper_callback, this, std::placeholders::_1));
 
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_lite_controller/joint_trajectory", 10);
@@ -33,7 +35,7 @@ class WebServerSubscriber : public rclcpp::Node {
         joint_state_pub = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 1,
-            std::bind(&WebServerSubscriber::joint_state_callback, this, std::placeholders::_1));
+            std::bind(&WebServerMoveit::joint_state_callback, this, std::placeholders::_1));
     }
     
     void initialize_moveit() {
@@ -47,10 +49,24 @@ class WebServerSubscriber : public rclcpp::Node {
         last_joint_state = *msg;
     }
 
+    float pose_distance(const geometry_msgs::msg::Pose &pose1, const geometry_msgs::msg::Pose &pose2) {
+        return sqrt(pow(pose1.position.x - pose2.position.x, 2) + 
+                    pow(pose1.position.y - pose2.position.y, 2) + 
+                    pow(pose1.position.z - pose2.position.z, 2));
+    }
+
     void arm_callback(const geometry_msgs::msg::Pose &msg)
     {
+        if (pose_distance(last_pose, msg) < sensitivity) {
+            return;
+        }
+
         // Get current robot state
-        robot_state->setToDefaultValues();
+        std::map<std::string, double> joint_position_map;
+        for (size_t i = 0; i < last_joint_state.name.size(); ++i) {
+            joint_position_map[last_joint_state.name[i]] = last_joint_state.position[i];
+        }
+        robot_state->setVariablePositions(joint_position_map);
         robot_state->update();
 
         // Perform IK
@@ -61,12 +77,14 @@ class WebServerSubscriber : public rclcpp::Node {
             return;
         }
 
+        last_pose = msg; // Update to most recent valid pose
+
         // Extract joint values
         std::vector<double> joint_values;
         robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
         const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
         
-        // // Preview
+        // // Preview calculated IK
         // sensor_msgs::msg::JointState joint_state_msg;
         // joint_state_msg.header.stamp = this->now();
         // joint_state_msg.name = joint_names;
@@ -110,7 +128,7 @@ class WebServerSubscriber : public rclcpp::Node {
         // End point
         trajectory_msgs::msg::JointTrajectoryPoint end_point;
         end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.5);
+        end_point.time_from_start = rclcpp::Duration::from_seconds(0.05);
         traj.points.push_back(end_point);
 
         // Publish trajectory
@@ -136,12 +154,15 @@ class WebServerSubscriber : public rclcpp::Node {
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub;
 
+    geometry_msgs::msg::Pose last_pose;
     sensor_msgs::msg::JointState last_joint_state;
+
+    float sensitivity;
 };
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<WebServerSubscriber>();
+    auto node = std::make_shared<WebServerMoveit>();
     node->initialize_moveit();
     rclcpp::spin(node);
     rclcpp::shutdown();

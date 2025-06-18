@@ -48,7 +48,7 @@ class WSRelay(Node):
 
         # Publish frequency
         self.last_publish_time = self.get_clock().now()
-        self.publish_interval = rclpy.duration.Duration(seconds=0.2)  # 10 Hz
+        self.publish_interval = rclpy.duration.Duration(seconds=0.05)  # 40 Hz
 
 
     def ws_callback(self, msg):
@@ -128,7 +128,8 @@ class WSRelay(Node):
         elif self.enable_counts[msg.device_id] == 0:
             self.base_xr_ref_pos = None
             self.base_xr_ref_quat = None
-            self.base_ref = None
+            self.base_ref_pos = None
+            self.base_ref_quat = None
             self.arm_xr_ref_pos = None
             self.arm_xr_ref_quat = None
             self.arm_ref = None
