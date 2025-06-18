@@ -97,6 +97,7 @@ def generate_launch_description():
                 "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                 joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.Model",
                 link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
+                "/world/empty/control@ros_gz_interfaces/srv/ControlWorld",
             ],
             output="screen",
         )
