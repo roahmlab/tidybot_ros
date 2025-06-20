@@ -158,6 +158,24 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
+    - Name: Visual Pose
+      Class: rviz_default_plugins/Pose
+      Enabled: true
+      Topic:
+        Value: /visual_pose
+      Alpha: 1
+      Arrow Color: 255; 25; 0
+      Shaft Radius: 0.02
+      Head Radius: 0.05
+      Shaft Length: 0.1
+      Head Length: 0.05
+      Position Tolerance: 0.01
+      Angle Tolerance: 0.01
+      Queue Size: 10
+      History Length: 1
+      Unreliable: false
+      Axes Length: 0.3
+      Axes Radius: 0.01
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48

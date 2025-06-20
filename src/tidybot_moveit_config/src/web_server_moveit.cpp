@@ -21,7 +21,11 @@ using moveit::planning_interface::MoveGroupInterface;
 class WebServerMoveit : public rclcpp::Node {
     public:
     WebServerMoveit() : Node("web_server_subscriber") {
-        sensitivity = 0.03; // Incoming pose must not be within 3cm of previous pose
+        sensitivity = 0.01; // Incoming pose must not be within 1cm of previous pose
+        options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
+        options.lock_redundant_joints = false;
+        options.return_approximate_solution = true;
+
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/arm_controller/command", 1,
             std::bind(&WebServerMoveit::arm_callback, this, std::placeholders::_1));
@@ -32,6 +36,8 @@ class WebServerMoveit : public rclcpp::Node {
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_lite_controller/joint_trajectory", 10);
 
+        // Debugging
+        pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
         joint_state_pub = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 1,
@@ -55,8 +61,28 @@ class WebServerMoveit : public rclcpp::Node {
                     pow(pose1.position.z - pose2.position.z, 2));
     }
 
+    void publish_pose_visual(const geometry_msgs::msg::Pose &pose)
+    {
+        auto msg = geometry_msgs::msg::PoseStamped();
+
+        msg.header.stamp = this->get_clock()->now();
+        msg.header.frame_id = "world";
+
+        msg.pose.position.x = pose.position.x;
+        msg.pose.position.y = pose.position.y;
+        msg.pose.position.z = pose.position.z;
+
+        msg.pose.orientation.x = pose.orientation.x;
+        msg.pose.orientation.y = pose.orientation.y;
+        msg.pose.orientation.z = pose.orientation.z;
+        msg.pose.orientation.w = pose.orientation.w;
+
+        pose_visual_pub->publish(msg);
+    }
+
     void arm_callback(const geometry_msgs::msg::Pose &msg)
     {
+        this->publish_pose_visual(msg);
         if (pose_distance(last_pose, msg) < sensitivity) {
             return;
         }
@@ -70,7 +96,10 @@ class WebServerMoveit : public rclcpp::Node {
         robot_state->update();
 
         // Perform IK
-        bool found_ik = robot_state->setFromIK(arm_joint_model_group, msg);
+        bool found_ik = robot_state->setFromIK(
+            arm_joint_model_group, msg, 0.1, 
+            moveit::core::GroupStateValidityCallbackFn(), options
+        );
 
         if (!found_ik) {
             RCLCPP_WARN(rclcpp::get_logger("arm_callback"), "IK solution not found");
@@ -153,11 +182,13 @@ class WebServerMoveit : public rclcpp::Node {
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_visual_pub;
 
     geometry_msgs::msg::Pose last_pose;
     sensor_msgs::msg::JointState last_joint_state;
 
     float sensitivity;
+    kinematics::KinematicsQueryOptions options;
 };
 
 int main(int argc, char * argv[]) {
