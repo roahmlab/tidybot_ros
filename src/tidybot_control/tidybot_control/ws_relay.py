@@ -7,6 +7,7 @@ from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import quaternion_multiply, quaternion_inverse
+import tf2_ros
 from tf2_ros import TransformBroadcaster
 import numpy as np
 import math
@@ -15,12 +16,13 @@ class WSRelay(Node):
     def __init__(self):
         super().__init__("ws_relay")
         self.get_logger().info('Web server relay initialized')
-        self.base_pub = self.create_publisher(Float64MultiArray, "/base_controller/command", 10)
+        self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
-        self.gripper_pub = self.create_publisher(
-            Float64MultiArray, "/gripper_controller/command", 10
-        )
+        self.gripper_pub = self.create_publisher(Float64MultiArray, "/gripper_controller/command", 10)
         self.rc_br = TransformBroadcaster(self)
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+
         self.state_pub = self.create_publisher(String, "/ws_state", 10)
         self.ws_sub = self.create_subscription(
             WSMsg, "/ws_commands", self.ws_callback, 10
@@ -39,12 +41,14 @@ class WSRelay(Node):
         # Robot reference position
         self.base_ref_pos = None
         self.base_ref_quat = None
-        self.arm_ref = None
+        self.arm_ref_pos = None
+        self.arm_ref_quat = None
         self.gripper_ref = None
 
         # Observed position
         self.base_obs = np.array([0.0, 0.0, 0.0])  # [x, y, theta]
-        self.arm_obs = np.array([0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]) # [x, y, z, ]
+        self.arm_obs_pos = [0.0, 0.0, 1.0]
+        self.arm_obs_quat = R.from_quat([0.0, 0.0, 0.0, 1.0])
         self.gripper_obs = []
 
         # Publish frequency
@@ -64,10 +68,11 @@ class WSRelay(Node):
             )
 
         if self.enable_counts[msg.device_id] > 2:
+            xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
+            xr_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+
             match msg.teleop_mode:
                 case "base":
-                    xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
-                    xr_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
                     if self.base_xr_ref_pos is None:
                         self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
                         self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
@@ -85,7 +90,7 @@ class WSRelay(Node):
                         delta_pos = self.xr_ref_r.inv().apply(delta_pos)
                         delta_pos = self.base_re_r.apply(delta_pos)
                         yaw = math.atan2(2 * (delta_quat[3] * delta_quat[2] + delta_quat[0] * delta_quat[1]),
-                                         delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
+                                            delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
                         command = Float64MultiArray()
                         command.data = [
                             delta_pos[0] + self.base_ref_pos[0],
@@ -96,35 +101,44 @@ class WSRelay(Node):
                         return
 
                 case "arm":
-                    xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
-                    xr_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                    xr_pos, xr_quat = convert_webxr_pose(xr_pos, xr_quat)
+
+                    # Store reference poses
                     if self.arm_xr_ref_pos is None:
-                        self.arm_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
-                        self.arm_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
-                        self.arm_ref = self.arm_obs.copy()
-                        self.r = R.from_quat(self.arm_xr_ref_quat)
-                    
+                        self.arm_xr_ref_pos = xr_pos
+                        self.arm_xr_ref_rot_inv = xr_quat.inv()
+                        self.arm_ref_pos = self.arm_obs_pos.copy()
+                        self.arm_ref_quat = self.arm_obs_quat
+                        self.arm_ref_base_pose = self.base_obs.copy()
+
+                    # Throttle publishing frequency
                     now = self.get_clock().now()
                     if (now - self.last_publish_time) < self.publish_interval:
                         return 
                     self.last_publish_time = now
 
-                    # convert the incoming position and orientation wrt world frame to the wx_ref frame
-                    delta_quat = quaternion_multiply(
-                        quaternion_inverse(self.arm_xr_ref_quat),
-                        xr_quat
-                    )
-                    delta_pos =  xr_pos - self.arm_xr_ref_pos
-                    delta_pos = self.r.inv().apply(delta_pos)
+                    # Rotations around z-axis to go between global frame (base) and local frame (arm)
+                    z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.base_obs[2])
+                    z_rot_inv = z_rot.inv()
+                    ref_z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.arm_ref_base_pose[2])
+
+                    # Position
+                    pos_diff = xr_pos - self.arm_xr_ref_pos  # WebXR
+                    pos_diff += ref_z_rot.apply(self.arm_ref_pos) - z_rot.apply(self.arm_ref_pos)  # Secondary base control: Compensate for base rotation
+                    pos_diff[:2] += self.arm_ref_base_pose[:2] - self.base_obs[:2]  # Secondary base control: Compensate for base translation
+                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff)
+
+                    # Orientation
+                    arm_target_quat = (z_rot_inv * (xr_quat * self.arm_xr_ref_rot_inv) * ref_z_rot) * self.arm_ref_quat
 
                     arm_command = Pose()
-                    arm_command.position.x = delta_pos[0] + self.arm_ref[0]
-                    arm_command.position.y = delta_pos[1] + self.arm_ref[1]
-                    arm_command.position.z = delta_pos[2] + self.arm_ref[2]
-                    arm_command.orientation.x = delta_quat[0] + self.arm_ref[3]
-                    arm_command.orientation.y = delta_quat[1] + self.arm_ref[4]
-                    arm_command.orientation.z = delta_quat[2] + self.arm_ref[5]
-                    arm_command.orientation.w = delta_quat[3] + self.arm_ref[6]
+                    arm_command.position.x = arm_target_pos[0]
+                    arm_command.position.y = arm_target_pos[1]
+                    arm_command.position.z = arm_target_pos[2]
+                    arm_command.orientation.x, \
+                    arm_command.orientation.y, \
+                    arm_command.orientation.z, \
+                    arm_command.orientation.w = arm_target_quat.as_quat()
                     self.arm_pub.publish(arm_command)
                     return
 
@@ -136,13 +150,44 @@ class WSRelay(Node):
             self.arm_xr_ref_pos = None
             self.arm_xr_ref_quat = None
             self.arm_ref = None
-            self.gripper_xr_ref = None
-            self.gripper_ref = None
 
     def joint_states_callback(self, msg):
         self.base_obs[0] = msg.position[msg.name.index("joint_x")]
         self.base_obs[1] = msg.position[msg.name.index("joint_y")]
         self.base_obs[2] = msg.position[msg.name.index("joint_th")]
+
+        # Forward kinematics to find end effector position
+        try:
+            transform = self.tf_buffer.lookup_transform(
+                target_frame="world",
+                source_frame="end_effector_link",
+                time=rclpy.time.Time(),    
+                timeout=rclpy.duration.Duration(seconds=0.5)
+            )
+
+            # Position
+            t = transform.transform.translation
+            self.arm_obs_pos = [t.x, t.y, t.z]
+
+            # Orientation
+            q = transform.transform.rotation
+            self.arm_obs_quat = R.from_quat([q.x, q.y, q.z, q.w])
+
+        except tf2_ros.LookupException as e:
+            self.get_logger().warn(f"Transform not found: {e}")
+
+
+DEVICE_CAMERA_OFFSET = np.array([0.0, 0.085, -0.12])  # iPad
+
+def convert_webxr_pose(pos, quat):
+    # WebXR: +x right, +y up, +z back; Robot: +x forward, +y left, +z up
+    pos = np.array([-pos[2], -pos[0], pos[1]], dtype=np.float64)
+    rot = R.from_quat([-quat[2], -quat[0], quat[1], quat[3]])
+    
+    # Apply offset so that rotations are around device center instead of device camera
+    pos = pos + rot.apply(DEVICE_CAMERA_OFFSET)
+
+    return pos, rot
 
 def main():
     rclpy.init()
