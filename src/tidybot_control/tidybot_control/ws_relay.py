@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
-from std_msgs.msg import Float64MultiArray, String
+from std_msgs.msg import Float64, Float64MultiArray, String
 from tidybot_msgs.msg import WSMsg
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
@@ -18,7 +18,8 @@ class WSRelay(Node):
         self.get_logger().info('Web server relay initialized')
         self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
-        self.gripper_pub = self.create_publisher(Float64MultiArray, "/gripper_controller/command", 10)
+        self.gripper_pub = self.create_publisher(Float64, "/gripper_controller/command", 10)
+
         self.rc_br = TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -49,7 +50,7 @@ class WSRelay(Node):
         self.base_obs = np.array([0.0, 0.0, 0.0])  # [x, y, theta]
         self.arm_obs_pos = [0.0, 0.0, 1.0]
         self.arm_obs_quat = R.from_quat([0.0, 0.0, 0.0, 1.0])
-        self.gripper_obs = []
+        self.gripper_obs = 0
 
         # Publish frequency
         self.last_publish_time = self.get_clock().now()
@@ -110,6 +111,7 @@ class WSRelay(Node):
                         self.arm_ref_pos = self.arm_obs_pos.copy()
                         self.arm_ref_quat = self.arm_obs_quat
                         self.arm_ref_base_pose = self.base_obs.copy()
+                        self.gripper_ref = self.gripper_obs
 
                     # Throttle publishing frequency
                     now = self.get_clock().now()
@@ -140,6 +142,11 @@ class WSRelay(Node):
                     arm_command.orientation.z, \
                     arm_command.orientation.w = arm_target_quat.as_quat()
                     self.arm_pub.publish(arm_command)
+
+                    gripper_command = Float64()
+                    gripper_command.data = np.clip(self.gripper_ref + msg.gripper_delta, 0, 1.0)
+                    self.gripper_obs = gripper_command.data
+                    self.gripper_pub.publish(gripper_command)
                     return
 
         elif self.enable_counts[msg.device_id] == 0:
@@ -149,7 +156,9 @@ class WSRelay(Node):
             self.base_ref_quat = None
             self.arm_xr_ref_pos = None
             self.arm_xr_ref_quat = None
-            self.arm_ref = None
+            self.arm_ref_pos = None
+            self.arm_ref_quat = None
+            self.gripper_ref = None
 
     def joint_states_callback(self, msg):
         self.base_obs[0] = msg.position[msg.name.index("joint_x")]

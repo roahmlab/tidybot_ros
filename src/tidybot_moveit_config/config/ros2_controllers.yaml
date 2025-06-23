@@ -32,6 +32,9 @@ gen3_lite_2f_controller:
   ros__parameters:
     joints: 
       - right_finger_bottom_joint
+      - right_finger_tip_joint
+      - left_finger_bottom_joint
+      - left_finger_tip_joint
     command_interfaces:
       - position
     state_interfaces:
