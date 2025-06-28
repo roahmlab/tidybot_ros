@@ -7,9 +7,9 @@
   <gazebo>
       <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
           <parameters>${config_path}</parameters>
-          <robot_description_param>robot_description</robot_description_param>
+          <!-- <robot_description_param>robot_description</robot_description_param> -->
       </plugin>
-      <self_collide>true</self_collide>
+      <!-- <self_collide>true</self_collide> -->
   </gazebo>
 
   <gazebo>

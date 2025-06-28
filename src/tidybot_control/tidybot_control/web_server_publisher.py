@@ -6,7 +6,7 @@ from queue import Queue
 import threading
 import rclpy
 from rclpy.node import Node
-from tidybot_msgs.msg import WSMsg
+from tidybot_utils.msg import WSMsg
 import json
 
 import os

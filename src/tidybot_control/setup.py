@@ -19,7 +19,7 @@ setup(
     install_requires=['setuptools',
                       'flask',
                       'flask_socketio',
-                      'tidybot_msgs'],
+                      'tidybot_utils'],
     zip_safe=True,
     maintainer='janchen',
     maintainer_email='janchen@umich.edu',
@@ -33,6 +33,7 @@ setup(
             'web_server_publisher = tidybot_control.web_server_publisher:main',            
             'ws_relay = tidybot_control.ws_relay:main',
             'state_controller = tidybot_control.state_controller:main',
+            'reset_env = tidybot_control.reset_env:main',
         ],
     },
 )
