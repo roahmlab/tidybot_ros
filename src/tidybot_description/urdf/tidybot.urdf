@@ -15,66 +15,66 @@
     <visual name="bumper">
       <origin rpy="-2.442021632452952 -1.5707963267948966 0.0" xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
     <collision name="bumper">
       <origin rpy="-2.442021632452952 -1.5707963267948966 0.0" xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
       </geometry>
     </collision>
     <visual name="bottom_plate">
       <origin rpy="1.6659662035857206 -1.5707963267948966 0.0" xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
     <collision name="bottom_plate">
       <origin rpy="1.6659662035857206 -1.5707963267948966 0.0" xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
       </geometry>
     </collision>
     <visual name="body">
       <origin rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793" xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
     <collision name="body">
       <origin rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793" xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
       </geometry>
     </collision>
     <visual name="top_plate">
       <origin rpy="1.6906681075416252 -1.5707963267948966 0.0" xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
     <collision name="top_plate">
       <origin rpy="1.6906681075416252 -1.5707963267948966 0.0" xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
       </geometry>
     </collision>
     <visual name="arm_plate">
       <origin rpy="1.5707963267948966 -1.5707963267948966 0.0" xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
       </geometry>
       <material name="white"/>
     </visual>
     <collision name="arm_plate">
       <origin rpy="1.5707963267948966 -1.5707963267948966 0.0" xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
       </geometry>
     </collision>
   </link>
@@ -168,7 +168,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/base_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/base_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -177,7 +177,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/base_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/base_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -193,7 +193,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/shoulder_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/shoulder_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -202,7 +202,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/shoulder_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/shoulder_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -233,7 +233,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/arm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/arm_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -242,7 +242,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/arm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/arm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -273,7 +273,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/forearm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/forearm_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -282,7 +282,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/forearm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/forearm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -313,7 +313,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/lower_wrist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/lower_wrist_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -322,7 +322,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/lower_wrist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/lower_wrist_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -353,7 +353,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/upper_wrist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/upper_wrist_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -362,7 +362,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/upper_wrist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_lite/upper_wrist_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -424,7 +424,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/gripper_base_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/gripper_base_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -450,7 +450,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/right_finger_prox_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/right_finger_prox_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -490,7 +490,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/right_finger_dist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/right_finger_dist_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0 0.055 0.525 1"/>
@@ -532,7 +532,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/left_finger_prox_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/left_finger_prox_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.803 0.824 0.820 1"/>
@@ -573,7 +573,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/left_finger_dist_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/meshes/grippers/gen3_lite_2f/left_finger_dist_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0 0.055 0.525 1"/>
@@ -709,7 +709,7 @@
   </ros2_control>
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>/home/yuandi/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
+      <parameters>/home/janchen/Documents/ros2/tidybot_ws/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
       <robot_description_param>robot_description</robot_description_param>
     </plugin>
     <self_collide>true</self_collide>

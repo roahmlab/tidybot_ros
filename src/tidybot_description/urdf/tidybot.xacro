@@ -1,7 +1,8 @@
 <?xml version="1.0"?>
 
 <robot name="tidybot" xmlns:xacro="http://ros.org/wiki/xacro">
-    <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem" />
+    <!-- <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem" />     -->
+    <xacro:arg name="hardware_plugin" default="gz_ros2_control/GazeboSimSystem" />
     <xacro:arg name="arm" default="gen3_lite" />
     <xacro:arg name="gripper" default="gen3_lite_2f" />
     <xacro:arg name="vision" default="false" />

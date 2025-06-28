@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tidybot_msgs</name>
+  <name>tidybot_utils</name>
   <version>0.0.0</version>
-  <description>Tidybot messages</description>
+  <description>Tidybot message and service utilities</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <license>TODO: License declaration</license>
 

@@ -11,7 +11,7 @@
                 <param name="position_proportional_gain">${gain}</param>
             </joint>
         </xacro:macro>
-        <ros2_control name="GazeboSystem" type="system">
+        <ros2_control name="TidybotSystem" type="system">
         <hardware>
             <plugin>${hardware_plugin}</plugin>
         </hardware>

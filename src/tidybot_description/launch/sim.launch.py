@@ -16,7 +16,6 @@ from launch.substitutions import (
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition, UnlessCondition
 
-
 def generate_launch_description():
     ld = LaunchDescription()
     ros_gz_sim_pkg = FindPackageShare("ros_gz_sim")
@@ -98,6 +97,7 @@ def generate_launch_description():
                 joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.Model",
                 link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
                 "/world/empty/control@ros_gz_interfaces/srv/ControlWorld",
+                "/world/empty/create@ros_gz_interfaces/srv/SpawnEntity",
             ],
             output="screen",
         )

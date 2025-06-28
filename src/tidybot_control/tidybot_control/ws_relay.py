@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Float64, Float64MultiArray, String
-from tidybot_msgs.msg import WSMsg
+from tidybot_utils.msg import WSMsg
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
 from scipy.spatial.transform import Rotation as R
