@@ -2,7 +2,7 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-<xacro:macro name="load_gazebo_plugins" params="config_path">
+<xacro:macro name="load_gazebo_plugins" params="config_path prefix arm">
 
   <gazebo>
       <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
@@ -24,6 +24,9 @@
     </plugin>
 
   </gazebo>
+
+  <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_transmission.xacro" />
+  <xacro:load_arm_transmission prefix="${prefix}" />
 
 </xacro:macro>
 </robot>
