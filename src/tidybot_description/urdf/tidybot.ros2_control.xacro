@@ -2,7 +2,7 @@
 
 <robot name="ros2_control" xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_ros2_control" params="hardware_plugin">
+    <xacro:macro name="load_ros2_control" params="hardware_plugin arm">
         <xacro:macro name="add_joint" params="name gain cmd_interface">
             <joint name="${name}">
                 <command_interface name="${cmd_interface}"/>
@@ -27,6 +27,11 @@
         <xacro:add_joint name="joint_4" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_5" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="joint_6" gain="0.1" cmd_interface="position"/>
+
+        <xacro:if value="${arm == 'gen3_7dof'}">
+            <xacro:add_joint name="joint_7" gain="0.1" cmd_interface="position"/>
+        </xacro:if>
+
         <xacro:add_joint name="right_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="right_finger_tip_joint" gain="0.1" cmd_interface="position"/>
         <xacro:add_joint name="left_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
