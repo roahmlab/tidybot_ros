@@ -96,7 +96,7 @@ class StateController(Node):
                 "controller_manager",
                 [],
                 [name],
-                strictness=SwitchController.Request.STRICT,
+                strict=SwitchController.Request.STRICT,
                 activate_asap=True,
                 timeout=5.0,
             )
