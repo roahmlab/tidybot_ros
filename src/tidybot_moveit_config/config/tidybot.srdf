@@ -17,6 +17,7 @@
         <joint name="joint_5"/>
         <joint name="joint_6"/>
         <joint name="joint_7"/>
+        <joint name="end_effector"/>
     </group>
     <group name="gen3_lite_2f">
         <joint name="right_finger_bottom_joint"/>
