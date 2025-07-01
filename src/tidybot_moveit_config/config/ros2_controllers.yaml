@@ -3,16 +3,18 @@ controller_manager:
   ros__parameters:
     update_rate: 100  # Hz
 
-    # joint_state_broadcaster:
-    #   type: joint_state_broadcaster/JointStateBroadcaster
-
-    gen3_lite_controller:
+    gen3_7dof_controller:
       type: joint_trajectory_controller/JointTrajectoryController
+
 
     gen3_lite_2f_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-gen3_lite_controller:
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+gen3_7dof_controller:
   ros__parameters:
     joints:
       - joint_1
@@ -21,16 +23,16 @@ gen3_lite_controller:
       - joint_4
       - joint_5
       - joint_6
+      - joint_7
     command_interfaces:
       - position
     state_interfaces:
       - position
       - velocity
     allow_nonzero_velocity_at_trajectory_end: true
-
 gen3_lite_2f_controller:
   ros__parameters:
-    joints: 
+    joints:
       - right_finger_bottom_joint
       - right_finger_tip_joint
       - left_finger_bottom_joint

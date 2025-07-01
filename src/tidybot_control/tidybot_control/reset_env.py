@@ -96,7 +96,7 @@ class StateController(Node):
                 "controller_manager",
                 [],
                 [name],
-                strictness=SwitchController.Request.STRICT,
+                strict=SwitchController.Request.STRICT,
                 activate_asap=True,
                 timeout=5.0,
             )
@@ -140,7 +140,7 @@ def main(args=None):
             [
                 "joint_state_broadcaster",
                 "tidybot_base_pos_controller",
-                "gen3_lite_controller",
+                "gen3_7dof_controller",
                 "gen3_lite_2f_controller",
             ]
         )

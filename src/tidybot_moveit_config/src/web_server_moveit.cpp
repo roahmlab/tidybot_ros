@@ -33,7 +33,7 @@ class WebServerMoveit : public rclcpp::Node {
             "/gripper_controller/command", 1,
             std::bind(&WebServerMoveit::publish_gripper, this, std::placeholders::_1));
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            "/gen3_lite_controller/joint_trajectory", 10);
+            "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_lite_2f_controller/joint_trajectory", 10);
 
@@ -49,7 +49,7 @@ class WebServerMoveit : public rclcpp::Node {
         robot_model_loader::RobotModelLoader robot_model_loader(shared_from_this(), "robot_description");
         robot_model = robot_model_loader.getModel();
         robot_state = std::make_shared<moveit::core::RobotState>(robot_model);
-        arm_joint_model_group = robot_model->getJointModelGroup("gen3_lite");
+        arm_joint_model_group = robot_model->getJointModelGroup("gen3_7dof");
         gripper_joint_model_group = robot_model->getJointModelGroup("gen3_lite_2f");
     }
 
