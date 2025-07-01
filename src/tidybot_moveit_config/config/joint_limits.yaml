@@ -11,55 +11,55 @@ joint_limits:
   joint_1:
     has_velocity_limits: true
     max_velocity: 1.3963000000000001
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_2:
     has_velocity_limits: true
     max_velocity: 1.3963000000000001
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_3:
     has_velocity_limits: true
     max_velocity: 1.3963000000000001
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_4:
     has_velocity_limits: true
     max_velocity: 1.3963000000000001
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_5:
     has_velocity_limits: true
     max_velocity: 1.2218
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_6:
     has_velocity_limits: true
     max_velocity: 1.2218
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   joint_7:
     has_velocity_limits: true
     max_velocity: 1.2218
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   left_finger_bottom_joint:
     has_velocity_limits: true
     max_velocity: 1000.0
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   left_finger_tip_joint:
     has_velocity_limits: true
     max_velocity: 1000.0
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   right_finger_bottom_joint:
     has_velocity_limits: true
     max_velocity: 1000.0
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
   right_finger_tip_joint:
     has_velocity_limits: true
     max_velocity: 1000.0
-    has_acceleration_limits: false
-    max_acceleration: 0
+    has_acceleration_limits: true
+    max_acceleration: 0.8
