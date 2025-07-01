@@ -12,7 +12,7 @@ controller_manager:
     tidybot_base_pos_controller:
       type: position_controllers/JointGroupPositionController
 
-    gen3_lite_controller:
+    gen3_7dof_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
     gen3_lite_2f_controller:
@@ -47,8 +47,8 @@ tidybot_base_pos_controller:
     state_publish_rate: 50
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
-    
-gen3_lite_controller:
+
+gen3_7dof_controller:
   ros__parameters:
     joints:
       - joint_1
@@ -57,6 +57,7 @@ gen3_lite_controller:
       - joint_4
       - joint_5
       - joint_6
+      - joint_7
     command_interfaces:
       - position
     state_interfaces:

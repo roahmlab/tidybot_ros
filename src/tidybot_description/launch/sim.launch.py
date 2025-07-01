@@ -140,7 +140,7 @@ def generate_launch_description():
         Node(
             package="controller_manager",
             executable="spawner",
-            arguments=["gen3_lite_controller"],
+            arguments=["gen3_7dof_controller"],
             output="screen",
         )
     )

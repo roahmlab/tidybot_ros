@@ -57,18 +57,10 @@ def generate_launch_description():
         parameters=[{"robot_description_kinematics": kinematics_config}],
     )
 
-    reset_env_server = Node(
-        package="tidybot_control",
-        executable="reset_env",
-        name="reset_env_server",
-        output="screen",
-    )
-
     return LaunchDescription([
         moveit_launch,
         web_server_publisher,
         web_server_relay,
         state_controller,
         web_server_moveit,
-        reset_env_server,
     ])
