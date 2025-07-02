@@ -18,14 +18,6 @@ def generate_launch_description():
 
     ld.add_action(
         DeclareLaunchArgument(
-            name="jsp",
-            default_value="true",
-            choices=["true", "false"],
-            description="Flag to enable joint_state_publisher",
-        )
-    )
-    ld.add_action(
-        DeclareLaunchArgument(
             name="jsp_gui",
             default_value="true",
             choices=["true", "false"],
@@ -62,14 +54,6 @@ def generate_launch_description():
         )
     )
 
-    ld.add_action(
-        DeclareLaunchArgument(
-            name="use_rviz",
-            default_value="true",
-            description="Flag to enable RViz"
-        )
-    )
-
     # need to manually pass configuration in because of https://github.com/ros2/launch/issues/313
     ld.add_action(
         IncludeLaunchDescription(
@@ -84,13 +68,6 @@ def generate_launch_description():
     )
 
     # Depending on gui parameter, either launch joint_state_publisher or joint_state_publisher_gui
-    ld.add_action(
-        Node(
-            package="joint_state_publisher",
-            executable="joint_state_publisher",
-            condition=IfCondition(LaunchConfiguration("jsp")),
-        )
-    )
 
     ld.add_action(
         Node(
@@ -102,11 +79,18 @@ def generate_launch_description():
 
     ld.add_action(
         Node(
+            package="joint_state_publisher",
+            executable="joint_state_publisher",
+            condition=UnlessCondition(LaunchConfiguration("jsp_gui")),
+        )
+    )
+
+    ld.add_action(
+        Node(
             package="rviz2",
             executable="rviz2",
             output="screen",
             arguments=["-d", LaunchConfiguration("rviz_config")],
-            condition=IfCondition(LaunchConfiguration("use_rviz")),
             parameters=[
                 {"use_sim_time": LaunchConfiguration("use_sim_time")},
             ]

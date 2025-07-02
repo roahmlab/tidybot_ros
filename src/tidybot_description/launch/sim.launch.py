@@ -20,6 +20,9 @@ def generate_launch_description():
     ld = LaunchDescription()
     ros_gz_sim_pkg = FindPackageShare("ros_gz_sim")
     tidybot_pkg = FindPackageShare("tidybot_description")
+    default_rviz_config_path = PathJoinSubstitution(
+        [tidybot_pkg, "config", "tidybot.rviz"]
+    )
     ld.add_action(
         SetEnvironmentVariable(
             "GZ_SIM_RESOURCE_PATH", PathJoinSubstitution([tidybot_pkg, "urdf"])
@@ -30,9 +33,17 @@ def generate_launch_description():
             "GZ_SIM_SYSTEM_PLUGIN_PATH", "/opt/ros/jazzy/lib/"
         )
     )
+    # if use rviz for visualization
     ld.add_action(
         DeclareLaunchArgument(
             "use_rviz", default_value="true", description="Flag to enable RViz"
+        )
+    )
+    ld.add_action(
+        DeclareLaunchArgument(
+            name="rviz_config",
+            default_value=default_rviz_config_path,
+            description="Absolute path to rviz config file",
         )
     )
     ld.add_action(
@@ -50,10 +61,11 @@ def generate_launch_description():
             launch_arguments={"gz_args": "-r empty.sdf"}.items(),
         )
     )
+    # launch the robot description
     ld.add_action(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                PathJoinSubstitution([tidybot_pkg, "launch", "display.launch.py"])
+                PathJoinSubstitution([tidybot_pkg, "launch", "description.launch.py"])
             ),
             launch_arguments={
                 "robot_description_content": Command(
@@ -64,12 +76,36 @@ def generate_launch_description():
                     ]
                 ),
                 "use_sim_time": "true",
-                "use_rviz": LaunchConfiguration("use_rviz"),
-                "jsp": "false",
-                "jsp_gui": "false",
             }.items(),
         )
     )
+    ld.add_action(
+        Node(
+            package="tidybot_description",
+            executable="tf_relay",
+            name="tf_relay",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        )
+    )
+    # launch rviz if enabled
+    ld.add_action(
+        Node(
+            package="rviz2",
+            executable="rviz2",
+            output="screen",
+            arguments=["-d", LaunchConfiguration("rviz_config")],
+            parameters=[
+                {"use_sim_time": True},
+            ],
+            remappings=[
+                ("/tf", "/tf_relay"),
+                ("/tf_static", "/tf_static_relay"),
+            ],
+            condition=IfCondition(LaunchConfiguration("use_rviz"))
+        )
+    )
+
     ld.add_action(
         Node(
             package="ros_gz_sim",

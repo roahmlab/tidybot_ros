@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from ros_gz_interfaces.msg import WorldReset, WorldControl, Entity, EntityFactory
+from std_srvs.srv import Empty
+from ros_gz_interfaces.msg import WorldReset, WorldControl, EntityFactory
 from ros_gz_interfaces.srv import ControlWorld, SpawnEntity
 from controller_manager_msgs.srv import SwitchController
 from ament_index_python.packages import get_package_share_directory
@@ -24,20 +25,26 @@ outpath.write_text(urdf_xml, encoding="utf-8")
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
-        self.reset_service = self.create_client(ControlWorld, "/world/empty/control")
-        self.spawn_service = self.create_client(SpawnEntity, "/world/empty/create")
-        while not self.reset_service.wait_for_service(timeout_sec=1.0):
+        self.reset_world_cli = self.create_client(ControlWorld, "/world/empty/control")
+        self.spawn_tidybot_cli = self.create_client(SpawnEntity, "/world/empty/create")
+        self.reset_time_cli = self.create_client(Empty, "/rviz/reset_time")
+        while not self.reset_world_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
-                f"Waiting for {self.reset_service} service to become available..."
+                f"Waiting for {self.reset_world_cli} service to become available..."
             )
-        self.get_logger().info(f"Connected to {self.reset_service}")
-        while not self.spawn_service.wait_for_service(timeout_sec=1.0):
+        self.get_logger().info(f"Connected to {self.reset_world_cli}")
+        while not self.spawn_tidybot_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
-                f"Waiting for {self.spawn_service} service to become available..."
+                f"Waiting for {self.spawn_tidybot_cli} service to become available..."
             )
-        self.get_logger().info(f"Connected to {self.spawn_service}")
+        self.get_logger().info(f"Connected to {self.spawn_tidybot_cli}")
+        while not self.reset_time_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(
+                f"Waiting for {self.reset_time_cli} service to become available..."
+            )
+        self.get_logger().info(f"Connected to {self.reset_time_cli}")
 
-    def reset_and_pause(self):
+    def reset_world(self):
         self.get_logger().info("Resetting world...")
         request = ControlWorld.Request()
         control = WorldControl()
@@ -46,7 +53,7 @@ class StateController(Node):
         control.reset = reset
         control.pause = True
         request.world_control = control
-        future = self.reset_service.call_async(request)
+        future = self.reset_world_cli.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.done():
             try:
@@ -57,7 +64,7 @@ class StateController(Node):
         else:
             self.get_logger().error("Service call did not complete")
 
-    def spawn(self):
+    def spawn_tidybot(self):
         self.get_logger().info("Spawning tidybot...")
         request = SpawnEntity.Request()
         entity = EntityFactory()
@@ -65,7 +72,7 @@ class StateController(Node):
         entity.allow_renaming = True
         entity.sdf_filename = robot_description_path + "/urdf/tidybot.urdf"
         request.entity_factory = entity
-        future = self.spawn_service.call_async(request)
+        future = self.spawn_tidybot_cli.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.done():
             try:
@@ -105,22 +112,32 @@ class StateController(Node):
             else:
                 self.get_logger().info(f"Controller {name} switched successfully")
 
-    def unpause(self):
+    def unpause_world(self):
         self.get_logger().info("Unpausing world...")
         request = ControlWorld.Request()
         control = WorldControl()
         control.pause = False
         request.world_control = control
-        future = self.reset_service.call_async(request)
+        future = self.reset_world_cli.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.done():
             try:
                 res = future.result()
-                self.get_logger().info(f"Result: {res}")
-                if res:
-                    self.get_logger().info("World unpaused successfully")
-                else:
-                    self.get_logger().error("Failed to unpause world")
+                self.get_logger().info(f"World unpaused: {res}")
+            except Exception as e:
+                self.get_logger().error(f"Service call failed: {e}")
+        else:
+            self.get_logger().error("Service call did not complete")
+
+    def reset_time(self):
+        self.get_logger().info("Resetting time...")
+        request = Empty.Request()
+        future = self.reset_time_cli.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.done():
+            try:
+                res = future.result()
+                self.get_logger().info(f"Time reset result: {res}")
             except Exception as e:
                 self.get_logger().error(f"Service call failed: {e}")
         else:
@@ -131,11 +148,13 @@ def main(args=None):
     rclpy.init(args=args)
     node = StateController()
     try:
-        node.reset_and_pause()
+        # TODO: replace sleep with a more robust wait mechanism
+        node.reset_world()
         time.sleep(1)  # Wait a moment before spawning
-        node.spawn()
+        node.spawn_tidybot()
         time.sleep(5)  # Wait a moment before spawning controllers
-        node.unpause()
+        # node.reset_time()
+        node.unpause_world()
         node.spawn_controllers(
             [
                 "joint_state_broadcaster",
