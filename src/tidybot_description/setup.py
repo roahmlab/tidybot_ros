@@ -34,6 +34,7 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
+            'tf_relay = tidybot_description.tf_relay:main',
         ],
     },
 )

@@ -12,7 +12,7 @@
       <!-- <self_collide>true</self_collide> -->
   </gazebo>
 
-  <gazebo>
+  <!-- <gazebo>
     <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher"/>
 
     <plugin
@@ -23,7 +23,7 @@
         <use_pose_vector_msg>true</use_pose_vector_msg>
     </plugin>
 
-  </gazebo>
+  </gazebo> -->
 
   <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_transmission.xacro" />
   <xacro:load_arm_transmission prefix="${prefix}" />
