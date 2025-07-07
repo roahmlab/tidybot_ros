@@ -3,8 +3,8 @@
 # by @sethgi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-IMAGE_TAG=tidybot_ws
-CONTAINER_NAME=tidybot_ws
+IMAGE_TAG=tidybot_platform
+CONTAINER_NAME=tidybot_platform
 DATA_DIR=/home/$(whoami)/data
 
 capabilities_str=\""capabilities=compute,utility,graphics,display\""
@@ -14,7 +14,7 @@ DOCKER_OPTIONS=""
 DOCKER_OPTIONS+="-it "
 DOCKER_OPTIONS+="-e DISPLAY=$DISPLAY "
 DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix "
-DOCKER_OPTIONS+="-v $SCRIPT_DIR/../:/home/$(whoami)/$(basename $(readlink -f $SCRIPT_DIR/../)) "
+DOCKER_OPTIONS+="-v $(realpath $SCRIPT_DIR/../):/home/${USER_NAME}/$(basename $(realpath $SCRIPT_DIR/../)) "
 DOCKER_OPTIONS+="-v $HOME/.Xauthority:/home/$(whoami)/.Xauthority "
 DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/data "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
