@@ -27,7 +27,12 @@ class StateController(Node):
         super().__init__("state_controller")
         self.reset_world_cli = self.create_client(ControlWorld, "/world/empty/control")
         self.spawn_tidybot_cli = self.create_client(SpawnEntity, "/world/empty/create")
-        self.reset_time_cli = self.create_client(Empty, "/rviz/reset_time")
+        self.reset_tf_buffer_cli = self.create_client(
+            Empty, "/reset_tf_buffer"
+        )
+        self.reset_time_cli = self.create_client(
+            Empty, "/rviz/reset_time"
+        )
         while not self.reset_world_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info(
                 f"Waiting for {self.reset_world_cli} service to become available..."
@@ -38,7 +43,12 @@ class StateController(Node):
                 f"Waiting for {self.spawn_tidybot_cli} service to become available..."
             )
         self.get_logger().info(f"Connected to {self.spawn_tidybot_cli}")
-        while not self.reset_time_cli.wait_for_service(timeout_sec=1.0):
+        while not self.reset_tf_buffer_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info(
+                f"Waiting for {self.reset_tf_buffer_cli} service to become available..."
+            )
+        self.get_logger().info(f"Connected to {self.reset_tf_buffer_cli}")
+        while not self.reset_time_cli.wait_for_service(timeout_sec=1.0):    
             self.get_logger().info(
                 f"Waiting for {self.reset_time_cli} service to become available..."
             )
@@ -129,15 +139,29 @@ class StateController(Node):
         else:
             self.get_logger().error("Service call did not complete")
 
+    def reset_tf_buffer(self):
+        self.get_logger().info("Resetting TF buffer...")
+        request = Empty.Request()
+        future = self.reset_tf_buffer_cli.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.done():
+            try:
+                res = future.result()
+                self.get_logger().info("TF buffer reset successfully")
+            except Exception as e:
+                self.get_logger().error(f"Service call failed: {e}")
+        else:
+            self.get_logger().error("Service call did not complete")
+
     def reset_time(self):
-        self.get_logger().info("Resetting time...")
+        self.get_logger().info("Resetting time in RViz...")
         request = Empty.Request()
         future = self.reset_time_cli.call_async(request)
         rclpy.spin_until_future_complete(self, future)
         if future.done():
             try:
                 res = future.result()
-                self.get_logger().info(f"Time reset result: {res}")
+                self.get_logger().info("Time reset successfully")
             except Exception as e:
                 self.get_logger().error(f"Service call failed: {e}")
         else:
@@ -150,6 +174,8 @@ def main(args=None):
     try:
         # TODO: replace sleep with a more robust wait mechanism
         node.reset_world()
+        node.reset_tf_buffer()
+        node.reset_time()
         time.sleep(1)  # Wait a moment before spawning
         node.spawn_tidybot()
         time.sleep(5)  # Wait a moment before spawning controllers

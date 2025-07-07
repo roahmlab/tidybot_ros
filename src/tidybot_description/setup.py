@@ -13,7 +13,7 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch/', glob('launch/*')),
-        ('share/' + package_name + '/urdf/', ['urdf/tidybot.xacro', 'urdf/bot.xacro', 'urdf/tidybot.ros2_control.xacro', 'urdf/tidybot.gazebo.xacro']),
+        ('share/' + package_name + '/urdf/', ['urdf/tidybot.xacro', 'urdf/bot.xacro', 'urdf/tidybot.ros2_control.xacro', 'urdf/tidybot.gazebo.xacro', 'urdf/tidybot.urdf']),
         ('share/' + package_name + '/urdf/base/', glob('urdf/base/*')),
         ('share/' + package_name + '/urdf/arms/gen3_lite/', glob('urdf/arms/gen3_lite/*')),
         ('share/' + package_name + '/urdf/arms/gen3_7dof/', glob('urdf/arms/gen3_7dof/*')),

@@ -26,11 +26,18 @@ def generate_launch_description():
         description='Use simulation time if true'
     )
 
+    ignore_timestamp = DeclareLaunchArgument(
+        'ignore_timestamp',
+        default_value='false',
+        description='Ignore timestamp in robot state publisher if true'
+    )
+
     robot_state_publisher_node = Node(package='robot_state_publisher',
                                       executable='robot_state_publisher',
                                       parameters=[{
                                           'robot_description': LaunchConfiguration('robot_description'),
-                                          'use_sim_time': LaunchConfiguration('use_sim_time')
+                                          'use_sim_time': LaunchConfiguration('use_sim_time'),
+                                          'ignore_timestamp': LaunchConfiguration('ignore_timestamp')
                                       }],)
 
     ld.add_action(use_sim_time)

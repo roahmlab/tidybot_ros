@@ -1,5 +1,10 @@
 import rclpy
+import rclpy.exceptions
 from rclpy.node import Node
+from rclpy.clock import JumpThreshold
+from rclpy.time import Time
+from rclpy.duration import Duration
+from rclpy.logging import LoggingSeverity
 from geometry_msgs.msg import Pose
 from std_msgs.msg import Float64, Float64MultiArray, String
 from tidybot_utils.msg import WSMsg
@@ -11,6 +16,7 @@ import tf2_ros
 from tf2_ros import TransformBroadcaster
 import numpy as np
 import math
+import gc
 
 class WSRelay(Node):
     def __init__(self):
@@ -32,6 +38,13 @@ class WSRelay(Node):
             JointState, "/joint_states", self.joint_states_callback, 10
         )
         self.enable_counts = {}
+
+        self.clock = self.get_clock()
+
+        threshold = JumpThreshold(min_forward=None,
+                                  min_backward=Duration(seconds=-1),
+                                  on_clock_change=True)
+        self.jump_handle = self.clock.create_jump_callback(threshold, post_callback=self.time_jump_callback)
 
         # WebXR reference position
         self.base_xr_ref_pos = None
@@ -184,6 +197,18 @@ class WSRelay(Node):
 
         except tf2_ros.LookupException as e:
             self.get_logger().warn(f"Transform not found: {e}")
+
+    def time_jump_callback(self, time: Time):
+        # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
+        self.destroy_subscription(self.tf_listener.tf_sub)
+        self.destroy_subscription(self.tf_listener.tf_static_sub)
+        del self.tf_listener
+        del self.tf_buffer
+        gc.collect()
+        # Clear both dynamic and static entries
+        self.tf_buffer = tf2_ros.Buffer()
+        self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
+        self.get_logger().info('TF buffer reset')
 
 
 DEVICE_CAMERA_OFFSET = np.array([0.0, 0.085, -0.12])  # iPad

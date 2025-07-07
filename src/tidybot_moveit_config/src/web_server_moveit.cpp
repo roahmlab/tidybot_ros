@@ -20,7 +20,7 @@ using moveit::planning_interface::MoveGroupInterface;
 
 class WebServerMoveit : public rclcpp::Node {
     public:
-    WebServerMoveit() : Node("web_server_subscriber") {
+    WebServerMoveit() : Node("web_server_moveit") {
         sensitivity = 0.01; // Incoming end effector position must not be within 1cm of previous pose
         options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
         options.lock_redundant_joints = false;
@@ -201,7 +201,7 @@ class WebServerMoveit : public rclcpp::Node {
     private:
     moveit::core::RobotModelPtr robot_model;
     moveit::core::RobotStatePtr robot_state;
-    rclcpp::Logger logger = rclcpp::get_logger("web_server_subscriber");
+    rclcpp::Logger logger = rclcpp::get_logger("web_server_moveit");
 
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_subscriber_;
