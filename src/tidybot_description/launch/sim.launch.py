@@ -76,6 +76,7 @@ def generate_launch_description():
                     ]
                 ),
                 "use_sim_time": "true",
+                "ignore_timestamp": "true",
             }.items(),
         )
     )

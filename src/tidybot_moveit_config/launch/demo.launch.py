@@ -32,11 +32,11 @@ def generate_launch_description():
                     str(launch_package_path / "launch/move_group.launch.py")
                 )
             ),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    str(launch_package_path / "launch/moveit_rviz.launch.py")
-                )
-            )
+            # IncludeLaunchDescription(
+            #     PythonLaunchDescriptionSource(
+            #         str(launch_package_path / "launch/moveit_rviz.launch.py")
+            #     )
+            # )
         ]
     )
 

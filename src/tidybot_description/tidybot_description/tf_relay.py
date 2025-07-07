@@ -5,6 +5,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from std_srvs.srv import Empty
 from tf2_ros import Buffer, TransformListener
 from tf2_msgs.msg import TFMessage
+import gc
 
 qos_static = QoSProfile(depth=10)
 qos_static.reliability = ReliabilityPolicy.RELIABLE
@@ -37,7 +38,7 @@ class TfRelay(Node):
         self.sub_tf     = self.create_subscription(TFMessage, '/tf',        self.handle_tf,    qos_profile_sensor_data)
         self.sub_static = self.create_subscription(TFMessage, '/tf_static', self.handle_static, qos_static)
 
-        self.create_service(Empty, 'reset_tf_buffer', self.reset_buffer_cb)
+        self.create_service(Empty, '/reset_tf_buffer', self.reset_buffer_cb)
 
     def handle_tf(self, msg: TFMessage):
         # Simply republish the incoming transforms
@@ -49,9 +50,16 @@ class TfRelay(Node):
         self.pub_static.publish(msg)
 
     def reset_buffer_cb(self, request, response):
+        # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
+        self.destroy_subscription(self.tf_listener.tf_sub)
+        self.destroy_subscription(self.tf_listener.tf_static_sub)
+        del self.tf_listener
+        del self.tf_buffer
+        gc.collect()
         # Clear both dynamic and static entries
-        self.tf_buffer.clear()
-        self.get_logger().info('TF buffer cleared')
+        self.tf_buffer = Buffer()
+        self.tf_listener = TransformListener(self.tf_buffer, self)
+        self.get_logger().info('TF buffer reset')
         return response
 
 def main(args=None):

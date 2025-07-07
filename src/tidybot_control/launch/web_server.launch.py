@@ -2,7 +2,7 @@ import os
 import yaml
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction, LogInfo
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -40,6 +40,11 @@ def generate_launch_description():
         executable="ws_relay",
         name="ws_relay",
         output="screen",
+        parameters=[{"use_sim_time": True}],
+        remappings=[
+            ("tf", "/tf_relay"),
+            ("tf_static", "/tf_static_relay"),
+        ]
     )
 
     state_controller = Node(
@@ -48,7 +53,7 @@ def generate_launch_description():
         name="state_controller",
         output="screen",
     )
-
+    
     web_server_moveit = Node(
         package="tidybot_moveit_config",
         executable="web_server_moveit",
