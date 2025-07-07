@@ -49,7 +49,7 @@ RUN useradd -m -l -u ${USER_ID} -s /bin/bash ${USER_NAME} \
 RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 USER ${USER_NAME}
-WORKDIR /home/${USER_NAME}/tidybot_ws
+WORKDIR /home/${USER_NAME}/tidybot_platform
  
 # Setup ROS 2 Jazzy + ROS 2 Control
 RUN sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
@@ -97,6 +97,16 @@ COPY ./src ./src
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
     colcon build
+
+# Setup base Tidybot packages
+RUN sudo git clone https://github.com/jimmyyhwu/tidybot2.git /opt/tidybot2
+RUN sudo curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh && \
+    sudo bash Miniforge3-Linux-$(uname -m).sh -b -p /opt/conda && sudo rm Miniforge3-Linux-$(uname -m).sh
+RUN export PATH="/opt/conda/bin:$PATH" && \
+    sudo chown -R $(whoami) /opt/conda && \
+    conda install mamba -n base -c conda-forge && \
+    mamba create -n tidybot2 python=3.10.14 -y && \
+    mamba run -n tidybot2 pip install -r /opt/tidybot2/requirements.txt
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 
