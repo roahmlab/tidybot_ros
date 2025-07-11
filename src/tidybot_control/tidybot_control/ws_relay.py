@@ -65,11 +65,6 @@ class WSRelay(Node):
         self.arm_obs_quat = R.from_quat([0.0, 0.0, 0.0, 1.0])
         self.gripper_obs = 0
 
-        # Publish frequency
-        self.last_publish_time = self.get_clock().now()
-        self.publish_interval = rclpy.duration.Duration(seconds=0.05)  # 40 Hz
-
-
     def ws_callback(self, msg):
         if msg.state_update:
             state_command = String()
@@ -125,12 +120,6 @@ class WSRelay(Node):
                         self.arm_ref_quat = self.arm_obs_quat
                         self.arm_ref_base_pose = self.base_obs.copy()
                         self.gripper_ref = self.gripper_obs
-
-                    # Throttle publishing frequency
-                    now = self.get_clock().now()
-                    if (now - self.last_publish_time) < self.publish_interval:
-                        return 
-                    self.last_publish_time = now
 
                     # Rotations around z-axis to go between global frame (base) and local frame (arm)
                     z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.base_obs[2])

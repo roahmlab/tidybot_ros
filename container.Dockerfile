@@ -86,17 +86,18 @@ RUN sudo apt-get update && sudo apt-get upgrade -y && \
 RUN sudo apt-get update && sudo apt-get upgrade && \
     sudo apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
 
+# Setup Gazebo sensors
+RUN sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable \
+        `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list' \
+    wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add - \
+    sudo apt-get update \
+    sudo apt install libgz-sensors<#>-dev
+
 # Setup MoveIt2 
 RUN sudo apt-get install ros-${ROS_DISTRO}-moveit -y
 
 # Setup Teleop
 RUN sudo apt-get install python3-flask python3-flask-socketio -y
-
-# Build the workspace
-COPY ./src ./src
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build
 
 # Setup base Tidybot packages
 RUN sudo git clone https://github.com/jimmyyhwu/tidybot2.git /opt/tidybot2
@@ -107,6 +108,12 @@ RUN export PATH="/opt/conda/bin:$PATH" && \
     conda install mamba -n base -c conda-forge && \
     mamba create -n tidybot2 python=3.10.14 -y && \
     mamba run -n tidybot2 pip install -r /opt/tidybot2/requirements.txt
+
+# Build the workspace
+COPY ./src ./src
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+    colcon build
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 

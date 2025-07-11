@@ -2,13 +2,14 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-<xacro:macro name="load_gazebo_plugins" params="config_path prefix arm">
+<xacro:macro name="load_gazebo_plugins" params="config_path prefix arm vision">
 
   <gazebo>
       <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
           <parameters>${config_path}</parameters>
-          <!-- <robot_description_param>robot_description</robot_description_param> -->
+          <robot_description_param>robot_description</robot_description_param>
       </plugin>
+      <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so"/>
       <!-- <self_collide>true</self_collide> -->
   </gazebo>
 
@@ -24,6 +25,36 @@
     </plugin>
 
   </gazebo> -->
+
+  <xacro:if value="${vision}">
+    <gazebo reference="${prefix}camera_link">
+      <sensor name="${prefix}camera" type="rgbd_camera">
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
+				<topic>/camera</topic>
+        <gz_frame_id>${prefix}camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.03</near>
+            <far>3.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </gazebo>
+  </xacro:if>
 
   <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_transmission.xacro" />
   <xacro:load_arm_transmission prefix="${prefix}" />
