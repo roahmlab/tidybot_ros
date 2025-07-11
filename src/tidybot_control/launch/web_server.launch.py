@@ -9,9 +9,17 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import PathJoinSubstitution
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
+import xacro
+from pathlib import Path
 
 def generate_launch_description():
     tidybot_moveit_pkg = FindPackageShare("tidybot_moveit_config")
+
+    robot_description_path = get_package_share_directory("tidybot_description")
+    doc = xacro.process_file(str(robot_description_path + "/urdf/tidybot.xacro"))
+    urdf_xml = doc.toxml()
+    outpath = Path(robot_description_path) / "urdf/tidybot.urdf"
+    outpath.write_text(urdf_xml, encoding="utf-8")
 
     moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
