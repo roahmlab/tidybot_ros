@@ -10,18 +10,14 @@ import os, yaml
 def generate_launch_description():
     launch_package_path = Path(get_package_share_directory("tidybot_moveit_config"))
 
-    move_group_node = Node(
-        package="moveit_ros_move_group",
-        executable="move_group",
-        output="screen",
-        parameters=[
-            {"use_sim_time": True}
-        ],
-    )
-    
     moveit_config_launch = TimerAction(
         period=3.0,
         actions=[
+            IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(
+                    str(launch_package_path / "launch/move_group.launch.py")
+                )
+            ),
             IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(
                     str(launch_package_path / "launch/rsp.launch.py")
@@ -41,6 +37,5 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        move_group_node,
         moveit_config_launch
     ])
