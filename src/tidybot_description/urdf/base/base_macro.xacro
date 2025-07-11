@@ -93,13 +93,7 @@
             <limit lower="-10.0" upper="10.0" effort="100" velocity="1"/>
             <dynamics damping="1.0" friction="1.0"/>
         </joint>
-        <transmission name="joint_x_trans">
-            <type>transmission_interface/SimpleTransmission</type>
-            <joint name="${prefix}joint_x" />
-            <actuator name="joint_x_motor">
-                <mechanicalReduction>1</mechanicalReduction>
-            </actuator>
-        </transmission>
+
         <link name="joint_y_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -115,13 +109,7 @@
             <limit lower="-10.0" upper="10.0" effort="100" velocity="1"/>
             <dynamics damping="1.0" friction="1.0"/>
         </joint>
-        <transmission name="joint_y_trans">
-            <type>transmission_interface/SimpleTransmission</type>
-            <joint name="${prefix}joint_y" />
-            <actuator name="joint_y_motor">
-                <mechanicalReduction>1</mechanicalReduction>
-            </actuator>
-        </transmission>
+
         <link name="joint_th_jointbody">
             <inertial>
                 <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
@@ -137,13 +125,7 @@
             <limit lower="-10" upper="10" effort="100" velocity="1"/>
             <dynamics damping="1.0" friction="1.0"/>
         </joint>
-        <transmission name="joint_th_trans">
-            <type>transmission_interface/SimpleTransmission</type>
-            <joint name="${prefix}joint_th" />
-            <actuator name="joint_th_motor">
-                <mechanicalReduction>1</mechanicalReduction>
-            </actuator>
-        </transmission>
+
         <joint type="fixed" name="joint_th_offset">
             <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
             <parent link="joint_th_jointbody"/>

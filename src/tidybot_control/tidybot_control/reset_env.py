@@ -10,17 +10,9 @@ from controller_manager import (
     configure_controller,
     switch_controllers,
 )
-import xacro
-from pathlib import Path
 import time
-import os
 
 robot_description_path = get_package_share_directory("tidybot_description")
-doc = xacro.process_file(str(robot_description_path + "/urdf/tidybot.xacro"))
-urdf_xml = doc.toxml()
-outpath = Path(robot_description_path) / "urdf/tidybot.urdf"
-outpath.write_text(urdf_xml, encoding="utf-8")
-
 
 class StateController(Node):
     def __init__(self):
@@ -113,7 +105,7 @@ class StateController(Node):
                 "controller_manager",
                 [],
                 [name],
-                strictness=SwitchController.Request.STRICT,
+                strict=SwitchController.Request.STRICT,
                 activate_asap=True,
                 timeout=5.0,
             )
