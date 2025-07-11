@@ -42,8 +42,8 @@ def generate_launch_description():
         output="screen",
         parameters=[{"use_sim_time": True}],
         remappings=[
-            ("tf", "/tf_relay"),
-            ("tf_static", "/tf_static_relay"),
+            ("/tf", "/tf_relay"),
+            ("/tf_static", "/tf_static_relay"),
         ]
     )
 
