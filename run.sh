@@ -19,12 +19,15 @@ DOCKER_OPTIONS+="-v $HOME/.Xauthority:/home/$(whoami)/.Xauthority "
 DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/data "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
+# installing the canivore-usb package may modify the host modules
+DOCKER_OPTIONS+="-v /lib/modules:/lib/modules:rw "
 DOCKER_OPTIONS+="--name $CONTAINER_NAME "
 DOCKER_OPTIONS+="--privileged "
 DOCKER_OPTIONS+="--net=host "
 DOCKER_OPTIONS+="-e SDL_VIDEODRIVER=x11 "
 DOCKER_OPTIONS+="-u $(id -u):$(id -g) "
 DOCKER_OPTIONS+="--shm-size 32G "
+DOCKER_OPTIONS+="--cap-add SYS_MODULE "
 
 for cam in /dev/video*; do
   DOCKER_OPTIONS+="--device=${cam} "
