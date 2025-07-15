@@ -21,22 +21,32 @@ import gc
 class WSRelay(Node):
     def __init__(self):
         super().__init__("ws_relay")
-        self.get_logger().info('Web server relay initialized')
-        self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
+        self.declare_parameter("use_sim", True)
+        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        self.get_logger().info('Web server relay initialized with use_sim: {}'.format(self.use_sim))
+        if self.use_sim:
+            self.joint_states_sub = self.create_subscription(
+                JointState, "/joint_states", self.joint_states_callback, 10
+            )
+            self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
+        else:
+            self.base_state_sub = self.create_subscription(
+                JointState, "/tidybot_base/joint_states", self.joint_states_callback, 10
+            )
+            self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base/commands", 10)
+
+        self.state_pub = self.create_publisher(String, "/ws_state", 10)
+        self.ws_sub = self.create_subscription(
+            WSMsg, "/ws_commands", self.ws_callback, 10
+        )
+
+        # TODO: condition on use_sim
         self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
         self.gripper_pub = self.create_publisher(Float64, "/gripper_controller/command", 10)
 
         self.rc_br = TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
-
-        self.state_pub = self.create_publisher(String, "/ws_state", 10)
-        self.ws_sub = self.create_subscription(
-            WSMsg, "/ws_commands", self.ws_callback, 10
-        )
-        self.joint_states_sub = self.create_subscription(
-            JointState, "/joint_states", self.joint_states_callback, 10
-        )
         self.enable_counts = {}
 
         self.clock = self.get_clock()
@@ -85,7 +95,7 @@ class WSRelay(Node):
                     if self.base_xr_ref_pos is None:
                         self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
                         self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
-                        self.base_ref_pos = np.array([self.base_obs[0], self.base_obs[1], 0.0])
+                        self.base_ref_pos = np.array([self.base_obs[1], self.base_obs[0], 0.0])
                         self.base_ref_quat = np.array([0.0, 0.0, self.base_obs[2], 1.0])
                         self.xr_ref_r = R.from_quat(self.base_xr_ref_quat)
                         self.base_re_r =  R.from_quat(self.base_ref_quat)
@@ -102,11 +112,12 @@ class WSRelay(Node):
                                             delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
                         command = Float64MultiArray()
                         command.data = [
-                            delta_pos[0] + self.base_ref_pos[0],
                             delta_pos[1] + self.base_ref_pos[1],
+                            -delta_pos[0] - self.base_ref_pos[0],
                             yaw + self.base_ref_quat[2]
                         ]
                         self.base_pub.publish(command)
+                        self.get_logger().info(f'Base pos: {self.base_ref_pos}, Base quat: {self.base_ref_quat}, Delta pos: {delta_pos}, Delta quat: {delta_quat}')
                         return
 
                 case "arm":
@@ -166,26 +177,31 @@ class WSRelay(Node):
         self.base_obs[0] = msg.position[msg.name.index("joint_x")]
         self.base_obs[1] = msg.position[msg.name.index("joint_y")]
         self.base_obs[2] = msg.position[msg.name.index("joint_th")]
+        # self.get_logger().info(f'Base joint states: {self.base_obs}')
 
         # Forward kinematics to find end effector position
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                target_frame="world",
-                source_frame="end_effector_link",
-                time=rclpy.time.Time(),    
-                timeout=rclpy.duration.Duration(seconds=0.5)
-            )
+        # try:
+        #     transform = self.tf_buffer.lookup_transform(
+        #         target_frame="world",
+        #         source_frame="end_effector_link",
+        #         time=rclpy.time.Time(),    
+        #         timeout=rclpy.duration.Duration(seconds=0.5)
+        #     )
 
-            # Position
-            t = transform.transform.translation
-            self.arm_obs_pos = [t.x, t.y, t.z]
+        #     # Position
+        #     t = transform.transform.translation
+        #     self.arm_obs_pos = [t.x, t.y, t.z]
 
-            # Orientation
-            q = transform.transform.rotation
-            self.arm_obs_quat = R.from_quat([q.x, q.y, q.z, q.w])
+        #     # Orientation
+        #     q = transform.transform.rotation
+        #     self.arm_obs_quat = R.from_quat([q.x, q.y, q.z, q.w])
 
-        except tf2_ros.LookupException as e:
-            self.get_logger().warn(f"Transform not found: {e}")
+        # except tf2_ros.LookupException as e:
+        #     self.get_logger().warn(f"Transform not found: {e}")
+
+    def base_state_callback(self, msg):
+        pass
+    
 
     def time_jump_callback(self, time: Time):
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
