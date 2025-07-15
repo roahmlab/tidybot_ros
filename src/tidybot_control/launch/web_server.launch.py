@@ -2,11 +2,11 @@ import os
 import yaml
 
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction, LogInfo
+from launch.actions import IncludeLaunchDescription, RegisterEventHandler, TimerAction, LogInfo, DeclareLaunchArgument
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 import xacro
@@ -14,6 +14,12 @@ from pathlib import Path
 
 def generate_launch_description():
     tidybot_moveit_pkg = FindPackageShare("tidybot_moveit_config")
+
+    use_sim = DeclareLaunchArgument(
+        "use_sim",
+        default_value='true',
+        description="Use simulation mode if true"
+    )
 
     robot_description_path = get_package_share_directory("tidybot_description")
     doc = xacro.process_file(str(robot_description_path + "/urdf/tidybot.xacro"))
@@ -48,7 +54,8 @@ def generate_launch_description():
         executable="ws_relay",
         name="ws_relay",
         output="screen",
-        parameters=[{"use_sim_time": True}],
+        parameters=[{"use_sim_time": True},
+                    {"use_sim": LaunchConfiguration("use_sim")}],
         remappings=[
             ("/tf", "/tf_relay"),
             ("/tf_static", "/tf_static_relay"),
@@ -71,6 +78,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        use_sim,
         moveit_launch,
         web_server_publisher,
         web_server_relay,
