@@ -67,6 +67,8 @@ def generate_launch_description():
         executable="state_controller",
         name="state_controller",
         output="screen",
+        parameters=[{"use_sim_time": True},
+                    {"use_sim": LaunchConfiguration("use_sim")}],
     )
     
     web_server_moveit = Node(

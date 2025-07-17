@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
+from std_srvs.srv import Empty
 from geometry_msgs.msg import Pose
 from ros_gz_interfaces.srv import ControlWorld, SpawnEntity
 from ament_index_python.packages import get_package_share_directory
@@ -19,11 +20,21 @@ class StateController(Node):
             String, "/ws_state", self.state_callback, 10
         )
 
+        self.reset_base_cli = self.create_client(
+            Empty, "/tidybot_base/reset"
+        )
+
+        self.declare_parameter("use_sim", True)
+        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+
     def state_callback(self, msg):
         self.get_logger().info(f"Received state command: {msg.data}")
         match msg.data:
             case "reset_env":
-                subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
+                if self.use_sim:
+                    subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
+                else:
+                    self.reset_base_cli.call_async(Empty.Request())
             case "episode_started":
                 self.get_logger().info(f"{GREEN}Episode started.{RESET}")
             case "episode_finished":

@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, Empty
+from std_srvs.srv import Empty
 from sensor_msgs.msg import JointState
 import time
 import numpy as np
@@ -28,15 +29,19 @@ class BaseServer(Node):
             10
         )
 
-        self.clock = self.get_clock()
-
+        self.reset_srv = self.create_service(
+            Empty,
+            '/tidybot_base/reset',
+            self.reset
+        )
+        self.pause_ctl = False
         self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_callback)
 
     def cmd_callback(self, msg):
         # Convert the incoming message to a numpy array
         target = np.array(msg.data, dtype=np.float64)
         # Log the received command
-        self.get_logger().info(f'Received command: {target}')
+        # self.get_logger().info(f'Received command: {target}')
 
         # Send the command to the vehicle
         self.vehicle.set_target_position(target)
@@ -44,11 +49,19 @@ class BaseServer(Node):
     def control_callback(self):
         self.vehicle.update_state()
         joint_state = JointState()
-        joint_state.header.stamp = self.clock.now().to_msg()
+        joint_state.header.stamp = self.get_clock().now().to_msg()
         joint_state.name = ['joint_x', 'joint_y', 'joint_th']
         joint_state.position = self.vehicle.get_position()
         self.state_pub.publish(joint_state)
+        # self.get_logger().info(f'Published joint states: {joint_state.name} - {joint_state.position}')
         self.vehicle.update_control()
+        # self.get_logger().info('Control callback executed')
+
+    def reset(self, request, response):
+        self.get_logger().info('Resetting base')
+        self.vehicle = Vehicle()  # Reinitialize the vehicle
+        self.get_logger().info('Base reset complete')
+        return response
 
 def main(args=None):
     os.environ['CTR_TARGET'] = 'Hardware'  # pylint: disable=wrong-import-position
