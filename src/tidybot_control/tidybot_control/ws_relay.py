@@ -117,7 +117,7 @@ class WSRelay(Node):
                             yaw + self.base_ref_quat[2]
                         ]
                         self.base_pub.publish(command)
-                        self.get_logger().info(f'Base pos: {self.base_ref_pos}, Base quat: {self.base_ref_quat}, Delta pos: {delta_pos}, Delta quat: {delta_quat}')
+                        # self.get_logger().info(f'Base pos: {self.base_ref_pos}, Base quat: {self.base_ref_quat}, Delta pos: {delta_pos}, Delta quat: {delta_quat}')
                         return
 
                 case "arm":
