@@ -181,21 +181,21 @@ def main(args=None):
     try:
         # TODO: replace sleep with a more robust wait mechanism
         node.reset_world()
-        node.reset_tf_buffer()
-        node.reset_time()
-        time.sleep(1)  # Wait a moment before spawning
-        node.spawn_tidybot()
-        time.sleep(5)  # Wait a moment before spawning controllers
+        # node.reset_tf_buffer()
         # node.reset_time()
-        node.unpause_world()
-        node.spawn_controllers(
-            [
-                "joint_state_broadcaster",
-                "tidybot_base_pos_controller",
-                "gen3_7dof_controller",
-                "gen3_lite_2f_controller",
-            ]
-        )
+        # time.sleep(1)  # Wait a moment before spawning
+        # node.spawn_tidybot()
+        # time.sleep(5)  # Wait a moment before spawning controllers
+        # # node.reset_time()
+        # node.unpause_world()
+        # node.spawn_controllers(
+        #     [
+        #         "joint_state_broadcaster",
+        #         "tidybot_base_pos_controller",
+        #         "gen3_7dof_controller",
+        #         "gen3_lite_2f_controller",
+        #     ]
+        # )
     except KeyboardInterrupt:
         node.get_logger().info("Node interrupted by user")
     finally:

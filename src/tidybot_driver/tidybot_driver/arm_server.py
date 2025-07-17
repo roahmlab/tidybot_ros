@@ -5,8 +5,10 @@ from geometry_msgs.msg import Pose, PoseStamped
 
 import queue
 import time
+import math
 from multiprocessing.managers import BaseManager as MPBaseManager
 import numpy as np
+from sensor_msgs.msg import JointState
 from tidybot_driver.arm_controller import JointCompliantController
 from tidybot_driver.constants import ARM_RPC_HOST, ARM_RPC_PORT, RPC_AUTHKEY
 from tidybot_driver.ik_solver import IKSolver
@@ -41,6 +43,11 @@ class ArmServer(Node):
         self.gripper_state_pub = self.create_publisher(
             Float64,
             '/tidybot_gripper/state',
+            10
+        )
+        self.joint_state_pub = self.create_publisher(
+            JointState,
+            '/joint_states',
             10
         )
 
@@ -103,6 +110,16 @@ class ArmServer(Node):
         gripper_state = Float64()
         gripper_state.data = float(state['gripper_pos'])
         self.gripper_state_pub.publish(gripper_state)
+
+        joint_state = JointState()
+        joint_state.header.stamp = self.clock.now().to_msg()
+        joint_state.name = [
+            'joint_1', 'joint_2', 'joint_3',
+            'joint_4', 'joint_5', 'joint_6', 'joint_7',
+            'joint_th', 'joint_x', 'joint_y' 
+        ]
+        joint_state.position = [angle for angle in self.arm.arm.q] + [0, 0, 0]
+        self.joint_state_pub.publish(joint_state)
 
 class Arm:
     def __init__(self):
