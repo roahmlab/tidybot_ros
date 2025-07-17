@@ -3,7 +3,7 @@
 # by @sethgi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-IMAGE_TAG=tidybot_platform
+IMAGE_TAG=arm_integration
 
 DOCKER_OPTIONS=""
 DOCKER_OPTIONS+="-t $IMAGE_TAG:latest "

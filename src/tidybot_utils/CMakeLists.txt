@@ -30,5 +30,4 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/ResetEnv.srv"
   DEPENDENCIES std_msgs
 )
-
 ament_package()
