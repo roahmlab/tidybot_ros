@@ -93,12 +93,14 @@ class WSRelay(Node):
             match msg.teleop_mode:
                 case "base":
                     if self.base_xr_ref_pos is None:
+                        # the initial position and orientation in the WebXR frame
                         self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
                         self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
+                        # the initial position and orientation in the robot frame
                         self.base_ref_pos = np.array([self.base_obs[1], self.base_obs[0], 0.0])
                         self.base_ref_quat = np.array([0.0, 0.0, self.base_obs[2], 1.0])
                         self.xr_ref_r = R.from_quat(self.base_xr_ref_quat)
-                        self.base_re_r =  R.from_quat(self.base_ref_quat)
+                        self.base_ref_r =  R.from_quat(self.base_ref_quat)
                     else:
                         # convert the incoming position and orientation wrt world frame to the wx_ref frame
                         delta_quat = quaternion_multiply(
@@ -107,17 +109,18 @@ class WSRelay(Node):
                         )
                         delta_pos =  xr_pos - self.base_xr_ref_pos
                         delta_pos = self.xr_ref_r.inv().apply(delta_pos)
-                        delta_pos = self.base_re_r.apply(delta_pos)
+                        delta_pos = self.base_ref_r.apply(delta_pos)
                         yaw = math.atan2(2 * (delta_quat[3] * delta_quat[2] + delta_quat[0] * delta_quat[1]),
                                             delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
                         command = Float64MultiArray()
                         command.data = [
                             delta_pos[1] + self.base_ref_pos[1],
-                            -delta_pos[0] - self.base_ref_pos[0],
+                            -delta_pos[0] + self.base_ref_pos[0],
                             yaw + self.base_ref_quat[2]
                         ]
                         self.base_pub.publish(command)
-                        # self.get_logger().info(f'Base pos: {self.base_ref_pos}, Base quat: {self.base_ref_quat}, Delta pos: {delta_pos}, Delta quat: {delta_quat}')
+                        # self.get_logger().info(f'base_ref_pos: {self.base_ref_pos}, base_ref_quat: {self.base_ref_quat}, delta_pos: {delta_pos}, delta_quat: {delta_quat}')
+                        self.get_logger().info(f'xr_pos: {xr_pos}')
                         return
 
                 case "arm":
