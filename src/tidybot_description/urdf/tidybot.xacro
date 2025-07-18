@@ -5,7 +5,7 @@
     <xacro:arg name="hardware_plugin" default="gz_ros2_control/GazeboSimSystem" />
     <xacro:arg name="arm" default="gen3_7dof" />
     <xacro:arg name="gripper" default="gen3_lite_2f" />
-    <xacro:arg name="vision" default="false" />
+    <xacro:arg name="vision" default="true" />
     <xacro:arg name="prefix" default="" />
     <xacro:arg name="ros2_control_config_path" default="$(find tidybot_description)/config/tidybot_controllers.yaml"/>
 
@@ -16,10 +16,10 @@
 
     <!-- configure ros2_control joints -->
     <xacro:include filename="$(find tidybot_description)/urdf/tidybot.ros2_control.xacro" />
-    <xacro:load_ros2_control hardware_plugin="$(arg hardware_plugin)" arm="$(arg arm)" />
+    <xacro:load_ros2_control hardware_plugin="$(arg hardware_plugin)" arm="$(arg arm)" gripper="$(arg gripper)"/>
 
     <!-- load gazebo plugins -->
     <xacro:include filename="$(find tidybot_description)/urdf/tidybot.gazebo.xacro" />
-    <xacro:load_gazebo_plugins config_path="$(arg ros2_control_config_path)" prefix="$(arg prefix) " arm="$(arg arm)" />
+    <xacro:load_gazebo_plugins config_path="$(arg ros2_control_config_path)" prefix="$(arg prefix)" arm="$(arg arm)" vision="$(arg vision)" />
 
 </robot>

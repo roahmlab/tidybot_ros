@@ -36,6 +36,7 @@
       <origin rpy="1.6659662035857206 -1.5707963267948966 0.0" xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373"/>
       <geometry>
         <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
+        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
       </geometry>
     </collision>
     <visual name="body">
@@ -357,14 +358,14 @@
   </joint>
   <link name="bracelet_link">
     <inertial>
-      <origin rpy="0 0 0" xyz="-9.3E-05 0.000132 -0.022905"/>
-      <mass value="0.364"/>
-      <inertia ixx="0.000214" ixy="0" ixz="1E-06" iyy="0.000223" iyz="-2E-06" izz="0.00024"/>
+      <origin rpy="0 0 0" xyz="0.000281 0.011402 -0.029798"/>
+      <mass value="0.5"/>
+      <inertia ixx="0.000587" ixy="3E-06" ixz="3E-06" iyy="0.000369" iyz="-0.000118" izz="0.000609"/>
     </inertial>
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_no_vision_link.STL"/>
+        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -373,7 +374,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_no_vision_link.STL"/>
+        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -393,6 +394,24 @@
     <parent link="bracelet_link"/>
     <child link="end_effector_link"/>
     <axis xyz="0 0 0"/>
+  </joint>
+  <link name="camera_link"/>
+  <joint name="camera_module" type="fixed">
+    <origin rpy="3.14159265358979 3.14159265358979 0" xyz="0 0.05639 -0.00305"/>
+    <parent link="end_effector_link"/>
+    <child link="camera_link"/>
+  </joint>
+  <link name="camera_depth_frame"/>
+  <joint name="depth_module" type="fixed">
+    <origin rpy="3.14159265358979 3.14159265358979 0" xyz="0.0275 0.066 -0.00305"/>
+    <parent link="end_effector_link"/>
+    <child link="camera_depth_frame"/>
+  </joint>
+  <link name="camera_color_frame"/>
+  <joint name="color_module" type="fixed">
+    <origin rpy="3.14159265358979 3.14159265358979 0" xyz="0 0.05639 -0.00305"/>
+    <parent link="end_effector_link"/>
+    <child link="camera_color_frame"/>
   </joint>
   <!-- Tool frame used by the arm -->
   <link name="tool_frame"/>
@@ -712,6 +731,7 @@
       <parameters>/home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
       <!-- <robot_description_param>robot_description</robot_description_param> -->
     </plugin>
+    <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors"/>
     <!-- <self_collide>true</self_collide> -->
   </gazebo>
   <!-- <gazebo>
@@ -726,46 +746,73 @@
     </plugin>
 
   </gazebo> -->
-  <transmission name=" joint_1_trans">
+  <gazebo reference="camera_link">
+    <sensor name="camera" type="rgbd_camera">
+      <always_on>1</always_on>
+      <update_rate>30</update_rate>
+      <visualize>true</visualize>
+      <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
+      <topic>/camera</topic>
+      <gz_frame_id>camera_link</gz_frame_id>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.03</near>
+          <far>3.0</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+    </sensor>
+  </gazebo>
+  <transmission name="joint_1_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_1_motor"/>
-    <joint name=" joint_1"/>
+    <actuator name="joint_1_motor"/>
+    <joint name="joint_1"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_2_trans">
+  <transmission name="joint_2_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_2_motor"/>
-    <joint name=" joint_2"/>
+    <actuator name="joint_2_motor"/>
+    <joint name="joint_2"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_3_trans">
+  <transmission name="joint_3_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_3_motor"/>
-    <joint name=" joint_3"/>
+    <actuator name="joint_3_motor"/>
+    <joint name="joint_3"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_4_trans">
+  <transmission name="joint_4_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_4_motor"/>
-    <joint name=" joint_4"/>
+    <actuator name="joint_4_motor"/>
+    <joint name="joint_4"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_5_trans">
+  <transmission name="joint_5_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_5_motor"/>
-    <joint name=" joint_5"/>
+    <actuator name="joint_5_motor"/>
+    <joint name="joint_5"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_6_trans">
+  <transmission name="joint_6_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_6_motor"/>
-    <joint name=" joint_6"/>
+    <actuator name="joint_6_motor"/>
+    <joint name="joint_6"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_7_trans">
+  <transmission name="joint_7_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_7_motor"/>
-    <joint name=" joint_7"/>
+    <actuator name="joint_7_motor"/>
+    <joint name="joint_7"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
   <transmission name="joint_x_trans">
