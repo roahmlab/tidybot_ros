@@ -15,6 +15,9 @@ RESET = "\x1b[0m"
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
+        self.declare_parameter("use_sim", True)
+        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+
         self.state_sub = self.create_subscription(
             String, "/ws_state", self.state_callback, 10
         )
@@ -23,7 +26,8 @@ class StateController(Node):
         self.get_logger().info(f"Received state command: {msg.data}")
         match msg.data:
             case "reset_env":
-                subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
+                subprocess.run(["ros2", "run", "tidybot_control", "reset_env",    
+                                f"--ros-args", "-p", f"use_sim:={str(self.use_sim).lower()}"])
             case "episode_started":
                 self.get_logger().info(f"{GREEN}Episode started.{RESET}")
             case "episode_finished":

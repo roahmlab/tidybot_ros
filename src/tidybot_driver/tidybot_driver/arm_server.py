@@ -116,9 +116,10 @@ class ArmServer(Node):
         joint_state.name = [
             'joint_1', 'joint_2', 'joint_3',
             'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            'joint_th', 'joint_x', 'joint_y' 
+            'joint_th', 'joint_x', 'joint_y', 'finger_joint'
         ]
-        joint_state.position = [angle for angle in self.arm.arm.q] + [0, 0, 0]
+        joint_state.position = [angle for angle in self.arm.arm.q] + \
+                               [0, 0, 0] + [0.8 * self.arm.arm.gripper_pos]
         self.joint_state_pub.publish(joint_state)
 
 class Arm:

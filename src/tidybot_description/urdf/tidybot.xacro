@@ -4,7 +4,7 @@
     <!-- <xacro:arg name="hardware_plugin" default="mock_components/GenericSystem" />     -->
     <xacro:arg name="hardware_plugin" default="gz_ros2_control/GazeboSimSystem" />
     <xacro:arg name="arm" default="gen3_7dof" />
-    <xacro:arg name="gripper" default="gen3_lite_2f" />
+    <xacro:arg name="gripper" default="robotiq_2f_85" />
     <xacro:arg name="vision" default="true" />
     <xacro:arg name="prefix" default="" />
     <xacro:arg name="ros2_control_config_path" default="$(find tidybot_description)/config/tidybot_controllers.yaml"/>

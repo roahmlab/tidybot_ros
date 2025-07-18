@@ -208,7 +208,7 @@ class WSRelay(Node):
             self.arm_obs_pos = [msg.pose.position.x, msg.pose.position.y, msg.pose.position.z]
             self.arm_obs_quat = R.from_quat([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w])
         
-        self.get_logger().info(f'Arm position: {self.arm_obs_pos}')
+        # self.get_logger().info(f'Arm position: {self.arm_obs_pos}')
 
     def base_state_callback(self, msg):
         pass

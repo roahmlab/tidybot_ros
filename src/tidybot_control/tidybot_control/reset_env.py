@@ -18,56 +18,68 @@ robot_description_path = get_package_share_directory("tidybot_description")
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
-        # self.reset_world_cli = self.create_client(ControlWorld, "/world/empty/control")
-        self.reset_arm_cli = self.create_client(ResetEnv, "/arm_controller/reset")
-        # self.spawn_tidybot_cli = self.create_client(SpawnEntity, "/world/empty/create")
-        # self.reset_tf_buffer_cli = self.create_client(
-        #     Empty, "/reset_tf_buffer"
-        # )
-        # self.reset_time_cli = self.create_client(
-        #     Empty, "/rviz/reset_time"
-        # )
-        # while not self.reset_world_cli.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(
-        #         f"Waiting for {self.reset_world_cli} service to become available..."
-        #     )
-        # self.get_logger().info(f"Connected to {self.reset_world_cli}")
-        # while not self.spawn_tidybot_cli.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(
-        #         f"Waiting for {self.spawn_tidybot_cli} service to become available..."
-        #     )
-        # self.get_logger().info(f"Connected to {self.spawn_tidybot_cli}")
-        # while not self.reset_tf_buffer_cli.wait_for_service(timeout_sec=1.0):
-        #     self.get_logger().info(
-        #         f"Waiting for {self.reset_tf_buffer_cli} service to become available..."
-        #     )
-        # self.get_logger().info(f"Connected to {self.reset_tf_buffer_cli}")
-        # while not self.reset_time_cli.wait_for_service(timeout_sec=1.0):    
-        #     self.get_logger().info(
-        #         f"Waiting for {self.reset_time_cli} service to become available..."
-        #     )
-        # self.get_logger().info(f"Connected to {self.reset_time_cli}")
+        self.declare_parameter("use_sim", True)
+        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+
+        if self.use_sim:
+            self.reset_world_cli = self.create_client(ControlWorld, "/world/empty/control")
+            self.spawn_tidybot_cli = self.create_client(SpawnEntity, "/world/empty/create")
+            self.reset_tf_buffer_cli = self.create_client(
+                Empty, "/reset_tf_buffer"
+            )
+            self.reset_time_cli = self.create_client(
+                Empty, "/rviz/reset_time"
+            )
+            while not self.reset_world_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(
+                    f"Waiting for {self.reset_world_cli} service to become available..."
+                )
+            self.get_logger().info(f"Connected to {self.reset_world_cli}")
+            while not self.spawn_tidybot_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(
+                    f"Waiting for {self.spawn_tidybot_cli} service to become available..."
+                )
+            self.get_logger().info(f"Connected to {self.spawn_tidybot_cli}")
+            while not self.reset_tf_buffer_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(
+                    f"Waiting for {self.reset_tf_buffer_cli} service to become available..."
+                )
+            self.get_logger().info(f"Connected to {self.reset_tf_buffer_cli}")
+            while not self.reset_time_cli.wait_for_service(timeout_sec=1.0):    
+                self.get_logger().info(
+                    f"Waiting for {self.reset_time_cli} service to become available..."
+                )
+            self.get_logger().info(f"Connected to {self.reset_time_cli}")
+        else:
+            self.reset_arm_cli = self.create_client(ResetEnv, "/arm_controller/reset")
+            while not self.reset_arm_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info(
+                    f"Waiting for {self.reset_arm_cli} service to become available..."
+                )
+            self.get_logger().info(f"Connected to {self.reset_arm_cli}")
 
     def reset_world(self):
         self.get_logger().info("Resetting world...")
-        # request = ControlWorld.Request()
-        # control = WorldControl()
-        # reset = WorldReset()
-        # reset.all = True
-        # control.reset = reset
-        # control.pause = True
-        # request.world_control = control
-        # future = self.reset_world_cli.call_async(request)
-        # rclpy.spin_until_future_complete(self, future)
-        # if future.done():
-        #     try:
-        #         res = future.result()
-        #         self.get_logger().info(f"Result: {res}")
-        #     except Exception as e:
-        #         self.get_logger().error(f"Service call failed: {e}")
-        # else:
-        #     self.get_logger().error("Service call did not complete")
+        request = ControlWorld.Request()
+        control = WorldControl()
+        reset = WorldReset()
+        reset.all = True
+        control.reset = reset
+        control.pause = True
+        request.world_control = control
+        future = self.reset_world_cli.call_async(request)
+        rclpy.spin_until_future_complete(self, future)
+        if future.done():
+            try:
+                res = future.result()
+                self.get_logger().info(f"Result: {res}")
+            except Exception as e:
+                self.get_logger().error(f"Service call failed: {e}")
+        else:
+            self.get_logger().error("Service call did not complete")
 
+    def reset_arm(self):
+        self.get_logger().info("Resetting arm...")
         arm_request = ResetEnv.Request()
         arm_request.reset = True
         future = self.reset_arm_cli.call_async(arm_request)        
@@ -179,23 +191,26 @@ def main(args=None):
     rclpy.init(args=args)
     node = StateController()
     try:
-        # TODO: replace sleep with a more robust wait mechanism
-        node.reset_world()
-        # node.reset_tf_buffer()
-        # node.reset_time()
-        # time.sleep(1)  # Wait a moment before spawning
-        # node.spawn_tidybot()
-        # time.sleep(5)  # Wait a moment before spawning controllers
-        # # node.reset_time()
-        # node.unpause_world()
-        # node.spawn_controllers(
-        #     [
-        #         "joint_state_broadcaster",
-        #         "tidybot_base_pos_controller",
-        #         "gen3_7dof_controller",
-        #         "gen3_lite_2f_controller",
-        #     ]
-        # )
+        if node.use_sim:
+            # TODO: replace sleep with a more robust wait mechanism
+            node.reset_world()
+            node.reset_tf_buffer()
+            node.reset_time()
+            time.sleep(1)  # Wait a moment before spawning
+            node.spawn_tidybot()
+            time.sleep(5)  # Wait a moment before spawning controllers
+            # node.reset_time()
+            node.unpause_world()
+            node.spawn_controllers(
+                [
+                    "joint_state_broadcaster",
+                    "tidybot_base_pos_controller",
+                    "gen3_7dof_controller",
+                    "gen3_lite_2f_controller",
+                ]
+            )
+        else:
+            node.reset_arm()
     except KeyboardInterrupt:
         node.get_logger().info("Node interrupted by user")
     finally:
