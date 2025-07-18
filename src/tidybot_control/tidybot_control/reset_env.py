@@ -51,7 +51,7 @@ class StateController(Node):
                 )
             self.get_logger().info(f"Connected to {self.reset_time_cli}")
         else:
-            self.reset_arm_cli = self.create_client(ResetEnv, "/arm_controller/reset")
+            self.reset_arm_cli = self.create_client(ResetEnv, "/tidybot/arm/reset")
             while not self.reset_arm_cli.wait_for_service(timeout_sec=1.0):
                 self.get_logger().info(
                     f"Waiting for {self.reset_arm_cli} service to become available..."

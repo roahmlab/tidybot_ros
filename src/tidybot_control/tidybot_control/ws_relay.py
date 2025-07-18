@@ -30,25 +30,25 @@ class WSRelay(Node):
             )
             self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         else:
-            # self.base_state_sub = self.create_subscription(
-            #     JointState, "/tidybot_base/joint_states", self.joint_states_callback, 10
-            # )
-            self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base/commands", 10)
+            self.base_state_sub = self.create_subscription(
+                JointState, "/tidybot/base/joint_states", self.joint_states_callback, 10
+            )
+            self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot/base/commands", 10)
 
         self.state_pub = self.create_publisher(String, "/ws_state", 10)
         self.ws_sub = self.create_subscription(
             WSMsg, "/ws_commands", self.ws_callback, 10
         )
 
-        self.arm_pub = self.create_publisher(Pose, "/arm_controller/command", 10)
-        self.gripper_pub = self.create_publisher(Float64, "/gripper_controller/command", 10)
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/command", 10)
+        self.gripper_pub = self.create_publisher(Float64, "/tidybot/gripper/command", 10)
         if self.use_sim:
             self.arm_state_sub = self.create_subscription(
                 JointState, "/joint_states", self.joint_states_callback, 10
             )
         else:
             self.arm_state_sub = self.create_subscription(
-                PoseStamped, "/tidybot_arm/pose", self.joint_states_callback, 10
+                PoseStamped, "/tidybot/arm/pose", self.joint_states_callback, 10
             )
 
         self.rc_br = TransformBroadcaster(self)
