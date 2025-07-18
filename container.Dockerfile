@@ -89,6 +89,13 @@ RUN sudo apt-get update && sudo apt-get upgrade -y && \
 RUN sudo apt-get update && sudo apt-get upgrade && \
     sudo apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
 
+# Setup Gazebo sensors
+RUN sudo sh -c 'echo "deb http://packages.osrfoundation.org/gazebo/ubuntu-stable \
+        `lsb_release -cs` main" > /etc/apt/sources.list.d/gazebo-stable.list' \
+    wget http://packages.osrfoundation.org/gazebo.key -O - | sudo apt-key add - \
+    sudo apt-get update \
+    sudo apt install libgz-sensors<#>-dev
+
 # Setup MoveIt2 
 RUN sudo apt-get install ros-${ROS_DISTRO}-moveit -y
 
@@ -115,6 +122,12 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
 
 RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
     sudo chown -R ${USER_NAME} /opt/tidybot2
+
+# Build the workspace
+COPY ./src ./src
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+    colcon build
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 
