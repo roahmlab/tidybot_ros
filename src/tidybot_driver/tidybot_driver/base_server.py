@@ -17,14 +17,14 @@ class BaseServer(Node):
         # Create a subscription to the command topic
         self.cmd_sub = self.create_subscription(
             Float64MultiArray,
-            '/tidybot_base/commands',
+            '/tidybot/base/commands',
             self.cmd_callback,
             10
         )
 
         self.state_pub = self.create_publisher(
             JointState,
-            '/tidybot_base/joint_states',
+            '/tidybot/base/joint_states',
             10
         )
 

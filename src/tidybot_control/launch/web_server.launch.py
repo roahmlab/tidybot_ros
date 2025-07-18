@@ -6,7 +6,7 @@ from launch.actions import IncludeLaunchDescription, RegisterEventHandler, Timer
 from launch.event_handlers import OnProcessStart
 from launch_ros.actions import Node
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import PathJoinSubstitution, LaunchConfiguration
+from launch.substitutions import PathJoinSubstitution, LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition, UnlessCondition
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
@@ -21,6 +21,12 @@ def generate_launch_description():
         "use_sim",
         default_value='true',
         description="Use simulation mode if true"
+    )
+
+    mode = DeclareLaunchArgument(
+        "mode", 
+        default_value="full", 
+        description="Control mode: full, arm_only, base_only"
     )
 
     robot_description_path = get_package_share_directory("tidybot_description")
@@ -93,12 +99,47 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
+    arm_server = Node(
+        package="tidybot_driver",
+        executable="arm_server",
+        name="arm_server",
+        condition=IfCondition(PythonExpression([
+            '("full" == "', LaunchConfiguration("mode"), '") or '
+            '("arm_only" == "', LaunchConfiguration("mode"), '") and '
+            '("false" == "', LaunchConfiguration("use_sim"), '")'
+        ]))
+    )
+
+    base_server = Node(
+        package="tidybot_driver",
+        executable="base_server",
+        name="base_server",
+        condition=IfCondition(PythonExpression([
+            '("full" == "', LaunchConfiguration("mode"), '") or '
+            '("base_only" == "', LaunchConfiguration("mode"), '") and '
+            '("false" == "', LaunchConfiguration("use_sim"), '")'
+        ])),
+    )
+
+    tidybot = Node(
+        package="tidybot_driver",
+        executable="tidybot",
+        name="tidybot",
+        output="screen",
+        parameters=[{"mode": LaunchConfiguration("mode")}],
+        condition=UnlessCondition(LaunchConfiguration("use_sim"))
+    )
+
     return LaunchDescription([
         use_sim,
+        mode,
         moveit_launch,
         rviz_launch,
         web_server_publisher,
         web_server_relay,
         state_controller,
         web_server_moveit,
+        arm_server,
+        base_server,
+        tidybot
     ])

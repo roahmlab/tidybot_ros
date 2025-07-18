@@ -25,36 +25,36 @@ class ArmServer(Node):
         # Create a subscription to the command topic
         self.arm_cmd_sub = self.create_subscription(
             Pose,
-            '/arm_controller/command',
+            '/tidybot/arm/command',
             self.cmd_callback,
             10
         )
         self.gripper_cmd_sub = self.create_subscription(
             Float64,
-            '/gripper_controller/command',
+            '/tidybot/gripper/command',
             self.gripper_cmd_callback,
             10
         )
         self.arm_state_pub = self.create_publisher(
             PoseStamped,
-            '/tidybot_arm/pose',
+            '/tidybot/arm/pose',
             10
         )
         self.gripper_state_pub = self.create_publisher(
             Float64,
-            '/tidybot_gripper/state',
+            '/tidybot/gripper/state',
             10
         )
         self.joint_state_pub = self.create_publisher(
             JointState,
-            '/joint_states',
+            '/tidybot/arm/joint_states',
             10
         )
 
         # Create reset service
         self.reset_srv = self.create_service(
             ResetEnv,
-            '/arm_controller/reset',
+            '/tidybot/arm/reset',
             self.handle_reset_request
         )
 
@@ -116,10 +116,10 @@ class ArmServer(Node):
         joint_state.name = [
             'joint_1', 'joint_2', 'joint_3',
             'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            'joint_th', 'joint_x', 'joint_y', 'finger_joint'
+            'finger_joint'
         ]
         joint_state.position = [angle for angle in self.arm.arm.q] + \
-                               [0, 0, 0] + [0.8 * self.arm.arm.gripper_pos]
+                               [0.8 * self.arm.arm.gripper_pos]
         self.joint_state_pub.publish(joint_state)
 
 class Arm:

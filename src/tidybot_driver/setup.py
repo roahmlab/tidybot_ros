@@ -35,6 +35,7 @@ setup(
             'base_server = tidybot_driver.base_server:main',
             'base_demo = tidybot_driver.base:main',
             'arm_server = tidybot_driver.arm_server:main',
+            'tidybot = tidybot_driver.tidybot:main',
         ],
     },
 )
