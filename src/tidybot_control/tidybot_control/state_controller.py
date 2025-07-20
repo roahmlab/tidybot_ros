@@ -16,6 +16,9 @@ RESET = "\x1b[0m"
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
+        self.declare_parameter("use_sim", True)
+        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+
         self.state_sub = self.create_subscription(
             String, "/ws_state", self.state_callback, 10
         )
@@ -23,9 +26,6 @@ class StateController(Node):
         self.reset_base_cli = self.create_client(
             Empty, "/tidybot_base/reset"
         )
-
-        self.declare_parameter("use_sim", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
 
     def state_callback(self, msg):
         self.get_logger().info(f"Received state command: {msg.data}")

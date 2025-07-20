@@ -77,13 +77,13 @@ def generate_launch_description():
         )
     )
 
-    ld.add_action(
-        Node(
-            package="joint_state_publisher",
-            executable="joint_state_publisher",
-            condition=UnlessCondition(LaunchConfiguration("jsp_gui")),
-        )
-    )
+    # ld.add_action(
+    #     Node(
+    #         package="joint_state_publisher",
+    #         executable="joint_state_publisher",
+    #         condition=UnlessCondition(LaunchConfiguration("jsp_gui")),
+    #     )
+    # )
 
     ld.add_action(
         Node(
