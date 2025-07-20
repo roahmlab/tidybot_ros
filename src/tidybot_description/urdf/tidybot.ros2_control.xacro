@@ -2,7 +2,7 @@
 
 <robot name="ros2_control" xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_ros2_control" params="hardware_plugin arm">
+    <xacro:macro name="load_ros2_control" params="hardware_plugin arm gripper">
         <xacro:macro name="add_joint" params="name gain cmd_interface">
             <joint name="${name}">
                 <command_interface name="${cmd_interface}"/>
@@ -32,10 +32,22 @@
             <xacro:add_joint name="joint_7" gain="0.1" cmd_interface="position"/>
         </xacro:if>
 
-        <xacro:add_joint name="right_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
-        <xacro:add_joint name="right_finger_tip_joint" gain="0.1" cmd_interface="position"/>
-        <xacro:add_joint name="left_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
-        <xacro:add_joint name="left_finger_tip_joint" gain="0.1" cmd_interface="position"/>
+        <xacro:if value="${gripper == 'gen3_lite_2f'}">
+            <xacro:add_joint name="right_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="right_finger_tip_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="left_finger_bottom_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="left_finger_tip_joint" gain="0.1" cmd_interface="position"/>
+        </xacro:if>
+
+        <xacro:if value="${gripper == 'robotiq_2f_85'}">
+            <xacro:add_joint name="right_inner_finger_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="right_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="right_inner_knuckle_joint" gain="0.1" cmd_interface="position"/>
+            <!-- <xacro:add_joint name="left_inner_finger_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="left_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="left_inner_knuckle_joint" gain="0.1" cmd_interface="position"/> -->
+        </xacro:if>
+
         </ros2_control>
     </xacro:macro>
 

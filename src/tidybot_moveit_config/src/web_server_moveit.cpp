@@ -26,12 +26,15 @@ class WebServerMoveit : public rclcpp::Node {
         options.lock_redundant_joints = false;
         options.return_approximate_solution = false;
 
+        // Listen to global tidybot commands
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
-            "/arm_controller/command", 1,
+            "/tidybot/arm/command", 1,
             std::bind(&WebServerMoveit::publish_arm, this, std::placeholders::_1));
         gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float64>(
-            "/gripper_controller/command", 1,
+            "/tidybot/gripper/command", 1,
             std::bind(&WebServerMoveit::publish_gripper, this, std::placeholders::_1));
+
+        // Publish to ros2_control controllers
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
