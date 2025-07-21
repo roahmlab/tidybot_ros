@@ -6,3 +6,4 @@ src/.vscode
 src/build
 /src/log
 /src/install
+venv
