@@ -1,8 +1,8 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
-from launch.conditions import IfCondition, UnlessCondition, AndCondition, OrCondition
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.conditions import IfCondition
 
 def generate_launch_description():
 
@@ -16,21 +16,19 @@ def generate_launch_description():
         package="tidybot_driver",
         executable="arm_server",
         name="arm_server",
-        condition=IfCondition(OrCondition([
-            IfCondition(LaunchConfiguration("mode") == "full"),
-            IfCondition(LaunchConfiguration("mode") == "arm_only"),
-        ]))
+        condition=IfCondition(PythonExpression(
+            LaunchConfiguration("mode"), " == 'arm_only' or ", LaunchConfiguration("mode"), " == 'full'"
+        ))
     )
 
     base_server = Node(
         package="tidybot_driver",
         executable="base_server",
         name="base_server",
-        condition=IfCondition(OrCondition([
-            IfCondition(LaunchConfiguration("mode") == "full"),
-            IfCondition(LaunchConfiguration("mode") == "base_only"),
-        ])),
-        prefix=['sudo', 'chrt', '-f', '80']
+        condition=IfCondition(PythonExpression(
+            LaunchConfiguration("mode"), " == 'base_only' or ", LaunchConfiguration("mode"), " == 'full'"
+        )),
+        # prefix=['sudo', 'chrt', '-f', '80']
     )
 
     return LaunchDescription([
