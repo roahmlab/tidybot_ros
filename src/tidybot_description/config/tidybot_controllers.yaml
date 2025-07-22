@@ -15,8 +15,8 @@ controller_manager:
     gen3_7dof_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-    gen3_lite_2f_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+    # gen3_lite_2f_controller:
+    #   type: joint_trajectory_controller/JointTrajectoryController
   
     robotiq_2f_85_controller:
       type: joint_trajectory_controller/JointTrajectoryController
