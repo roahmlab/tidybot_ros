@@ -1,19 +1,23 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float64, Float64MultiArray
+from std_msgs.msg import Float64, Float64MultiArray, Header
 from geometry_msgs.msg import Pose, PoseStamped
-
+from builtin_interfaces.msg import Duration
 import queue
 import time
 import math
 from multiprocessing.managers import BaseManager as MPBaseManager
 import numpy as np
 from sensor_msgs.msg import JointState
+from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from tidybot_driver.arm_controller import JointCompliantController
 from tidybot_driver.constants import ARM_RPC_HOST, ARM_RPC_PORT, RPC_AUTHKEY
 from tidybot_driver.ik_solver import IKSolver
 from tidybot_driver.kinova import TorqueControlledArm
-from tidybot_utils.srv import ResetEnv
+from std_srvs.srv import Empty
+
+CONTROL_FREQ = 20                    # 20 Hz
+CONTROL_PERIOD = 1.0 / CONTROL_FREQ  # 50 ms
 
 class ArmServer(Node):
     def __init__(self):
@@ -40,6 +44,11 @@ class ArmServer(Node):
             '/tidybot/arm/pose',
             10
         )
+        self.arm_trajectory_pub = self.create_publisher(
+            JointTrajectory,
+            '/tidybot/arm/trajectory',
+            10
+        )
         self.gripper_state_pub = self.create_publisher(
             Float64,
             '/tidybot/gripper/state',
@@ -53,24 +62,19 @@ class ArmServer(Node):
 
         # Create reset service
         self.reset_srv = self.create_service(
-            ResetEnv,
+            Empty,
             '/tidybot/arm/reset',
             self.handle_reset_request
         )
 
         self.gripper_cmd = Float64()
         self.clock = self.get_clock()
-        self.control_timer = self.create_timer(0.05, self.control_callback)
+        self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_callback)
 
     def handle_reset_request(self, request, response):
-        if request.reset:
-            self.get_logger().info("Received reset request")
-            self.arm.reset()
-            response.success = True
-        else:
-            self.get_logger().warn("Received non-reset request")
-            response.success = False
-
+        self.get_logger().info("Resetting arm")
+        self.arm.reset()
+        self.get_logger().info("Arm reset complete")
         return response
 
     def cmd_callback(self, msg):
@@ -84,7 +88,7 @@ class ArmServer(Node):
         action = {'arm_pos' : target_pos,
                   'arm_quat' : target_quat,
                   'gripper_pos' : np.array(self.gripper_cmd.data, dtype=np.float64)}
-        self.arm.execute_action(action)
+        self.arm_trajectory_pub.publish(self.arm.execute_action(action, self.clock.now().to_msg()))
 
     def gripper_cmd_callback(self, msg):
         self.gripper_cmd = msg
@@ -151,9 +155,24 @@ class Arm:
         while not self.arm.cyclic_running:
             time.sleep(0.01)
 
-    def execute_action(self, action):
+    def execute_action(self, action, timestamp):
         qpos = self.ik_solver.solve(action['arm_pos'], action['arm_quat'], self.arm.q)
+
+        traj_msg = JointTrajectory()
+        traj_msg.header = Header()
+        traj_msg.header.stamp = timestamp
+        traj_msg.joint_names = [
+            'joint_1', 'joint_2', 'joint_3',
+            'joint_4', 'joint_5', 'joint_6', 'joint_7',
+            'finger_joint'
+        ]
+        point = JointTrajectoryPoint()
+        point.positions = list(qpos) + [0.8 * action['gripper_pos'].item()]
+        point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
+        traj_msg.points = [point]
+
         self.command_queue.put((qpos, action['gripper_pos'].item()))
+        return traj_msg
 
     def get_state(self):
         arm_pos, arm_quat = self.arm.get_tool_pose()

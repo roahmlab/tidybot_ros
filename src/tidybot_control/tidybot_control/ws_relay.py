@@ -31,7 +31,7 @@ class WSRelay(Node):
             self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         else:
             self.base_state_sub = self.create_subscription(
-                JointState, "/tidybot/base/joint_states", self.joint_states_callback, 10
+                JointState, "/tidybot/base/joint_states", self.base_state_callback, 10
             )
             self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot/base/commands", 10)
 
@@ -48,7 +48,7 @@ class WSRelay(Node):
             )
         else:
             self.arm_state_sub = self.create_subscription(
-                PoseStamped, "/tidybot/arm/pose", self.joint_states_callback, 10
+                PoseStamped, "/tidybot/arm/pose", self.arm_pose_callback, 10
             )
 
         self.rc_br = TransformBroadcaster(self)
@@ -100,14 +100,12 @@ class WSRelay(Node):
             match msg.teleop_mode:
                 case "base":
                     if self.base_xr_ref_pos is None:
-                        # the initial position and orientation in the WebXR frame
                         self.base_xr_ref_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])
                         self.base_xr_ref_quat = np.array([msg.or_x, msg.or_y, msg.or_z, msg.or_w])
-                        # the initial position and orientation in the robot frame
                         self.base_ref_pos = np.array([self.base_obs[1], self.base_obs[0], 0.0])
                         self.base_ref_quat = np.array([0.0, 0.0, self.base_obs[2], 1.0])
                         self.xr_ref_r = R.from_quat(self.base_xr_ref_quat)
-                        self.base_ref_r =  R.from_quat(self.base_ref_quat)
+                        self.base_re_r =  R.from_quat(self.base_ref_quat)
                     else:
                         # convert the incoming position and orientation wrt world frame to the wx_ref frame
                         delta_quat = quaternion_multiply(
@@ -116,18 +114,17 @@ class WSRelay(Node):
                         )
                         delta_pos =  xr_pos - self.base_xr_ref_pos
                         delta_pos = self.xr_ref_r.inv().apply(delta_pos)
-                        delta_pos = self.base_ref_r.apply(delta_pos)
+                        delta_pos = self.base_re_r.apply(delta_pos)
                         yaw = math.atan2(2 * (delta_quat[3] * delta_quat[2] + delta_quat[0] * delta_quat[1]),
                                             delta_quat[3]**2 - delta_quat[2]**2 - delta_quat[1]**2 + delta_quat[0]**2)
                         command = Float64MultiArray()
                         command.data = [
                             delta_pos[1] + self.base_ref_pos[1],
-                            -delta_pos[0] + self.base_ref_pos[0],
+                            -delta_pos[0] - self.base_ref_pos[0],
                             yaw + self.base_ref_quat[2]
                         ]
                         self.base_pub.publish(command)
-                        # self.get_logger().info(f'base_ref_pos: {self.base_ref_pos}, base_ref_quat: {self.base_ref_quat}, delta_pos: {delta_pos}, delta_quat: {delta_quat}')
-                        self.get_logger().info(f'xr_pos: {xr_pos}')
+                        self.get_logger().info(f'Base pos: {self.base_ref_pos}, Base quat: {self.base_ref_quat}, Delta pos: {delta_pos}, Delta quat: {delta_quat}')
                         return
 
                 case "arm":
@@ -183,12 +180,13 @@ class WSRelay(Node):
             self.arm_ref_quat = None
             self.gripper_ref = None
 
-    def joint_states_callback(self, msg):
-        # self.base_obs[0] = msg.position[msg.name.index("joint_x")]
-        # self.base_obs[1] = msg.position[msg.name.index("joint_y")]
-        # self.base_obs[2] = msg.position[msg.name.index("joint_th")]
+    def base_state_callback(self, msg):
+        self.base_obs[0] = msg.position[msg.name.index("joint_x")]
+        self.base_obs[1] = msg.position[msg.name.index("joint_y")]
+        self.base_obs[2] = msg.position[msg.name.index("joint_th")]
         # self.get_logger().info(f'Base joint states: {self.base_obs}')
 
+    def arm_pose_callback(self, msg):
         if self.use_sim:
             # Forward kinematics to find end effector position
             try:
@@ -212,9 +210,6 @@ class WSRelay(Node):
             self.arm_obs_quat = R.from_quat([msg.pose.orientation.x, msg.pose.orientation.y, msg.pose.orientation.z, msg.pose.orientation.w])
         
         # self.get_logger().info(f'Arm position: {self.arm_obs_pos}')
-
-    def base_state_callback(self, msg):
-        pass
 
     def time_jump_callback(self, time: Time):
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning

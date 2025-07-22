@@ -23,12 +23,6 @@ def generate_launch_description():
         description="Use simulation mode if true"
     )
 
-    mode = DeclareLaunchArgument(
-        "mode", 
-        default_value="full", 
-        description="Control mode: full, arm_only, base_only"
-    )
-
     robot_description_path = get_package_share_directory("tidybot_description")
     doc = xacro.process_file(str(robot_description_path + "/urdf/tidybot.xacro"))
     urdf_xml = doc.toxml()

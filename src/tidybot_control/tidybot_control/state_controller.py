@@ -26,6 +26,8 @@ class StateController(Node):
         self.reset_base_cli = self.create_client(
             Empty, "/tidybot_base/reset"
         )
+    
+        self.reset_arm_cli = self.create_client(Empty, "/tidybot/arm/reset")
 
     def state_callback(self, msg):
         self.get_logger().info(f"Received state command: {msg.data}")
@@ -35,11 +37,11 @@ class StateController(Node):
                     subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
                 else:
                     self.reset_base_cli.call_async(Empty.Request())
+                    self.reset_arm_cli.call_async(Empty.Request())
             case "episode_started":
                 self.get_logger().info(f"{GREEN}Episode started.{RESET}")
             case "episode_finished":
                 self.get_logger().info(f"{GREEN}Episode finished.{RESET}")
-
 
 
 def main(args=None):
