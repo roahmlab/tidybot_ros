@@ -20,7 +20,7 @@ class BaseServer(Node):
             Float64MultiArray,
             '/tidybot/base/commands',
             self.cmd_callback,
-            10
+            1
         )
 
         self.state_pub = self.create_publisher(

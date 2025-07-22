@@ -30,9 +30,17 @@ def generate_launch_description():
         )),
         # prefix=['sudo', 'chrt', '-f', '80']
     )
+    
+    tidybot_jsp = Node(
+        package="tidybot_driver",
+        executable="tidybot",
+        name="tidybot",
+        parameters=[{"mode": LaunchConfiguration("mode")}]
+    )
 
     return LaunchDescription([
         mode,
         arm_server,
-        base_server
+        base_server,
+        tidybot_jsp
     ])

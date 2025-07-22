@@ -5,6 +5,7 @@
   <version>0.0.0</version>
   <description>Tidybot message and service utilities</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
   <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>

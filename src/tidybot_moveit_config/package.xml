@@ -7,6 +7,7 @@
      An automatically generated package with all the configuration and launch files for using the tidybot with the MoveIt Motion Planning Framework
   </description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
 
   <license>BSD-3-Clause</license>
 

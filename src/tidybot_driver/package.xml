@@ -5,6 +5,7 @@
   <version>0.0.0</version>
   <description>Package to interface with the TidyBot hardware</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
   <license>TODO: License declaration</license>
 
   <test_depend>ament_copyright</test_depend>
