@@ -187,7 +187,7 @@ def generate_launch_description():
         Node(
             package="controller_manager",
             executable="spawner",
-            arguments=["gen3_lite_2f_controller"],
+            arguments=["robotiq_2f_85_controller"],
             output="screen",
         )
     )
