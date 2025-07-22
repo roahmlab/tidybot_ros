@@ -38,7 +38,7 @@ class WebServerMoveit : public rclcpp::Node {
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            "/gen3_lite_2f_controller/joint_trajectory", 10);
+            "/robotiq_2f_85_controller/joint_trajectory", 10);
 
         // Debugging
         pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
