@@ -1,7 +1,7 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, PythonExpression
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.conditions import IfCondition
 
 def generate_launch_description():
@@ -16,19 +16,27 @@ def generate_launch_description():
         package="tidybot_driver",
         executable="arm_server",
         name="arm_server",
-        condition=IfCondition(PythonExpression(
-            LaunchConfiguration("mode"), " == 'arm_only' or ", LaunchConfiguration("mode"), " == 'full'"
-        ))
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+        ]))
+    )
+    
+    camera_streamer = Node(
+        package="tidybot_driver",
+        executable="camera",
+        name="camera",
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+        ]))
     )
 
     base_server = Node(
         package="tidybot_driver",
         executable="base_server",
         name="base_server",
-        condition=IfCondition(PythonExpression(
-            LaunchConfiguration("mode"), " == 'base_only' or ", LaunchConfiguration("mode"), " == 'full'"
-        )),
-        # prefix=['sudo', 'chrt', '-f', '80']
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("mode"), "' == 'base_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+        ]))
     )
     
     tidybot_jsp = Node(
@@ -41,6 +49,7 @@ def generate_launch_description():
     return LaunchDescription([
         mode,
         arm_server,
+        camera_streamer,
         base_server,
         tidybot_jsp
     ])

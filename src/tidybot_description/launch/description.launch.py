@@ -41,6 +41,7 @@ def generate_launch_description():
                                       }],)
 
     ld.add_action(use_sim_time)
+    ld.add_action(ignore_timestamp)
     ld.add_action(robot_description_content)
     ld.add_action(robot_state_publisher_node)
     return ld
