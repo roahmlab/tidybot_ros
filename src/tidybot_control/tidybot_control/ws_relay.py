@@ -26,7 +26,7 @@ class WSRelay(Node):
         self.get_logger().info('Web server relay initialized with use_sim: {}'.format(self.use_sim))
         if self.use_sim:
             self.joint_states_sub = self.create_subscription(
-                JointState, "/joint_states", self.joint_states_callback, 10
+                JointState, "/joint_states", self.base_state_callback, 10
             )
             self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot_base_pos_controller/commands", 10)
         else:
@@ -44,7 +44,7 @@ class WSRelay(Node):
         self.gripper_pub = self.create_publisher(Float64, "/tidybot/gripper/command", 10)
         if self.use_sim:
             self.arm_state_sub = self.create_subscription(
-                JointState, "/joint_states", self.joint_states_callback, 10
+                JointState, "/joint_states", self.arm_pose_callback, 10
             )
         else:
             self.arm_state_sub = self.create_subscription(
