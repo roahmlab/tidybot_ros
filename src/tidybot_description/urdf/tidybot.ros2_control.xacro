@@ -43,9 +43,9 @@
             <xacro:add_joint name="right_inner_finger_joint" gain="0.1" cmd_interface="position"/>
             <xacro:add_joint name="right_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
             <xacro:add_joint name="right_inner_knuckle_joint" gain="0.1" cmd_interface="position"/>
-            <!-- <xacro:add_joint name="left_inner_finger_joint" gain="0.1" cmd_interface="position"/>
+            <xacro:add_joint name="left_inner_finger_joint" gain="0.1" cmd_interface="position"/>
             <xacro:add_joint name="left_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="left_inner_knuckle_joint" gain="0.1" cmd_interface="position"/> -->
+            <xacro:add_joint name="left_inner_knuckle_joint" gain="0.1" cmd_interface="position"/>
         </xacro:if>
 
         </ros2_control>
