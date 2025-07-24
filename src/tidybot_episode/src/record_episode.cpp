@@ -67,7 +67,6 @@ public:
                 "/robotiq_2f_85_controller/joint_trajectory", 10,
                 std::bind(&EpisodeRecorder::gripper_cmd_callback, this, std::placeholders::_1));
         }
-
         // If not in simulation, subscribe to the tidybot_control topics
         else
         {
@@ -75,7 +74,7 @@ public:
                 "/tidybot/base/commands", 10,
                 std::bind(&EpisodeRecorder::base_cmd_callback, this, std::placeholders::_1));
             arm_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-                "/tidybot/arm/trajectory", 10,
+                "/tidybot/arm/pose", 10,
                 std::bind(&EpisodeRecorder::arm_cmd_callback, this, std::placeholders::_1));
             gripper_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
                 "/tidybot/gripper/state", 10,
@@ -110,7 +109,14 @@ public:
     void arm_cmd_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
     {
         // Write the arm command message to the rosbag
-        write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/gen3_7dof_controller/joint_trajectory");
+        if (use_sim_)
+        {
+            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/gen3_7dof_controller/joint_trajectory");
+        }
+        else
+        {
+            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/tidybot/arm/command");
+        }
     }
 
     void gripper_cmd_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
