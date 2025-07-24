@@ -13,23 +13,31 @@ import os
 # Vehicle
 POLICY_CONTROL_FREQ = 10
 POLICY_CONTROL_PERIOD = 1.0 / POLICY_CONTROL_FREQ
-CONTROL_FREQ = 100                   # 100 Hz
+CONTROL_FREQ = 250  # 100 Hz
 CONTROL_PERIOD = 1.0 / CONTROL_FREQ  # 10 ms
 NUM_CASTERS = 4
-ENCODER_MAGNET_OFFSETS = [1374.0 / 4096, 1591.0 / 4096, -1544.0 / 4096, -1214.0 / 4096]  # Encoder magnet offsets for each caster (in radians)
-h_x, h_y = 0.190150 * np.array([1.0, 1.0, -1.0, -1.0]), 0.170150 * np.array([-1.0, 1.0, 1.0, -1.0])  # Kinova / Franka
+ENCODER_MAGNET_OFFSETS = [
+    1374.0 / 4096,
+    1591.0 / 4096,
+    -1544.0 / 4096,
+    -1214.0 / 4096,
+]  # Encoder magnet offsets for each caster (in radians)
+h_x, h_y = 0.190150 * np.array([1.0, 1.0, -1.0, -1.0]), 0.170150 * np.array(
+    [-1.0, 1.0, 1.0, -1.0]
+)  # Kinova / Franka
 
 # Caster
-b_x = -0.014008                  # Caster offset (m)
-b_y = -0.003753                  # Lateral caster offset (m)
-r = 0.0508                       # Wheel radius (m)
+b_x = -0.014008  # Caster offset (m)
+b_y = -0.003753  # Lateral caster offset (m)
+r = 0.0508  # Wheel radius (m)
 N_s = 32.0 / 15.0 * 60.0 / 10.0  # Steer gear ratio
-N_r1 = 50.0 / 14.0               # Drive gear ratio (1st stage)
-N_r2 = 19.0 / 25.0               # Drive gear ratio (2nd stage)
-N_w = 45.0 / 15.0                # Wheel gear ratio
+N_r1 = 50.0 / 14.0  # Drive gear ratio (1st stage)
+N_r2 = 19.0 / 25.0  # Drive gear ratio (2nd stage)
+N_w = 45.0 / 15.0  # Wheel gear ratio
 N_r1_r2_w = N_r1 * N_r2 * N_w
 N_s_r2_w = N_s * N_r2 * N_w
 TWO_PI = 2 * math.pi
+
 
 class Motor:
     def __init__(self, num):
@@ -43,9 +51,11 @@ class Motor:
         if self.num == 1:
             time.sleep(0.2)  # First CAN device, wait for CAN bus to be ready
             supply_voltage = self.fx.get_supply_voltage().value
-            print(f'Motor supply voltage: {supply_voltage:.2f} V')
+            print(f"Motor supply voltage: {supply_voltage:.2f} V")
             if supply_voltage < 11.5:
-                raise Exception('Motor supply voltage is too low. Please charge the battery.')
+                raise Exception(
+                    "Motor supply voltage is too low. Please charge the battery."
+                )
 
         # Status signals
         self.position_signal = self.fx.get_position()
@@ -59,11 +69,15 @@ class Motor:
 
         # Velocity control gains
         fx_cfg.slot0.k_p = 5.0
-        fx_cfg.slot0.k_d = 0.1 if self.is_steer else 0.0  # Set k_d for steer to prevent caster flutter
+        fx_cfg.slot0.k_d = (
+            0.1 if self.is_steer else 0.0
+        )  # Set k_d for steer to prevent caster flutter
 
         # Current limits (hard floor with no incline)
         # IMPORTANT: These values limit the force that the base can generate. Proceed very carefully if modifying these values.
-        torque_current_limit = 40 if self.is_steer else 10  # 40 A for steer, 10 A for drive
+        torque_current_limit = (
+            40 if self.is_steer else 10
+        )  # 40 A for steer, 10 A for drive
         fx_cfg.torque_current.peak_forward_torque_current = torque_current_limit
         fx_cfg.torque_current.peak_reverse_torque_current = -torque_current_limit
 
@@ -86,6 +100,7 @@ class Motor:
     def set_neutral(self):
         self.fx.set_control(self.neutral_request)
 
+
 class Caster:
     def __init__(self, num):
         self.num = num
@@ -97,11 +112,17 @@ class Caster:
         # Status signals
         self.steer_position_signal = self.cancoder.get_absolute_position()
         self.steer_velocity_signal = self.cancoder.get_velocity()
-        self.status_signals = self.steer_motor.status_signals + self.drive_motor.status_signals
-        self.status_signals.extend([self.steer_position_signal, self.steer_velocity_signal])
+        self.status_signals = (
+            self.steer_motor.status_signals + self.drive_motor.status_signals
+        )
+        self.status_signals.extend(
+            [self.steer_position_signal, self.steer_velocity_signal]
+        )
 
         # Encoder magnet offset
-        self.cancoder_cfg.magnet_sensor.magnet_offset = ENCODER_MAGNET_OFFSETS[self.num - 1]
+        self.cancoder_cfg.magnet_sensor.magnet_offset = ENCODER_MAGNET_OFFSETS[
+            self.num - 1
+        ]
         self.cancoder.configurator.apply(self.cancoder_cfg)
 
     def get_steer_position(self):
@@ -134,14 +155,17 @@ class Caster:
         self.steer_motor.set_neutral()
         self.drive_motor.set_neutral()
 
+
 class CommandType(Enum):
-    POSITION = 'position'
-    VELOCITY = 'velocity'
+    POSITION = "position"
+    VELOCITY = "velocity"
+
 
 # Currently only used for velocity commands
 class FrameType(Enum):
-    GLOBAL = 'global'
-    LOCAL = 'local'
+    GLOBAL = "global"
+    LOCAL = "local"
+
 
 class Vehicle:
     def __init__(self, max_vel=(0.5, 0.5, 1.57), max_accel=(0.25, 0.25, 0.79)):
@@ -155,10 +179,13 @@ class Vehicle:
         self.casters = [Caster(num) for num in range(1, NUM_CASTERS + 1)]
 
         # # CAN bus update frequency
-        self.status_signals = [signal for caster in self.casters for signal in caster.status_signals]
+        self.status_signals = [
+            signal for caster in self.casters for signal in caster.status_signals
+        ]
         # print(self.status_signals)
-        phoenix6.BaseStatusSignal.set_update_frequency_for_all(CONTROL_FREQ, *self.status_signals)
-
+        phoenix6.BaseStatusSignal.set_update_frequency_for_all(
+            CONTROL_FREQ, *self.status_signals
+        )
 
         # Joint space
         num_motors = 2 * NUM_CASTERS
@@ -200,7 +227,9 @@ class Vehicle:
 
         # Control loop
         self.command_queue = queue.Queue(1)
-        self.control_loop_thread = threading.Thread(target=self.control_loop, daemon=True)
+        self.control_loop_thread = threading.Thread(
+            target=self.control_loop, daemon=True
+        )
         self.control_loop_running = False
 
         # Debugging
@@ -210,12 +239,14 @@ class Vehicle:
 
     def update_state(self):
         # Update all status signals (sensor values)
-        phoenix6.BaseStatusSignal.refresh_all(*self.status_signals)  # Note: Signal latency is roughly 4 ms
+        phoenix6.BaseStatusSignal.refresh_all(
+            *self.status_signals
+        )  # Note: Signal latency is roughly 4 ms
 
         # Joint positions and velocities
         for i, caster in enumerate(self.casters):
-            self.q[2*i : 2*i + 2] = caster.get_positions()
-            self.dq[2*i : 2*i + 2] = caster.get_velocities()
+            self.q[2 * i : 2 * i + 2] = caster.get_positions()
+            self.dq[2 * i : 2 * i + 2] = caster.get_velocities()
 
         q_steer = self.q[::2]
         s = np.sin(q_steer)
@@ -224,39 +255,49 @@ class Vehicle:
         # C matrix
         self.C_steer[:, 0] = s / b_x
         self.C_steer[:, 1] = -c / b_x
-        self.C_steer[:, 2] = (-h_x*c - h_y*s) / b_x - 1.0
-        self.C_drive[:, 0] = c/r - b_y*s / (b_x*r)
-        self.C_drive[:, 1] = s/r + b_y*c / (b_x*r)
-        self.C_drive[:, 2] = (h_x*s - h_y*c) / r + b_y * (h_x*c + h_y*s) / (b_x*r)
+        self.C_steer[:, 2] = (-h_x * c - h_y * s) / b_x - 1.0
+        self.C_drive[:, 0] = c / r - b_y * s / (b_x * r)
+        self.C_drive[:, 1] = s / r + b_y * c / (b_x * r)
+        self.C_drive[:, 2] = (h_x * s - h_y * c) / r + b_y * (h_x * c + h_y * s) / (
+            b_x * r
+        )
 
         # C_p matrix
-        self.C_p_steer[:, 2] = -b_x*s - b_y*c - h_y
-        self.C_p_drive[:, 2] = b_x*c - b_y*s + h_x
+        self.C_p_steer[:, 2] = -b_x * s - b_y * c - h_y
+        self.C_p_drive[:, 2] = b_x * c - b_y * s + h_x
 
         # C_qp^# matrix
-        self.CpT_Cqinv_steer[0] = b_x*s + b_y*c
-        self.CpT_Cqinv_steer[1] = -b_x*c + b_y*s
-        self.CpT_Cqinv_steer[2] = b_x * (-h_x*c - h_y*s - b_x) + b_y * (h_x*s - h_y*c - b_y)
+        self.CpT_Cqinv_steer[0] = b_x * s + b_y * c
+        self.CpT_Cqinv_steer[1] = -b_x * c + b_y * s
+        self.CpT_Cqinv_steer[2] = b_x * (-h_x * c - h_y * s - b_x) + b_y * (
+            h_x * s - h_y * c - b_y
+        )
         self.CpT_Cqinv_drive[0] = r * c
         self.CpT_Cqinv_drive[1] = r * s
-        self.CpT_Cqinv_drive[2] = r * (h_x*s - h_y*c - b_y)
-        with threadpool_limits(limits=1, user_api='blas'):  # Prevent excessive CPU usage
+        self.CpT_Cqinv_drive[2] = r * (h_x * s - h_y * c - b_y)
+        with threadpool_limits(
+            limits=1, user_api="blas"
+        ):  # Prevent excessive CPU usage
             self.C_pinv = np.linalg.solve(self.C_p.T @ self.C_p, self.CpT_Cqinv)
 
         # Odometry
         dx_local = self.C_pinv @ self.dq
         theta_avg = self.x[2] + 0.5 * dx_local[2] * CONTROL_PERIOD
-        R = np.array([
-            [math.cos(theta_avg), -math.sin(theta_avg), 0.0],
-            [math.sin(theta_avg), math.cos(theta_avg), 0.0],
-            [0.0, 0.0, 1.0]
-        ])
+        R = np.array(
+            [
+                [math.cos(theta_avg), -math.sin(theta_avg), 0.0],
+                [math.sin(theta_avg), math.cos(theta_avg), 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
         self.dx = R @ dx_local
         self.x += self.dx * CONTROL_PERIOD
 
     def start_control(self):
         if self.control_loop_thread is None:
-            print('To initiate a new control loop, please create a new instance of Vehicle.')
+            print(
+                "To initiate a new control loop, please create a new instance of Vehicle."
+            )
             return
         self.control_loop_running = True
         self.control_loop_thread.start()
@@ -268,10 +309,10 @@ class Vehicle:
 
     def control_loop(self):
         # Set real-time scheduling policy
-        try:
-            os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(os.sched_get_priority_max(os.SCHED_FIFO)))
-        except PermissionError:
-            print('Failed to set real-time scheduling policy, please edit /etc/security/limits.d/99-realtime.conf')
+        # try:
+        #     os.sched_setscheduler(0, os.SCHED_FIFO, os.sched_param(os.sched_get_priority_max(os.SCHED_FIFO)))
+        # except PermissionError:
+        #     print('Failed to set real-time scheduling policy, please edit /etc/security/limits.d/99-realtime.conf')
 
         disable_motors = True
         last_command_time = time.time()
@@ -284,34 +325,40 @@ class Vehicle:
             step_time = curr_time - last_step_time
             last_step_time = curr_time
             if step_time > 0.005:  # 5 ms
-                print(f'Warning: Step time {1000 * step_time:.3f} ms in {self.__class__.__name__} control_loop')
+                print(
+                    f"Warning: Step time {1000 * step_time:.3f} ms in {self.__class__.__name__} control_loop"
+                )
 
             # Update state
             self.update_state()
 
             # Global to local frame conversion
             theta = self.x[2]
-            R = np.array([
-                [math.cos(theta), math.sin(theta), 0.0],
-                [-math.sin(theta), math.cos(theta), 0.0],
-                [0.0, 0.0, 1.0]
-            ])
+            R = np.array(
+                [
+                    [math.cos(theta), math.sin(theta), 0.0],
+                    [-math.sin(theta), math.cos(theta), 0.0],
+                    [0.0, 0.0, 1.0],
+                ]
+            )
 
             # Check for new command
             if not self.command_queue.empty():
                 command = self.command_queue.get()
                 last_command_time = time.time()
-                target = command['target']
+                target = command["target"]
 
                 # Velocity command
-                if command['type'] == CommandType.VELOCITY:
-                    if command['frame'] == FrameType.LOCAL:
+                if command["type"] == CommandType.VELOCITY:
+                    if command["frame"] == FrameType.LOCAL:
                         target = R.T @ target
                     self.otg_inp.control_interface = ControlInterface.Velocity
-                    self.otg_inp.target_velocity = np.clip(target, -self.max_vel, self.max_vel)
+                    self.otg_inp.target_velocity = np.clip(
+                        target, -self.max_vel, self.max_vel
+                    )
 
                 # Position command
-                elif command['type'] == CommandType.POSITION:
+                elif command["type"] == CommandType.POSITION:
                     self.otg_inp.control_interface = ControlInterface.Position
                     self.otg_inp.target_position = target
                     self.otg_inp.target_velocity = np.zeros_like(self.dx)
@@ -323,7 +370,9 @@ class Vehicle:
             if time.time() - last_command_time > 2.5 * POLICY_CONTROL_PERIOD:
                 self.otg_inp.target_position = self.otg_out.new_position
                 self.otg_inp.target_velocity = np.zeros_like(self.dx)
-                self.otg_inp.current_velocity = self.dx  # Set this to prevent lurch when command stream resumes
+                self.otg_inp.current_velocity = (
+                    self.dx
+                )  # Set this to prevent lurch when command stream resumes
                 self.otg_res = Result.Working
                 disable_motors = True
 
@@ -359,7 +408,7 @@ class Vehicle:
 
                 # Send motor velocity commands
                 for i in range(NUM_CASTERS):
-                    self.casters[i].set_velocities(dq_d[2*i], dq_d[2*i + 1])
+                    self.casters[i].set_velocities(dq_d[2 * i], dq_d[2 * i + 1])
 
             # Debugging
             # self.data.append({
@@ -374,14 +423,14 @@ class Vehicle:
 
     def _enqueue_command(self, command_type, target, frame=None):
         if self.command_queue.full():
-            print('Warning: Command queue is full. Is control loop running?')
+            print("Warning: Command queue is full. Is control loop running?")
         else:
-            command = {'type': command_type, 'target': target}
+            command = {"type": command_type, "target": target}
             if frame is not None:
-                command['frame'] = FrameType(frame)
+                command["frame"] = FrameType(frame)
             self.command_queue.put(command, block=False)
 
-    def set_target_velocity(self, velocity, frame='global'):
+    def set_target_velocity(self, velocity, frame="global"):
         self._enqueue_command(CommandType.VELOCITY, velocity, frame)
 
     def set_target_position(self, position):
@@ -390,18 +439,21 @@ class Vehicle:
     def get_encoder_offsets(self):
         offsets = []
         for caster in self.casters:
-            caster.cancoder.configurator.refresh(caster.cancoder_cfg)  # Read current config
+            caster.cancoder.configurator.refresh(
+                caster.cancoder_cfg
+            )  # Read current config
             curr_offset = caster.cancoder_cfg.magnet_sensor.magnet_offset
             caster.steer_position_signal.wait_for_update(0.1)
             curr_position = caster.cancoder.get_absolute_position().value
-            offsets.append(f'{round(4096 * (curr_offset - curr_position))}.0 / 4096')
+            offsets.append(f"{round(4096 * (curr_offset - curr_position))}.0 / 4096")
         print(f'ENCODER_MAGNET_OFFSETS = [{", ".join(offsets)}]')
 
     def get_position(self):
         return self.x
 
+
 def main(args=None):
-    os.environ['CTR_TARGET'] = 'Hardware'  # pylint: disable=wrong-import-position
+    os.environ["CTR_TARGET"] = "Hardware"  # pylint: disable=wrong-import-position
     vehicle = Vehicle(max_vel=(0.25, 0.25, 0.79))
     # vehicle.get_encoder_offsets()
     # exit()
@@ -411,10 +463,12 @@ def main(args=None):
             # vehicle.set_target_velocity(np.array([0.1, 0.0, 0.0]))
             vehicle.set_target_velocity(np.array([0.0, 0.0, 0.25]))
             # vehicle.set_target_position(np.array([0.5, 0.0, 0.0]))
-            print(f'Vehicle - x: {vehicle.x} dx: {vehicle.dx}')
-            time.sleep(POLICY_CONTROL_PERIOD)  # Note: Not precise
+            print(f"Vehicle - x: {vehicle.x} dx: {vehicle.dx}")
+            time.sleep(POLICY_CONTROL_PERIOD)
+            # Note: Not precise
     finally:
         vehicle.stop_control()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
