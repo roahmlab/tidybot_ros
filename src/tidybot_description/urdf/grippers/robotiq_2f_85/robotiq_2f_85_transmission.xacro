@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:macro name="load_gripper_transmission" params="prefix">
+
+        <transmission name="${prefix}left_inner_knuckle_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}left_inner_knuckle_joint" />
+            <actuator name="${prefix}left_inner_knuckle_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+
+        <transmission name="${prefix}right_inner_knuckle_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}right_inner_knuckle_joint" />
+            <actuator name="${prefix}right_inner_knuckle_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+
+        <transmission name="${prefix}left_inner_finger_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}left_inner_finger_joint" />
+            <actuator name="${prefix}left_inner_finger_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+
+       <transmission name="${prefix}right_inner_finger_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}right_inner_finger_joint" />
+            <actuator name="${prefix}right_inner_finger_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+
+        <transmission name="${prefix}left_outer_knuckle_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}left_outer_knuckle_joint" />
+            <actuator name="${prefix}left_outer_knuckle_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+        
+        <transmission name="${prefix}right_outer_knuckle_joint_trans">
+            <type>transmission_interface/SimpleTransmission</type>
+            <joint name="${prefix}right_outer_knuckle_joint" />
+            <actuator name="${prefix}right_outer_knuckle_joint_motor" />
+            <mechanicalReduction>1</mechanicalReduction>
+        </transmission>
+
+    </xacro:macro>
+
+</robot>
