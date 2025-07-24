@@ -78,7 +78,7 @@ public:
                 "/tidybot/arm/trajectory", 10,
                 std::bind(&EpisodeRecorder::arm_cmd_callback, this, std::placeholders::_1));
             gripper_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-                "/tidybot/gripper/trajectory", 10,
+                "/tidybot/gripper/state", 10,
                 std::bind(&EpisodeRecorder::gripper_cmd_callback, this, std::placeholders::_1));
         }
 
@@ -116,7 +116,14 @@ public:
     void gripper_cmd_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
     {
         // Write the gripper command message to the rosbag
-        write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/robotiq_2f_85_controller/joint_trajectory");
+        if (use_sim_)
+        {
+            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/robotiq_2f_85_controller/joint_trajectory");
+        }
+        else
+        {
+            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/tidybot/gripper/command");
+        }
     }
 
     void start_recording_callback(
