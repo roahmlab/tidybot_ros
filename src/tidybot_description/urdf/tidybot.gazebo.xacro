@@ -62,5 +62,8 @@
   <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_transmission.xacro" />
   <xacro:load_base_transmission prefix="${prefix}" />
 
+  <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_2f_85_transmission.xacro" />
+  <xacro:load_gripper_transmission prefix="${prefix}" />
+
 </xacro:macro>
 </robot>
