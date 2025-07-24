@@ -39,11 +39,19 @@ class ArmServer(Node):
             self.gripper_cmd_callback,
             10
         )
+        # End effector pose
         self.arm_state_pub = self.create_publisher(
             PoseStamped,
             '/tidybot/arm/pose',
             10
         )
+        # Arm joint states (joint_1 to joint_7)
+        self.joint_state_pub = self.create_publisher(
+            JointState,
+            '/tidybot/arm/joint_states',
+            10
+        )
+        # Sent IK trajectories
         self.arm_trajectory_pub = self.create_publisher(
             JointTrajectory,
             '/tidybot/arm/trajectory',
@@ -54,9 +62,9 @@ class ArmServer(Node):
             '/tidybot/gripper/state',
             10
         )
-        self.joint_state_pub = self.create_publisher(
-            JointState,
-            '/tidybot/arm/joint_states',
+        self.gripper_trajectory_pub = self.create_publisher(
+            JointTrajectory,
+            '/tidybot/gripper/trajectory',
             10
         )
 
@@ -88,7 +96,10 @@ class ArmServer(Node):
         action = {'arm_pos' : target_pos,
                   'arm_quat' : target_quat,
                   'gripper_pos' : np.array(self.gripper_cmd.data, dtype=np.float64)}
-        self.arm_trajectory_pub.publish(self.arm.execute_action(action, self.clock.now().to_msg()))
+        
+        (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
+        self.arm_trajectory_pub.publish(arm_traj_msg)
+        self.gripper_trajectory_pub.publish(gripper_traj_msg)
 
     def gripper_cmd_callback(self, msg):
         self.gripper_cmd = msg
@@ -158,21 +169,33 @@ class Arm:
     def execute_action(self, action, timestamp):
         qpos = self.ik_solver.solve(action['arm_pos'], action['arm_quat'], self.arm.q)
 
-        traj_msg = JointTrajectory()
-        traj_msg.header = Header()
-        traj_msg.header.stamp = timestamp
-        traj_msg.joint_names = [
+        arm_traj_msg = JointTrajectory()
+        # arm_traj_msg.header = Header()
+        # arm_traj_msg.header.stamp = timestamp
+        arm_traj_msg.joint_names = [
             'joint_1', 'joint_2', 'joint_3',
             'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            'finger_joint'
+            # 'finger_joint'
         ]
         point = JointTrajectoryPoint()
-        point.positions = list(qpos) + [0.8 * action['gripper_pos'].item()]
+        wrapped_qpos = [(angle + np.pi) % (2 * np.pi) - np.pi for angle in qpos]
+        point.positions = wrapped_qpos # + [0.8 * action['gripper_pos'].item()]
         point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
-        traj_msg.points = [point]
+        arm_traj_msg.points = [point]
+
+        gripper_traj_msg = JointTrajectory()
+        gripper_traj_msg.joint_names = [
+            'left_outer_knuckle_joint', 'left_inner_knuckle_joint', 'left_inner_finger_joint',
+            'right_outer_knuckle_joint', 'right_inner_knuckle_joint', 'right_inner_finger_joint'
+        ]
+        point = JointTrajectoryPoint()
+        gripper_pos = 0.8 * float(action['gripper_pos'])  # gripper_pos corresponds to left_outer_knuckle_joint
+        point.positions = [gripper_pos, gripper_pos, -gripper_pos, gripper_pos, gripper_pos, -gripper_pos]
+        point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
+        gripper_traj_msg.points = [point]
 
         self.command_queue.put((qpos, action['gripper_pos'].item()))
-        return traj_msg
+        return (arm_traj_msg, gripper_traj_msg)
 
     def get_state(self):
         arm_pos, arm_quat = self.arm.get_tool_pose()
