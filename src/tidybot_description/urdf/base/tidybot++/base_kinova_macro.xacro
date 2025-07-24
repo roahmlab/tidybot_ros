@@ -23,7 +23,7 @@
                 </material>
             </visual>
             <collision>
-                <origin xyz="-0.3066 0.064 0.0.085" rpy="0 -0 0"/>
+                <origin xyz="-0.3066 0.064 0.085" rpy="0 -0 0"/>
                 <geometry>
                     <mesh filename="file://$(find tidybot_description)/meshes/base/tidybot++/Kinova.stl"/>
                 </geometry>
