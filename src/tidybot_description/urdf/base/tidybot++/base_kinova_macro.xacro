@@ -1,0 +1,93 @@
+<?xml version="1.0"?>
+
+<robot name="tidybot_base" xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:property name="last_base_link" value="base"/>
+
+    <xacro:macro name="load_base" params="parent:='' prefix">
+        <link name="world"></link>
+        <link name="${prefix}base">
+            <inertial>
+                <origin xyz="0 0 0" rpy="0 0 0"/>
+                <mass value="34"/>
+                <inertia ixx="1e-09" ixy="0" ixz="0" iyy="1e-09" iyz="0" izz="1e-09"/>  
+            </inertial>
+            <!-- Part kinova -->
+            <visual>
+                <origin xyz="-0.3066 0.064 0.085" rpy="0 -0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/tidybot++/Kinova.stl"/>
+                </geometry>
+                <material name="kinova_material">
+                    <color rgba="0.917647 0.917647 0.917647 1"/>
+                </material>
+            </visual>
+            <collision>
+                <origin xyz="-0.3066 0.064 0.0.085" rpy="0 -0 0"/>
+                <geometry>
+                    <mesh filename="file://$(find tidybot_description)/meshes/base/tidybot++/Kinova.stl"/>
+                </geometry>
+            </collision>
+        </link>
+
+        <link name="joint_x_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="prismatic" name="joint_x">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <parent link="world"/>
+            <child link="joint_x_jointbody"/>
+            <axis xyz="1 0 0" />
+            <limit lower="-10.0" upper="10.0" effort="100" velocity="1"/>
+            <dynamics damping="1.0" friction="1.0"/>
+        </joint>
+
+        <link name="joint_y_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="prismatic" name="joint_y">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <parent link="joint_x_jointbody"/>
+            <child link="joint_y_jointbody"/>
+            <axis xyz="0 1 0" />
+            <limit lower="-10.0" upper="10.0" effort="100" velocity="1"/>
+            <dynamics damping="1.0" friction="1.0"/>
+        </joint>
+
+        <link name="joint_th_jointbody">
+            <inertial>
+                <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+                <mass value="0.001"/>
+                <inertia ixx="1e-09" iyy="1e-09" izz="1e-09" ixy="0" ixz="0" iyz="0"/>
+            </inertial>
+        </link>
+        <joint type="revolute" name="joint_th">
+            <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0"/>
+            <parent link="joint_y_jointbody"/>
+            <child link="joint_th_jointbody"/>
+            <axis xyz="0.0 0.0 1.0"/>
+            <limit lower="-10" upper="10" effort="100" velocity="1"/>
+            <dynamics damping="1.0" friction="1.0"/>
+        </joint>
+
+        <joint type="fixed" name="joint_th_offset">
+            <origin xyz="-0.0 -0.0 -0.0" rpy="0.0 0.0 0.0"/>
+            <parent link="joint_th_jointbody"/>
+            <child link="base"/>
+            <axis xyz="0.0 0.0 1.0"/>
+            <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
+        </joint>
+        <material name="white">
+            <color rgba="1 1 1 1"/>
+        </material>
+    </xacro:macro>
+    <!-- <xacro:load_base prefix=""/> -->
+</robot>
