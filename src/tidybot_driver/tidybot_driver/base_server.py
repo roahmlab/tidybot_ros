@@ -9,31 +9,24 @@ import numpy as np
 from tidybot_driver.base import Vehicle, CONTROL_PERIOD
 import os
 
+
 class BaseServer(Node):
     def __init__(self):
-        super().__init__('tidybot_base_server')
+        super().__init__("tidybot_base_server")
         self.vehicle = Vehicle()
-        self.get_logger().info('Tidybot base server started')
+        self.get_logger().info("Tidybot base server started")
 
         # Create a subscription to the command topic
         self.cmd_sub = self.create_subscription(
-            Float64MultiArray,
-            '/tidybot/base/commands',
-            self.cmd_callback,
-            1
+            Float64MultiArray, "/tidybot/base/commands", self.cmd_callback, 1
         )
 
         self.state_pub = self.create_publisher(
-            JointState,
-            '/tidybot/base/joint_states',
-            10
+            JointState, "/tidybot/base/joint_states", 10
         )
+        self.base_state_timer = self.create_timer(0.05, self.publish_base_state)
 
-        self.reset_srv = self.create_service(
-            Empty,
-            '/tidybot_base/reset',
-            self.reset
-        )
+        self.reset_srv = self.create_service(Empty, "/tidybot_base/reset", self.reset)
         self.vehicle.start_control()
 
     def cmd_callback(self, msg):
@@ -47,15 +40,23 @@ class BaseServer(Node):
         if self.vehicle is not None:
             if self.vehicle.control_loop_running:
                 self.vehicle.stop_control()
-                self.get_logger().info('Stopping control...')
-        self.get_logger().info('Resetting base...')
+                self.get_logger().info("Stopping control...")
+        self.get_logger().info("Resetting base...")
         self.vehicle = Vehicle()  # Reinitialize the vehicle
         self.vehicle.start_control()
-        self.get_logger().info('Base reset complete')
+        self.get_logger().info("Base reset complete")
         return response
 
+    def publish_base_state(self):
+        state_msg = JointState()
+        state_msg.header.stamp = self.get_clock().now().to_msg()
+        state_msg.name = ["joint_x", "joint_y", "joint_th"]
+        state_msg.position = self.vehicle.get_position()
+        self.state_pub.publish(state_msg)
+
+
 def main(args=None):
-    os.environ['CTR_TARGET'] = 'Hardware'  # pylint: disable=wrong-import-position
+    os.environ["CTR_TARGET"] = "Hardware"  # pylint: disable=wrong-import-position
     rclpy.init(args=args)
     base_server = BaseServer()
     try:
@@ -70,5 +71,6 @@ def main(args=None):
         base_server.destroy_node()
         rclpy.shutdown()
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()
