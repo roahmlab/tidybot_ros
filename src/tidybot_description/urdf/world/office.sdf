@@ -1,0 +1,134 @@
+<sdf version='1.10'>
+  <world name='empty'>
+    <physics name='1ms' type='ignored'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <plugin name='gz::sim::systems::Physics' filename='gz-sim-physics-system'/>
+    <plugin name='gz::sim::systems::UserCommands' filename='gz-sim-user-commands-system'/>
+    <plugin name='gz::sim::systems::SceneBroadcaster' filename='gz-sim-scene-broadcaster-system'/>
+    <plugin name='gz::sim::systems::Contact' filename='gz-sim-contact-system'/>
+    <gravity>0 0 -9.8000000000000007</gravity>
+    <magnetic_field>5.5644999999999998e-06 2.2875799999999999e-05 -4.2388400000000002e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <scene>
+      <ambient>0.400000006 0.400000006 0.400000006 1</ambient>
+      <background>0.699999988 0.699999988 0.699999988 1</background>
+      <shadows>true</shadows>
+    </scene>
+    <model name='ground_plane'>
+      <static>true</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode/>
+            </friction>
+            <bounce/>
+            <contact/>
+          </surface>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.800000012 0.800000012 0.800000012 1</ambient>
+            <diffuse>0.800000012 0.800000012 0.800000012 1</diffuse>
+            <specular>0.800000012 0.800000012 0.800000012 1</specular>
+          </material>
+        </visual>
+        <pose>0 0 0 0 0 0</pose>
+        <inertial>
+          <pose>0 0 0 0 0 0</pose>
+          <mass>1</mass>
+          <inertia>
+            <ixx>1</ixx>
+            <ixy>0</ixy>
+            <ixz>0</ixz>
+            <iyy>1</iyy>
+            <iyz>0</iyz>
+            <izz>1</izz>
+          </inertia>
+        </inertial>
+        <enable_wind>false</enable_wind>
+      </link>
+      <pose>0 0 0 0 0 0</pose>
+      <self_collide>false</self_collide>
+    </model>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/office desk/1</uri>
+      <name>Desk</name>
+      <pose>-1.0959800481796265 0.536213219165802 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/office chair/1</uri>
+      <name>OfficeChair</name>
+      <pose>-0.080117315053939819 1.446616530418396 0 0 0 2.1029100352929904</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120</name>
+      <pose>-1.2297793482087847 1.433728643067115 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_0</name>
+      <pose>-1.2215589284896851 1.4343687295913696 0 0 0 1.5703099521643451</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_1</name>
+      <pose>-1.2007764577865601 0.25650510191917419 0 0 0 1.6065600009264132</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_2</name>
+      <pose>-0.048753687617717922 1.4232573883649 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_3</name>
+      <pose>-2.3845200538635254 -0.95386302471160889 0 0 0 -1.5760200130235145</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_4</name>
+      <pose>-1.1962404667102449 -2.1518659642555282 0 0 0 0</pose>
+    </include>
+    <include>
+      <uri>package://tidybot_description/models/openrobotics/models/nist maze wall 120/3</uri>
+      <name>nist_maze_wall_120_5</name>
+      <pose>-0.0077542417522615259 -2.1550226092039493 0 0 0 0</pose>
+    </include>
+    <light name='sun' type='directional'>
+      <pose>0 0 10 0 0 0</pose>
+      <cast_shadows>true</cast_shadows>
+      <intensity>1</intensity>
+      <direction>-0.5 0.10000000000000001 -0.90000000000000002</direction>
+      <diffuse>0.800000012 0.800000012 0.800000012 1</diffuse>
+      <specular>0.200000003 0.200000003 0.200000003 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <linear>0.01</linear>
+        <constant>0.90000000000000002</constant>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+  </world>
+</sdf>

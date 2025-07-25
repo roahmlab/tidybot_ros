@@ -5,6 +5,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     TimerAction,
     DeclareLaunchArgument,
+    OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import (
@@ -15,17 +16,34 @@ from launch.substitutions import (
 )
 from launch_ros.substitutions import FindPackageShare
 from launch.conditions import IfCondition, UnlessCondition
+from ament_index_python.packages import get_package_share_directory
+
+ros_gz_sim_pkg = FindPackageShare("ros_gz_sim")
+tidybot_pkg = FindPackageShare("tidybot_description")
+default_rviz_config_path = PathJoinSubstitution(
+    [tidybot_pkg, "config", "tidybot.rviz"]
+)
+
+def launch_world(context, *args, **kwargs):
+    world = LaunchConfiguration("world").perform(context)
+    world_path = get_package_share_directory("tidybot_description") + f"/urdf/world/{world}.sdf"
+    return [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([ros_gz_sim_pkg, "launch", "gz_sim.launch.py"])
+            ),
+            launch_arguments={"gz_args": f"-r {world_path}"}.items(),
+        )
+    ]
 
 def generate_launch_description():
     ld = LaunchDescription()
-    ros_gz_sim_pkg = FindPackageShare("ros_gz_sim")
-    tidybot_pkg = FindPackageShare("tidybot_description")
-    default_rviz_config_path = PathJoinSubstitution(
-        [tidybot_pkg, "config", "tidybot.rviz"]
-    )
     ld.add_action(
         SetEnvironmentVariable(
-            "GZ_SIM_RESOURCE_PATH", PathJoinSubstitution([tidybot_pkg, "urdf"])
+            name="GZ_SIM_RESOURCE_PATH",
+            value=[
+                PathJoinSubstitution([tidybot_pkg, "urdf"]),
+            ]
         )
     )
     ld.add_action(
@@ -54,12 +72,15 @@ def generate_launch_description():
         )
     )
     ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([ros_gz_sim_pkg, "launch", "gz_sim.launch.py"])
-            ),
-            launch_arguments={"gz_args": "-r empty.sdf"}.items(),
+        DeclareLaunchArgument(
+            "world",
+            default_value="empty",
+            choices=["empty", "office", "warehouse", "fetch_coke"],
+            description="Path to the world file to load in Gazebo",
         )
+    )
+    ld.add_action(
+        OpaqueFunction(function=launch_world)
     )
     # launch the robot description
     ld.add_action(
