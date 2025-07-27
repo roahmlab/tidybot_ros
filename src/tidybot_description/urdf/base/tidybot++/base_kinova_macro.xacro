@@ -33,11 +33,11 @@
         <xacro:if value="${vision}">
             <link name="${prefix}base_camera_link" />
             <joint type="fixed" name="${prefix}base_camera_joint">
-                <origin xyz="0.2285 0.0 0.315" rpy="0.0 1.57079632679 0.0"/>
+                <origin xyz="0.2525 0.0 0.315" rpy="0 0.7853981634 0"/>
                 <parent link="${prefix}base"/>
                 <child link="${prefix}base_camera_link"/>
                 <visual>
-                    <origin xyz="0.2285 0.0 0.315" rpy="0.0 0.0 0.0"/>
+                    <origin xyz="0.2285 0.0 0.315" rpy="0 0 0"/>
                     <geometry>
                         <box size="0.1 0.1 0.1"/>
                     </geometry>
