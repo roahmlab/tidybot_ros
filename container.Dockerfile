@@ -120,9 +120,9 @@ USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_platform
 
 COPY ./src ./src
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build
+# RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+#     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+#     colcon build
 
 # RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
 #     sudo chown -R ${USER_NAME} /opt/tidybot2

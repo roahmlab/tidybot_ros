@@ -27,14 +27,41 @@
   </gazebo> -->
 
   <xacro:if value="${vision}">
-    <gazebo reference="${prefix}camera_link">
-      <sensor name="${prefix}camera" type="rgbd_camera">
+    <gazebo reference="${prefix}arm_camera_link">
+      <sensor name="${prefix}arm_camera" type="rgbd_camera">
         <always_on>1</always_on>
         <update_rate>30</update_rate>
         <visualize>true</visualize>
         <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
-				<topic>/camera</topic>
-        <gz_frame_id>${prefix}camera_link</gz_frame_id>
+				<topic>/arm_camera</topic>
+        <gz_frame_id>${prefix}arm_camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.047</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.03</near>
+            <far>3.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </gazebo>
+    <gazebo reference="${prefix}base_camera_link">
+      <sensor name="${prefix}base_camera" type="rgbd_camera">
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <pose>0 0 0 0 4.7124 0</pose>
+				<topic>/base_camera</topic>
+        <gz_frame_id>${prefix}base_camera_link</gz_frame_id>
         <camera>
           <horizontal_fov>1.047</horizontal_fov>
           <image>
