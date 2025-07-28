@@ -16,6 +16,9 @@ find_package(sensor_msgs REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
 find_package(rosidl_runtime_cpp REQUIRED)
+find_package(cv_bridge REQUIRED)
+find_package(image_transport REQUIRED)
+find_package(OpenCV REQUIRED)
 
 add_executable(record_episode src/record_episode.cpp)
 ament_target_dependencies(record_episode
@@ -28,7 +31,11 @@ ament_target_dependencies(record_episode
   geometry_msgs
   trajectory_msgs
   rosidl_runtime_cpp
+  cv_bridge
+  image_transport
+  OpenCV
 )
+
 install(TARGETS record_episode
   DESTINATION lib/${PROJECT_NAME}
 )
