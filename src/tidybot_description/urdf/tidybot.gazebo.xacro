@@ -10,7 +10,6 @@
           <robot_description_param>robot_description</robot_description_param>
       </plugin>
       <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so"/>
-      <!-- <self_collide>true</self_collide> -->
   </gazebo>
 
   <!-- <gazebo>

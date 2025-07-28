@@ -40,12 +40,42 @@
         </xacro:if>
 
         <xacro:if value="${gripper == 'robotiq_2f_85'}">
-            <xacro:add_joint name="right_inner_finger_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="right_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="right_inner_knuckle_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="left_inner_finger_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="left_outer_knuckle_joint" gain="0.1" cmd_interface="position"/>
-            <xacro:add_joint name="left_inner_knuckle_joint" gain="0.1" cmd_interface="position"/>
+            <joint name ="left_outer_knuckle_joint">      
+                <command_interface name="position"/>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+                <param name="position_proportional_gain">0.1</param>
+            </joint>
+            <joint name ="right_inner_finger_joint">
+                <param name="mimic">left_outer_knuckle_joint</param>
+                <param name="multiplier">-1.0</param>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name ="right_outer_knuckle_joint">
+                <param name="mimic">left_outer_knuckle_joint</param>
+                <param name="multiplier">1.0</param>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name ="right_inner_knuckle_joint">
+                <param name="mimic">left_outer_knuckle_joint</param>
+                <param name="multiplier">1.0</param>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name ="left_inner_finger_joint">
+                <param name="mimic">left_outer_knuckle_joint</param>
+                <param name="multiplier">-1.0</param>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
+            <joint name ="left_inner_knuckle_joint">  
+                <param name="mimic">left_outer_knuckle_joint</param>
+                <param name="multiplier">1.0</param>
+                <state_interface name="position"/>
+                <state_interface name="velocity"/>
+            </joint>
         </xacro:if>
 
         </ros2_control>

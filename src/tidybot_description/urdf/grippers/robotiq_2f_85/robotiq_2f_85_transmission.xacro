@@ -25,7 +25,7 @@
             <mechanicalReduction>1</mechanicalReduction>
         </transmission>
 
-       <transmission name="${prefix}right_inner_finger_joint_trans">
+        <transmission name="${prefix}right_inner_finger_joint_trans">
             <type>transmission_interface/SimpleTransmission</type>
             <joint name="${prefix}right_inner_finger_joint" />
             <actuator name="${prefix}right_inner_finger_joint_motor" />
@@ -45,7 +45,7 @@
             <actuator name="${prefix}right_outer_knuckle_joint_motor" />
             <mechanicalReduction>1</mechanicalReduction>
         </transmission>
-
+        
     </xacro:macro>
 
 </robot>

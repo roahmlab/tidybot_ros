@@ -57,7 +57,7 @@
     <link name="${prefix}${fingerprefix}_inner_knuckle">
       <inertial>
         <origin xyz="0.000123011831763771 0.0507850843201817 0.00103968640075166" rpy="0 0 0" />
-       <mass value="0.0271177346495152" />
+      <mass value="0.0271177346495152" />
         <inertia ixx="2.61910379223783E-05" ixy="-2.43616858946494E-07" ixz="-6.37789906117123E-09" iyy="2.8270243746167E-06" iyz="-5.37200748039765E-07" izz="2.83695868220296E-05" />
       </inertial>
       <visual>
@@ -103,7 +103,7 @@
     </link>
   </xacro:macro>
 
-   <!-- Finger pad link, the default are the "big pads" with rubber-->
+  <!-- Finger pad link, the default are the "big pads" with rubber-->
   <xacro:macro name="inner_finger_pad" params="prefix fingerprefix">
     <link name="${prefix}${fingerprefix}_inner_finger_pad">
       <visual>
@@ -118,7 +118,7 @@
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
-           <box size="0.022 0.00635 0.0375"/>
+          <box size="0.022 0.00635 0.0375"/>
         </geometry>
         <material name="">
           <color rgba="0.9 0.0 0.0 1" />
@@ -144,7 +144,7 @@
       <child link="${prefix}${fingerprefix}_inner_knuckle" />
       <axis xyz="1 0 0" />
       <limit lower="-1.0" upper="1.0" velocity="1.0" effort="1000" />
-      <!-- <mimic joint="${prefix}finger_joint" multiplier="1" offset="0" /> -->
+      <mimic joint="${prefix}left_outer_knuckle_joint" multiplier="1" offset="0" />
     </joint>
   </xacro:macro>
 
@@ -155,7 +155,7 @@
       <child link="${prefix}${fingerprefix}_inner_finger" />
       <axis xyz="1 0 0" />
       <limit lower="-1.0" upper="1.0" velocity="1.0" effort="1000" />
-      <!-- <mimic joint="${prefix}finger_joint" multiplier="-1" offset="0" /> -->
+      <mimic joint="${prefix}left_outer_knuckle_joint" multiplier="-1" offset="0" />
     </joint>
   </xacro:macro>
 
@@ -167,8 +167,6 @@
       <axis xyz="0 0 1" />
     </joint>
   </xacro:macro>
-
-  <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_arg2f.xacro" />
 
   <xacro:macro name="left_outer_knuckle_joint" params="prefix">
     <joint name="${prefix}left_outer_knuckle_joint" type="revolute">
@@ -188,28 +186,8 @@
       <child link="${prefix}right_outer_knuckle" />
       <axis xyz="1 0 0" />
       <limit lower="-1.0" upper="1.0" velocity="1.0" effort="1000" />
-      <!-- <mimic joint="${prefix}finger_joint" multiplier="1" offset="0" /> -->
+      <mimic joint="${prefix}left_outer_knuckle_joint" multiplier="1" offset="0" />
     </joint>
     <xacro:finger_joints prefix="${prefix}" fingerprefix="right" reflect="-1.0"/>
-  </xacro:macro>
-
-  <!-- Initialization of all joints and links -->
-  <xacro:macro name="robotiq_arg2f_85" params="prefix parent">
-    <!-- Tool frame used by the arm -->
-    <link name="${prefix}tool_frame"/>
-    <joint name="${prefix}tool_frame_joint" type="fixed">
-        <origin xyz="0 0 0.120" rpy="0 0 0" />
-        <parent link="${parent}" />
-        <child link="${prefix}tool_frame" />
-        <axis xyz="0 0 0" />
-    </joint>
-    <!-- Gripper description -->
-    <xacro:robotiq_arg2f_base_link prefix="${prefix}" parent="${parent}"/>
-    <xacro:finger_links prefix="${prefix}" fingerprefix="left" stroke="85"/>
-    <xacro:finger_links prefix="${prefix}" fingerprefix="right" stroke="85"/>
-    <xacro:left_outer_knuckle_joint prefix="${prefix}"/>
-    <xacro:right_outer_knuckle_joint prefix="${prefix}"/>
-    <!-- Transmissions are loaded in the generic kortex xacro when simulation is enabled -->
-    <!-- <xacro:robotiq_arg2f_transmission prefix="${prefix}"/> -->
   </xacro:macro>
 </robot>

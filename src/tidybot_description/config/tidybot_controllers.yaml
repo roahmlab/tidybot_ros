@@ -1,7 +1,7 @@
 controller_manager:
   ros__parameters:
     use_sim_time: true
-    update_rate: 100
+    update_rate: 50
     enforce_command_limits: true
 
     joint_state_broadcaster:
@@ -71,12 +71,7 @@ gen3_7dof_controller:
 robotiq_2f_85_controller:
   ros__parameters:
     joints:
-      - right_inner_finger_joint
-      - right_outer_knuckle_joint
-      - right_inner_knuckle_joint
-      - left_inner_finger_joint
       - left_outer_knuckle_joint
-      - left_inner_knuckle_joint
     command_interfaces:
       - position
     state_interfaces:

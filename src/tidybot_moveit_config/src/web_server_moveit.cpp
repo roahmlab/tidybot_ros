@@ -1,5 +1,6 @@
 #include <memory>
 #include <cmath>
+#include <algorithm>
 
 #include <rclcpp/rclcpp.hpp>
 #include <moveit/move_group_interface/move_group_interface.hpp>
@@ -47,6 +48,14 @@ class WebServerMoveit : public rclcpp::Node {
         joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 1,
         std::bind(&WebServerMoveit::joint_state_callback, this, std::placeholders::_1));
+
+        gripper_timer = this->create_wall_timer(
+            std::chrono::milliseconds(20),
+            [this]() {
+                std_msgs::msg::Float64MultiArray gripper_msg;
+                gripper_msg.data = {gripper_state * 0.81};
+                gripper_pos_pub->publish(gripper_msg);
+            });
     }
     
     void initialize_moveit() {
@@ -115,19 +124,8 @@ class WebServerMoveit : public rclcpp::Node {
     }
 
     void publish_gripper(const std_msgs::msg::Float64 gripper_delta) {
-        // Hardcoded mimic joints
-        std::vector<double> joint_values = {-gripper_delta.data * 0.81,
-                                            gripper_delta.data * 0.81,
-                                            gripper_delta.data * 0.81,
-                                            -gripper_delta.data * 0.81,
-                                            gripper_delta.data * 0.81,
-                                            gripper_delta.data * 0.81};
-        // Create position message
-        std_msgs::msg::Float64MultiArray pos_msg;
-        pos_msg.data = joint_values;
-
-        // Publish trajectory
-        gripper_pos_pub->publish(pos_msg);
+        // Update gripper state
+        gripper_state = std::clamp(gripper_delta.data, 0.0, 1.0);
     }
 
     void publish_pose_visual(const geometry_msgs::msg::Pose &pose)
@@ -210,6 +208,8 @@ class WebServerMoveit : public rclcpp::Node {
 
     float sensitivity;
     kinematics::KinematicsQueryOptions options;
+    double gripper_state = 0.0;
+    rclcpp::TimerBase::SharedPtr gripper_timer;
 };
 
 int main(int argc, char * argv[]) {
