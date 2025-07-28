@@ -75,7 +75,7 @@ def generate_launch_description():
         DeclareLaunchArgument(
             "world",
             default_value="empty",
-            choices=["empty", "office", "warehouse", "fetch_coke"],
+            choices=["empty", "office", "warehouse", "fetch_coke", "fetch_cube"],
             description="Path to the world file to load in Gazebo",
         )
     )

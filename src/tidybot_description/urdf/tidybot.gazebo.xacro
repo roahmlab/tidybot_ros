@@ -35,7 +35,7 @@
 				<topic>/arm_camera</topic>
         <gz_frame_id>${prefix}arm_camera_link</gz_frame_id>
         <camera>
-          <horizontal_fov>1.047</horizontal_fov>
+          <horizontal_fov>1.147</horizontal_fov>
           <image>
             <width>640</width>
             <height>480</height>
