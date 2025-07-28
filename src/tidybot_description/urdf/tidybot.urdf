@@ -8,76 +8,42 @@
   <link name="world"/>
   <link name="base">
     <inertial>
-      <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.035"/>
-      <mass value="60.0"/>
-      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <mass value="34"/>
+      <inertia ixx="1e-09" ixy="0" ixz="0" iyy="1e-09" iyz="0" izz="1e-09"/>
     </inertial>
-    <visual name="bumper">
-      <origin rpy="-2.442021632452952 -1.5707963267948966 0.0" xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055"/>
+    <!-- Part kinova -->
+    <visual>
+      <origin rpy="0 -0 0" xyz="-0.3066 0.06523 0.085"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
       </geometry>
-      <material name="white"/>
+      <material name="kinova_material">
+        <color rgba="0.917647 0.917647 0.917647 1"/>
+      </material>
     </visual>
-    <collision name="bumper">
-      <origin rpy="-2.442021632452952 -1.5707963267948966 0.0" xyz="-1.3915598211675165e-07 -2.058962502098711e-07 0.05386474576457055"/>
+    <collision>
+      <origin rpy="0 -0 0" xyz="-0.3066 0.06523 0.085"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bumper.stl"/>
-      </geometry>
-    </collision>
-    <visual name="bottom_plate">
-      <origin rpy="1.6659662035857206 -1.5707963267948966 0.0" xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
-      </geometry>
-      <material name="white"/>
-    </visual>
-    <collision name="bottom_plate">
-      <origin rpy="1.6659662035857206 -1.5707963267948966 0.0" xyz="4.155854111430312e-11 1.8201972332496634e-11 0.08495000004768373"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/bottom_plate.stl"/>
-      </geometry>
-    </collision>
-    <visual name="body">
-      <origin rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793" xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
-      </geometry>
-      <material name="white"/>
-    </visual>
-    <collision name="body">
-      <origin rpy="-1.5707963267948966 -1.570779305272103 3.141592653589793" xyz="7.590768644441668e-06 -6.000635064190085e-10 0.20330222068596052"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/body.stl"/>
-      </geometry>
-    </collision>
-    <visual name="top_plate">
-      <origin rpy="1.6906681075416252 -1.5707963267948966 0.0" xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
-      </geometry>
-      <material name="white"/>
-    </visual>
-    <collision name="top_plate">
-      <origin rpy="1.6906681075416252 -1.5707963267948966 0.0" xyz="-2.9658670629084936e-11 -3.476524862019053e-11 0.3216499984264373"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/top_plate.stl"/>
-      </geometry>
-    </collision>
-    <visual name="arm_plate">
-      <origin rpy="1.5707963267948966 -1.5707963267948966 0.0" xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
-      </geometry>
-      <material name="white"/>
-    </visual>
-    <collision name="arm_plate">
-      <origin rpy="1.5707963267948966 -1.5707963267948966 0.0" xyz="-2.7580994002430455e-12 -3.3382504263355704e-12 0.32999999883475684"/>
-      <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/arm_plate.stl"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
       </geometry>
     </collision>
   </link>
+  <link name="base_camera_link"/>
+  <joint name="base_camera_joint" type="fixed">
+    <origin rpy="0 0.7853981634 0" xyz="0.2525 0.0 0.315"/>
+    <parent link="base"/>
+    <child link="base_camera_link"/>
+    <visual>
+      <origin rpy="0 0 0" xyz="0.2285 0.0 0.315"/>
+      <geometry>
+        <box size="0.1 0.1 0.1"/>
+      </geometry>
+      <material name="red">
+        <color rgba="1 0 0 1"/>
+      </material>
+    </visual>
+  </joint>
   <link name="joint_x_jointbody">
     <inertial>
       <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
@@ -134,7 +100,7 @@
     <color rgba="1 1 1 1"/>
   </material>
   <joint name="arm_base_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0 0.33"/>
+    <origin rpy="0 0 0" xyz="0.12 3.76986e-15 0.374775"/>
     <parent link="base"/>
     <child link="arm_base_link"/>
   </joint>
@@ -147,7 +113,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -156,7 +122,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -172,7 +138,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -181,7 +147,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -204,7 +170,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -213,7 +179,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -236,7 +202,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -245,7 +211,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -268,7 +234,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -277,7 +243,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -300,7 +266,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -309,7 +275,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -332,7 +298,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -341,7 +307,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -364,7 +330,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -373,7 +339,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -394,11 +360,11 @@
     <child link="end_effector_link"/>
     <axis xyz="0 0 0"/>
   </joint>
-  <link name="camera_link"/>
+  <link name="arm_camera_link"/>
   <joint name="camera_module" type="fixed">
     <origin rpy="3.14159265358979 3.14159265358979 0" xyz="0 0.05639 -0.00305"/>
     <parent link="end_effector_link"/>
-    <child link="camera_link"/>
+    <child link="arm_camera_link"/>
   </joint>
   <link name="camera_depth_frame"/>
   <joint name="depth_module" type="fixed">
@@ -439,7 +405,7 @@
       <geometry>
         <!-- The DAE file doesn't show well in Gazebo so we're using the STL instead -->
         <!-- <mesh filename="file://$(find simulation)/meshes/grippers/robotiq_2f_85/meshes/visual/robotiq_arg2f_85_base_link.dae" scale="0.001 0.001 0.001"/> -->
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
@@ -448,7 +414,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl"/>
       </geometry>
     </collision>
   </link>
@@ -464,18 +430,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="left_outer_finger">
     <inertial>
@@ -486,18 +452,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="left_inner_finger">
     <inertial>
@@ -508,18 +474,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001" />
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="left_inner_finger_pad">
     <visual>
@@ -531,15 +497,15 @@
         <color rgba="0.9 0.9 0.9 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-           <box size="0.022 0.00635 0.0375"/>
-        </geometry>
-        <material name="">
-          <color rgba="0.9 0.0 0.0 1" />
-        </material>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.022 0.00635 0.0375"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.9 0.0 0.0 1"/>
+      </material>
+    </collision>
   </link>
   <link name="left_inner_knuckle">
     <inertial>
@@ -550,18 +516,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_outer_knuckle">
     <inertial>
@@ -572,18 +538,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_outer_finger">
     <inertial>
@@ -594,18 +560,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_inner_finger">
     <inertial>
@@ -616,18 +582,18 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001" />
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <link name="right_inner_finger_pad">
     <visual>
@@ -639,15 +605,15 @@
         <color rgba="0.9 0.9 0.9 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-           <box size="0.022 0.00635 0.0375"/>
-        </geometry>
-        <material name="">
-          <color rgba="0.9 0.0 0.0 1" />
-        </material>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <box size="0.022 0.00635 0.0375"/>
+      </geometry>
+      <material name="">
+        <color rgba="0.9 0.0 0.0 1"/>
+      </material>
+    </collision>
   </link>
   <link name="right_inner_knuckle">
     <inertial>
@@ -658,25 +624,25 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="">
         <color rgba="0.1 0.1 0.1 1"/>
       </material>
     </visual>
-    <!-- <collision>
-        <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
-          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
-        </geometry>
-      </collision> -->
+    <collision>
+      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <geometry>
+        <mesh filename="file:///home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.dae" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
   </link>
   <joint name="left_outer_knuckle_joint" type="revolute">
     <origin rpy="0 0 3.141592653589793" xyz="0 -0.0306011 0.054904"/>
     <parent link="robotiq_arg2f_base_link"/>
     <child link="left_outer_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="0" upper="0.8" velocity="2.0"/>
+    <limit effort="1000" lower="-0.01" upper="0.8" velocity="2.0"/>
   </joint>
   <joint name="left_outer_finger_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0.0315 -0.0041"/>
@@ -690,7 +656,7 @@
     <parent link="robotiq_arg2f_base_link"/>
     <child link="left_inner_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="0" upper="0.8757" velocity="2.0"/>
+    <limit effort="1000" lower="-0.01" upper="0.8757" velocity="2.0"/>
     <!-- <mimic joint="${prefix}finger_joint" multiplier="1" offset="0" /> -->
   </joint>
   <joint name="left_inner_finger_joint" type="revolute">
@@ -712,7 +678,7 @@
     <parent link="robotiq_arg2f_base_link"/>
     <child link="right_outer_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="0" upper="0.81" velocity="2.0"/>
+    <limit effort="1000" lower="-0.01" upper="0.81" velocity="2.0"/>
     <!-- <mimic joint="${prefix}finger_joint" multiplier="1" offset="0" /> -->
   </joint>
   <joint name="right_outer_finger_joint" type="fixed">
@@ -727,7 +693,7 @@
     <parent link="robotiq_arg2f_base_link"/>
     <child link="right_inner_knuckle"/>
     <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="0" upper="0.8757" velocity="2.0"/>
+    <limit effort="1000" lower="-0.01" upper="0.8757" velocity="2.0"/>
     <!-- <mimic joint="${prefix}finger_joint" multiplier="1" offset="0" /> -->
   </joint>
   <joint name="right_inner_finger_joint" type="revolute">
@@ -867,7 +833,7 @@
   </ros2_control>
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>/home/yuandi/tidybot_platform/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
+      <parameters>/home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
       <robot_description_param>robot_description</robot_description_param>
     </plugin>
     <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors"/>
@@ -885,14 +851,14 @@
     </plugin>
 
   </gazebo> -->
-  <gazebo reference=" camera_link">
-    <sensor name=" camera" type="rgbd_camera">
+  <gazebo reference="arm_camera_link">
+    <sensor name="arm_camera" type="rgbd_camera">
       <always_on>1</always_on>
       <update_rate>30</update_rate>
       <visualize>true</visualize>
       <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
-      <topic>/camera</topic>
-      <gz_frame_id> camera_link</gz_frame_id>
+      <topic>/arm_camera</topic>
+      <gz_frame_id>arm_camera_link</gz_frame_id>
       <camera>
         <horizontal_fov>1.047</horizontal_fov>
         <image>
@@ -912,103 +878,130 @@
       </camera>
     </sensor>
   </gazebo>
-  <transmission name=" joint_1_trans">
+  <gazebo reference="base_camera_link">
+    <sensor name="base_camera" type="rgbd_camera">
+      <always_on>1</always_on>
+      <update_rate>30</update_rate>
+      <visualize>true</visualize>
+      <pose>0 0 0 0 0 0</pose>
+      <topic>/base_camera</topic>
+      <gz_frame_id>base_camera_link</gz_frame_id>
+      <camera>
+        <horizontal_fov>1.434</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.03</near>
+          <far>3.0</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+    </sensor>
+  </gazebo>
+  <transmission name="joint_1_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_1_motor"/>
-    <joint name=" joint_1"/>
+    <actuator name="joint_1_motor"/>
+    <joint name="joint_1"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_2_trans">
+  <transmission name="joint_2_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_2_motor"/>
-    <joint name=" joint_2"/>
+    <actuator name="joint_2_motor"/>
+    <joint name="joint_2"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_3_trans">
+  <transmission name="joint_3_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_3_motor"/>
-    <joint name=" joint_3"/>
+    <actuator name="joint_3_motor"/>
+    <joint name="joint_3"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_4_trans">
+  <transmission name="joint_4_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_4_motor"/>
-    <joint name=" joint_4"/>
+    <actuator name="joint_4_motor"/>
+    <joint name="joint_4"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_5_trans">
+  <transmission name="joint_5_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_5_motor"/>
-    <joint name=" joint_5"/>
+    <actuator name="joint_5_motor"/>
+    <joint name="joint_5"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_6_trans">
+  <transmission name="joint_6_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_6_motor"/>
-    <joint name=" joint_6"/>
+    <actuator name="joint_6_motor"/>
+    <joint name="joint_6"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" joint_7_trans">
+  <transmission name="joint_7_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <actuator name=" joint_7_motor"/>
-    <joint name=" joint_7"/>
+    <actuator name="joint_7_motor"/>
+    <joint name="joint_7"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
   <transmission name="joint_x_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" joint_x"/>
+    <joint name="joint_x"/>
     <actuator name="joint_x_motor">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
   </transmission>
   <transmission name="joint_y_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" joint_y"/>
+    <joint name="joint_y"/>
     <actuator name="joint_y_motor">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
   </transmission>
   <transmission name="joint_th_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" joint_th"/>
+    <joint name="joint_th"/>
     <actuator name="joint_th_motor">
       <mechanicalReduction>1</mechanicalReduction>
     </actuator>
   </transmission>
-  <transmission name=" left_inner_knuckle_joint_trans">
+  <transmission name="left_inner_knuckle_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" left_inner_knuckle_joint"/>
-    <actuator name=" left_inner_knuckle_joint_motor"/>
+    <joint name="left_inner_knuckle_joint"/>
+    <actuator name="left_inner_knuckle_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" right_inner_knuckle_joint_trans">
+  <transmission name="right_inner_knuckle_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" right_inner_knuckle_joint"/>
-    <actuator name=" right_inner_knuckle_joint_motor"/>
+    <joint name="right_inner_knuckle_joint"/>
+    <actuator name="right_inner_knuckle_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" left_inner_finger_joint_trans">
+  <transmission name="left_inner_finger_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" left_inner_finger_joint"/>
-    <actuator name=" left_inner_finger_joint_motor"/>
+    <joint name="left_inner_finger_joint"/>
+    <actuator name="left_inner_finger_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" right_inner_finger_joint_trans">
+  <transmission name="right_inner_finger_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" right_inner_finger_joint"/>
-    <actuator name=" right_inner_finger_joint_motor"/>
+    <joint name="right_inner_finger_joint"/>
+    <actuator name="right_inner_finger_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" left_outer_knuckle_joint_trans">
+  <transmission name="left_outer_knuckle_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" left_outer_knuckle_joint"/>
-    <actuator name=" left_outer_knuckle_joint_motor"/>
+    <joint name="left_outer_knuckle_joint"/>
+    <actuator name="left_outer_knuckle_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
-  <transmission name=" right_outer_knuckle_joint_trans">
+  <transmission name="right_outer_knuckle_joint_trans">
     <type>transmission_interface/SimpleTransmission</type>
-    <joint name=" right_outer_knuckle_joint"/>
-    <actuator name=" right_outer_knuckle_joint_motor"/>
+    <joint name="right_outer_knuckle_joint"/>
+    <actuator name="right_outer_knuckle_joint_motor"/>
     <mechanicalReduction>1</mechanicalReduction>
   </transmission>
 </robot>

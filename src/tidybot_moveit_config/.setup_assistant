@@ -7,7 +7,7 @@ moveit_setup_assistant_config:
   package_settings:
     author_name: janchen
     author_email: janchen@umich.edu
-    generated_timestamp: 1751336013
+    generated_timestamp: 1753650820
   control_xacro:
     command:
       - position

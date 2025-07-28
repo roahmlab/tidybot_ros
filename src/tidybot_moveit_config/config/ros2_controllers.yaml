@@ -6,11 +6,6 @@ controller_manager:
     gen3_7dof_controller:
       type: joint_trajectory_controller/JointTrajectoryController
 
-
-    gen3_lite_2f_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
-
-
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
 
@@ -38,8 +33,7 @@ gen3_lite_2f_controller:
       - left_finger_bottom_joint
       - left_finger_tip_joint
     command_interfaces:
-      - position
+      []
     state_interfaces:
-      - position
-      - velocity
+      []
     allow_nonzero_velocity_at_trajectory_end: true

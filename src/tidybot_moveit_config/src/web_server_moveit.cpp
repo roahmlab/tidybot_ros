@@ -5,6 +5,7 @@
 #include <moveit/move_group_interface/move_group_interface.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include "std_msgs/msg/float64.hpp"
+#include <std_msgs/msg/float64_multi_array.hpp>
 
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <trajectory_msgs/msg/joint_trajectory_point.hpp>
@@ -37,15 +38,15 @@ class WebServerMoveit : public rclcpp::Node {
         // Publish to ros2_control controllers
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
-        gripper_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-            "/robotiq_2f_85_controller/joint_trajectory", 10);
+        gripper_pos_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+            "/robotiq_2f_85_controller/commands", 10);
 
         // Debugging
         pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
         joint_state_pub = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 1,
-            std::bind(&WebServerMoveit::joint_state_callback, this, std::placeholders::_1));
+        std::bind(&WebServerMoveit::joint_state_callback, this, std::placeholders::_1));
     }
     
     void initialize_moveit() {
@@ -53,7 +54,7 @@ class WebServerMoveit : public rclcpp::Node {
         robot_model = robot_model_loader.getModel();
         robot_state = std::make_shared<moveit::core::RobotState>(robot_model);
         arm_joint_model_group = robot_model->getJointModelGroup("gen3_7dof");
-        gripper_joint_model_group = robot_model->getJointModelGroup("gen3_lite_2f");
+        // gripper_joint_model_group = robot_model->getJointModelGroup("gen3_lite_2f");
     }
 
     void publish_arm(const geometry_msgs::msg::Pose &msg) {
@@ -115,31 +116,18 @@ class WebServerMoveit : public rclcpp::Node {
 
     void publish_gripper(const std_msgs::msg::Float64 gripper_delta) {
         // Hardcoded mimic joints
-        std::vector<std::string> joint_names = {"right_finger_bottom_joint", "right_finger_tip_joint", 
-                                                 "left_finger_bottom_joint", "left_finger_tip_joint"};
-        std::vector<double> joint_values = {gripper_delta.data * 1.05 - 0.09,
-                                            -0.676 * (gripper_delta.data * 0.71 - 0.5) + 0.149, 
-                                            -(gripper_delta.data * 1.05 - 0.09),
-                                            -0.676 * (gripper_delta.data * 0.71 - 0.5) + 0.149};
-        
-        // Create trajectory message
-        trajectory_msgs::msg::JointTrajectory traj;
-        traj.joint_names = joint_names;
-
-        // Start point
-        trajectory_msgs::msg::JointTrajectoryPoint start_point;
-        start_point.positions = joint_values;
-        start_point.time_from_start = rclcpp::Duration(0, 0);
-        traj.points.push_back(start_point);
-
-        // End point
-        trajectory_msgs::msg::JointTrajectoryPoint end_point;
-        end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.01);
-        traj.points.push_back(end_point);
+        std::vector<double> joint_values = {-gripper_delta.data * 0.81,
+                                            gripper_delta.data * 0.81,
+                                            gripper_delta.data * 0.81,
+                                            -gripper_delta.data * 0.81,
+                                            gripper_delta.data * 0.81,
+                                            gripper_delta.data * 0.81};
+        // Create position message
+        std_msgs::msg::Float64MultiArray pos_msg;
+        pos_msg.data = joint_values;
 
         // Publish trajectory
-        gripper_traj_pub->publish(traj);
+        gripper_pos_pub->publish(pos_msg);
     }
 
     void publish_pose_visual(const geometry_msgs::msg::Pose &pose)
@@ -209,9 +197,9 @@ class WebServerMoveit : public rclcpp::Node {
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_subscriber_;
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub;
-    rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr gripper_traj_pub;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pos_pub;
     const moveit::core::JointModelGroup* arm_joint_model_group;
-    const moveit::core::JointModelGroup* gripper_joint_model_group;
+    // const moveit::core::JointModelGroup* gripper_joint_model_group;
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub;

@@ -103,11 +103,11 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim,
-        # moveit_launch,
+        moveit_launch,
         rviz_launch,
         web_server_publisher,
         web_server_relay,
         state_controller,
-        # web_server_moveit,
+        web_server_moveit,    
         episode_recorder,   
     ])
