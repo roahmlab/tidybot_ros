@@ -42,7 +42,6 @@ class TeleopController(Node):
                 Float64MultiArray, "/tidybot/base/commands", 10
             )
 
-        self.state_pub = self.create_publisher(String, "/ws_state", 10)
         self.ws_sub = self.create_subscription(
             WSMsg, "/ws_commands", self.ws_callback, 10
         )
@@ -95,15 +94,11 @@ class TeleopController(Node):
         self.gripper_obs = 0
 
     def ws_callback(self, msg):
-        if msg.state_update:
-            state_command = String()
-            state_command.data = msg.state_update
-            self.state_pub.publish(state_command)
-            return
-        else:
+        if not msg.state_update:
             self.enable_counts[msg.device_id] = (
                 self.enable_counts.get(msg.device_id, 0) + 1 if msg.teleop_mode else 0
             )
+        else: return
 
         if self.enable_counts[msg.device_id] > 2:
             xr_pos = np.array([msg.pos_x, msg.pos_y, msg.pos_z])

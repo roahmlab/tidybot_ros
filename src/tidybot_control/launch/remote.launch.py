@@ -81,7 +81,8 @@ def generate_launch_description():
         executable="state_controller",
         name="state_controller",
         output="screen",
-        parameters=[{"use_sim": LaunchConfiguration("use_sim")}]
+        parameters=[{"use_sim": LaunchConfiguration("use_sim")},
+                    {"use_remote": True}],
     )
     
     teleop_to_moveit = Node(

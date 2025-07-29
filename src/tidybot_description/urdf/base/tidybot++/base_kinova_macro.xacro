@@ -18,8 +18,8 @@
                 <geometry>
                     <mesh filename="file://$(find tidybot_description)/meshes/base/tidybot++/Kinova.stl"/>
                 </geometry>
-                <material name="kinova_material">
-                    <color rgba="0.917647 0.917647 0.917647 1"/>
+                <material name="grey">
+                    <color rgba="0.5 0.5 0.5 1"/>
                 </material>
             </visual>
             <collision>
@@ -103,8 +103,8 @@
             <axis xyz="0.0 0.0 1.0"/>
             <limit lower="0.0" upper="0.0" effort="100" velocity="100"/>
         </joint>
-        <material name="white">
-            <color rgba="1 1 1 1"/>
+        <material name="grey">
+            <color rgba="0.5 0.5 0.5 1"/>
         </material>
     </xacro:macro>
     <!-- <xacro:load_base prefix=""/> -->

@@ -7,6 +7,7 @@ import threading
 import rclpy
 from rclpy.node import Node
 from tidybot_utils.msg import WSMsg
+from std_msgs.msg import String
 import json
 
 import os
@@ -68,6 +69,7 @@ class WebServerPublisher(Node):
         self.pub = self.create_publisher(
             WSMsg, "/ws_commands", 10
         )
+        self.state_pub = self.create_publisher(String, "/ws_state", 10)
 
         self.queue = queue
         self.create_timer(0.0001, self._publish_loop)
@@ -81,6 +83,9 @@ class WebServerPublisher(Node):
             msg.timestamp = data["timestamp"]
             if "state_update" in data:
                 msg.state_update = data["state_update"]
+                state_command = String()
+                state_command.data = msg.state_update
+                self.state_pub.publish(state_command)
             else:
                 msg.device_id = data["device_id"]
                 if "teleop_mode" in data:

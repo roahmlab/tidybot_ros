@@ -16,7 +16,8 @@ from geometry_msgs.msg import Vector3, TransformStamped
 import zmq
 import cv2
 import gc
-from tf_transformations import quaternion_multiply
+from tf_transformations import quaternion_multiply, euler_from_quaternion
+import numpy as np
 
 REMOTE_CONTROL_FREQUENCY = 20  # Hz
 
@@ -85,7 +86,7 @@ class RemoteController(Node):
         context = zmq.Context()
         self.socket = context.socket(zmq.REQ)
         self.socket.connect(f'tcp://localhost:5555')
-        print(f'Connected to policy server at localhost:5555')
+        self.get_logger().info(f'Connected to policy server at localhost:5555')
 
     def control_loop(self):
         if not self.enabled:
@@ -93,40 +94,56 @@ class RemoteController(Node):
         pass  
         
         # Get the latest arm pose
-        arm_pose, arm_orientation = self.get_arm_pose()
-        base_pose, base_orientation = self.get_base_pose()
+        arm_pos, arm_orientation = self.get_arm_pose()
+        base_pos, base_orientation = self.get_base_pose()
+        _, _, base_yaw = euler_from_quaternion(base_orientation)
         base_image = self.ros_image_to_jpg(self.last_base_image) if self.last_base_image else None
         arm_image = self.ros_image_to_jpg(self.last_arm_image) if self.last_arm_image else None
 
         obs = {
-            "base_pose": base_pose,
-            "base_quat": base_orientation,
-            "arm_pose": arm_pose,
-            "arm_quat": arm_orientation,
+            "base_pose": np.array([base_pos[0], base_pos[1], base_yaw]),
+            "arm_pos": np.array(arm_pos),
+            "arm_quat": np.array(arm_orientation),
+            "gripper_pos": np.array([self.last_gripper_state]) if self.last_gripper_state is not None else None,
             "base_image": base_image,
             "wrist_image": arm_image,
         }
-        if None in obs.values():
-            self.get_logger().warn("Incomplete observation, skipping control loop")
-            return
+        # if None in obs:
+        #     self.get_logger().warn("Incomplete observation, skipping control loop")
+        #     return
         # Send observation to policy server
-        self.socket.send_pyobj(obs)
+        req = {'obs': obs}
+        self.get_logger().info(f"Sending request to policy server: {req}")
+        self.socket.send_pyobj(req)
 
         rep = self.socket.recv_pyobj()
-        rep_base_pose = rep.get("base_pose", None)
-        rep_base_quat = rep.get("base_quat", None)
-        rep_arm_pose = rep.get("arm_pose", None) + rep_base_pose
-        rep_arm_quat = quaternion_multiply(rep_base_quat, rep.get("arm_quat", None))
-        rep_gripper = rep.get("gripper", None)
+        self.get_logger().info(f"Received response from policy server: {rep}")
+
+        if rep['action'] is None:
+            self.get_logger().warn("Received None actions from policy server, skipping control loop")
+            return
+        rep_base_pose = rep['action']['base_pose'].tolist()
+        rep_arm_pos = rep['action']['arm_pos'].tolist()
+        rep_arm_quat = rep['action']['arm_quat'].tolist()
+        rep_gripper = rep['action']['gripper_pos'].tolist()
+
+        self.get_logger().info(f"Base pose: {rep_base_pose}, Arm pos: {rep_arm_pos}, Arm quat: {rep_arm_quat}, Gripper: {rep_gripper}")
+        # Offset the arm position by the base offset
+        rep_arm_pos = rep_arm_pos + [rep_base_pose[0] + 0.12, rep_base_pose[1], 0.374775]
+        abs_arm_quat = quaternion_multiply([0, 0, np.sin(rep_base_pose[2] / 2), np.cos(rep_base_pose[2] / 2)], rep_arm_quat)
 
         arm_command = Pose()
-        arm_command.position.x = rep_arm_pose[0]
-        arm_command.position.y = rep_arm_pose[1]
-        arm_command.position.z = rep_arm_pose[2]
-        arm_command.orientation.x = rep_arm_quat[0]
-        arm_command.orientation.y = rep_arm_quat[1]
-        arm_command.orientation.z = rep_arm_quat[2]
-        arm_command.orientation.w = rep_arm_quat[3]
+        arm_command.position.x = rep_arm_pos[0]
+        arm_command.position.y = rep_arm_pos[1]
+        arm_command.position.z = rep_arm_pos[2]
+        arm_command.orientation.x = abs_arm_quat[0]
+        arm_command.orientation.y = abs_arm_quat[1]
+        arm_command.orientation.z = abs_arm_quat[2]
+        arm_command.orientation.w = abs_arm_quat[3]
+        # arm_command.orientation.x = rep_arm_quat[0]
+        # arm_command.orientation.y = rep_arm_quat[1]
+        # arm_command.orientation.z = rep_arm_quat[2]
+        # arm_command.orientation.w = rep_arm_quat[3]
         self.arm_pub.publish(arm_command)
 
         base_command = Float64MultiArray()
@@ -138,7 +155,7 @@ class RemoteController(Node):
 
         if rep_gripper is not None:
             gripper_command = Float64()
-            gripper_command.data = rep_gripper
+            gripper_command.data = rep_gripper[0]
             self.gripper_pub.publish(gripper_command)
 
     def reset_env_callback(self, request, response):
@@ -155,9 +172,10 @@ class RemoteController(Node):
 
         # Disable policy execution until user presses on screen
         self.enabled = False  # Note: Set to True to run without phone
+        return response
 
     def joint_states_callback(self, msg):
-        self.last_joint_state = msg
+        self.last_gripper_state = msg.position[msg.name.index("left_outer_knuckle_joint")]
 
     def base_image_callback(self, msg):
         self.last_base_image = msg
@@ -177,7 +195,7 @@ class RemoteController(Node):
         # Note: This is a placeholder, adjust as needed
         v = cv2.resize(cv_image, (84, 84))
         _, jpeg = cv2.imencode('.jpg', v)
-        return jpeg.tobytes()
+        return jpeg
     
     def get_base_pose(self):
         try:

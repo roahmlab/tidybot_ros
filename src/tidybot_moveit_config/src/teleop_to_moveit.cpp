@@ -26,7 +26,7 @@ class WebServerMoveit : public rclcpp::Node {
         sensitivity = 0.01; // Incoming end effector position must not be within 1cm of previous pose
         options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
         options.lock_redundant_joints = false;
-        options.return_approximate_solution = false;
+        options.return_approximate_solution = true;
 
         // Listen to global tidybot commands
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
