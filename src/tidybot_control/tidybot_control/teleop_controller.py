@@ -19,13 +19,13 @@ import math
 import gc
 
 
-class WSRelay(Node):
+class TeleopController(Node):
     def __init__(self):
-        super().__init__("ws_relay")
+        super().__init__("teleop_controller")
         self.declare_parameter("use_sim", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
         self.get_logger().info(
-            "Web server relay initialized with use_sim: {}".format(self.use_sim)
+            "Teleop controller initialized with use_sim: {}".format(self.use_sim)
         )
         if self.use_sim:
             self.joint_states_sub = self.create_subscription(
@@ -67,6 +67,7 @@ class WSRelay(Node):
 
         self.clock = self.get_clock()
 
+        # time jump back callback to handle tf buffer reset
         threshold = JumpThreshold(
             min_forward=None, min_backward=Duration(seconds=-1), on_clock_change=True
         )
@@ -287,9 +288,9 @@ def convert_webxr_pose(pos, quat):
 
 def main():
     rclpy.init()
-    ws_relay = WSRelay()
-    rclpy.spin(ws_relay)
-    ws_relay.destroy_node()
+    teleop_controller = TeleopController()
+    rclpy.spin(teleop_controller)
+    teleop_controller.destroy_node()
     rclpy.shutdown()
 
 

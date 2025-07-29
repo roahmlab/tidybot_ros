@@ -27,7 +27,9 @@ class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
         self.declare_parameter("use_sim", True)
+        self.declare_parameter("use_remote", False)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        self.use_remote = self.get_parameter("use_remote").get_parameter_value().bool_value
 
         self.state_sub = self.create_subscription(
             String, "/ws_state", self.state_callback, 10
@@ -46,6 +48,9 @@ class StateController(Node):
 
         self.reset_arm_cli = self.create_client(Empty, "/tidybot/arm/reset")
 
+        if (self.use_remote):
+            self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")
+
     def state_callback(self, msg):
         self.get_logger().info(f"Received state command: {msg.data}")
         match msg.data:
@@ -53,6 +58,9 @@ class StateController(Node):
                 if self.state == State.IDLE or self.state == State.EPISODE_FINISHED:
                     self.get_logger().info(f"{GREEN}Resetting environment...{RESET}")
                     self.state = State.ENVIRONMENT_RESET
+                    # Reset the remote policy server if using remote control
+                    if self.use_remote:
+                        self.reset_remote_cli.call_async(Empty.Request())
                     # Reset the environment
                     if self.use_sim:
                         subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])

@@ -19,7 +19,9 @@ setup(
     install_requires=['setuptools',
                       'flask',
                       'flask_socketio',
-                      'tidybot_utils'],
+                      'tidybot_utils'
+                      'numpy',
+                      'opencv-python',],
     zip_safe=True,
     maintainer='janchen',
     maintainer_email='janchen@umich.edu',
@@ -30,10 +32,11 @@ setup(
         'console_scripts': [
             'joint_states_listener = tidybot_control.joint_states_listener:main',
             'twist_to_multiarray = tidybot_control.twist_to_multiarray:main',
-            'web_server_publisher = tidybot_control.web_server_publisher:main',            
-            'ws_relay = tidybot_control.ws_relay:main',
+            'teleop_server = tidybot_control.teleop_server:main',
+            'teleop_controller = tidybot_control.teleop_controller:main',
             'state_controller = tidybot_control.state_controller:main',
             'reset_env = tidybot_control.reset_env:main',
+            'remote_controller = tidybot_control.remote_controller:main',
         ],
     },
 )

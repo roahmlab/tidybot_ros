@@ -71,7 +71,7 @@ class WebServerMoveit : public rclcpp::Node {
         if (pose_distance(last_pose, msg) < sensitivity) {
             return;
         }
-
+        RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Received arm pose: %f, %f, %f", msg.position.x, msg.position.y, msg.position.z);
         // Get current robot state
         std::map<std::string, double> joint_position_map;
         for (size_t i = 0; i < last_joint_state.name.size(); ++i) {

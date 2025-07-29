@@ -56,17 +56,17 @@ def generate_launch_description():
     with open(kinematics_yaml_path, 'r') as f:
         kinematics_config = yaml.safe_load(f)
 
-    web_server_publisher = Node(
+    teleop_server = Node(
         package="tidybot_control",
-        executable="web_server_publisher",
-        name="web_server_publisher",
+        executable="teleop_server",
+        name="teleop_server",
         output="screen",
     )
 
-    web_server_relay = Node(
+    teleop_controller = Node(
         package="tidybot_control",
-        executable="ws_relay",
-        name="ws_relay",
+        executable="remote_controller",
+        name="teleop_controller",
         output="screen",
         parameters=[{"use_sim_time": True},
                     {"use_sim": LaunchConfiguration("use_sim")}],
@@ -84,10 +84,10 @@ def generate_launch_description():
         parameters=[{"use_sim": LaunchConfiguration("use_sim")}]
     )
     
-    web_server_moveit = Node(
+    teleop_to_moveit = Node(
         package="tidybot_moveit_config",
-        executable="web_server_moveit",
-        name="web_server_moveit",
+        executable="teleop_to_moveit",
+        name="teleop_to_moveit",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
         condition=IfCondition(LaunchConfiguration("use_sim"))
@@ -105,9 +105,9 @@ def generate_launch_description():
         use_sim,
         moveit_launch,
         rviz_launch,
-        web_server_publisher,
-        web_server_relay,
+        teleop_server,
+        teleop_controller,
         state_controller,
-        web_server_moveit,    
-        episode_recorder,   
+        teleop_to_moveit,
+        episode_recorder,
     ])
