@@ -7,7 +7,7 @@
     <!-- load the corresponding macros -->
     <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_macro.xacro" />
     <xacro:include filename="$(find tidybot_description)/urdf/grippers/${gripper}/${gripper}_macro.xacro" />
-    <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_macro.xacro" />
+    <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot/base_macro.xacro" />
 
     <!-- load the base -->
     <xacro:load_base parent="" prefix="${prefix}" vision="${vision}" />

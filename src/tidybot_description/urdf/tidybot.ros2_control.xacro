@@ -27,7 +27,7 @@
         <xacro:add_joint name="joint_2" gain="0.1" cmd_interface="position" init_pos="-0.348927"/>
         <xacro:add_joint name="joint_3" gain="0.1" cmd_interface="position" init_pos="3.141522"/>
         <xacro:add_joint name="joint_4" gain="0.1" cmd_interface="position" init_pos="-2.548368"/>
-        <xacro:add_joint name="joint_5" gain="0.1" cmd_interface="position" init_pos="-3.195793"/>
+        <xacro:add_joint name="joint_5" gain="0.1" cmd_interface="position" init_pos="-3.131593"/>
         <xacro:add_joint name="joint_6" gain="0.1" cmd_interface="position" init_pos="0.872947"/>
 
         <xacro:if value="${arm == 'gen3_7dof'}">
