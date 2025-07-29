@@ -37,6 +37,7 @@ setup(
             'base_demo = tidybot_driver.base:main',
             'arm_server = tidybot_driver.arm_server:main',
             'camera = tidybot_driver.camera:main',
+            'webcamera = tidybot_driver.camera_external:main',
             'tidybot = tidybot_driver.tidybot:main',
         ],
     },

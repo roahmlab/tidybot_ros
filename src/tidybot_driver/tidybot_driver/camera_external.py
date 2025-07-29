@@ -3,7 +3,7 @@ from rclpy.node import Node
 import time
 import cv2
 from cv_bridge import CvBridge
-from sensor_msgs.msg import Image, CompressedImage
+from sensor_msgs.msg import CompressedImage
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 
 class Camera(Node):
@@ -16,51 +16,47 @@ class Camera(Node):
             depth=10
         )
 
-        self.publisher_ = self.create_publisher(CompressedImage, '/tidybot/camera/color/compressed', qos)
+        self.publisher_ = self.create_publisher(
+            CompressedImage, 
+            '/tidybot/camera/color/compressed', 
+            qos
+        )
         self.br = CvBridge()
 
-        # RTSP stream URL
-        self.cap = cv2.VideoCapture(
-            'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp ! '
-            'rtph264depay ! avdec_h264 ! videoconvert ! appsink',
-            cv2.CAP_GSTREAMER
-        )
+        # Use webcam
+        self.cap = cv2.VideoCapture(1)
 
         if not self.cap.isOpened():
-            self.get_logger().error(f"Failed to open RTSP stream")
+            self.get_logger().error("Failed to open webcam (/dev/video0)")
             return
-        
+
         w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        self.get_logger().info(f"Camera resolution: {w}x{h}")
-        timer_period = 1.0 / 1.0
-        self.timer = self.create_timer(timer_period, self.timer_callback)
+        self.get_logger().info(f"Webcam resolution: {w}x{h}")
+
+        # Set your desired FPS
+        fps = 10.0
+        self.timer = self.create_timer(1.0 / fps, self.timer_callback)
 
     def timer_callback(self):
         ret, frame = self.cap.read()
         if not ret:
-            self.get_logger().warn('Failed to read frame from RTSP stream')
-            self.cap.release()
-            time.sleep(1)
-            self.cap = cv2.VideoCapture(
-                'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp ! '
-                'rtph264depay ! avdec_h264 ! videoconvert ! appsink',
-                cv2.CAP_GSTREAMER)
+            self.get_logger().warn("Failed to read frame from webcam")
             return
 
         success, encoded_image = cv2.imencode('.jpg', frame)
         if not success:
             self.get_logger().warn("JPEG compression failed")
             return
-        # Convert and publish the frame
+
         msg = CompressedImage()
         msg.header.stamp = self.get_clock().now().to_msg()
         msg.format = 'jpeg'
         msg.data = encoded_image.tobytes()
-        self.get_logger().info('published image')
 
         self.publisher_.publish(msg)
-        
+        self.get_logger().debug("Published webcam image")
+
     def destroy_node(self):
         if self.cap:
             self.cap.release()

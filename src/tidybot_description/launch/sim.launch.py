@@ -135,6 +135,7 @@ def generate_launch_description():
                 link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
                 "/camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
                 "/camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image",
+                "/third_person_camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
                 "/world/empty/control@ros_gz_interfaces/srv/ControlWorld",
                 "/world/empty/create@ros_gz_interfaces/srv/SpawnEntity",
             ],

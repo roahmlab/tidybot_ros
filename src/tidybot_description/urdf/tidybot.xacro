@@ -20,6 +20,6 @@
 
     <!-- load gazebo plugins -->
     <xacro:include filename="$(find tidybot_description)/urdf/tidybot.gazebo.xacro" />
-    <xacro:load_gazebo_plugins config_path="$(arg ros2_control_config_path)" prefix="$(arg prefix) " arm="$(arg arm)" vision="$(arg vision)" />
+    <xacro:load_gazebo_plugins config_path="$(arg ros2_control_config_path)" prefix="$(arg prefix)" arm="$(arg arm)" vision="$(arg vision)" />
 
 </robot>

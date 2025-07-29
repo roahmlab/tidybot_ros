@@ -57,7 +57,7 @@ class WSRelay(Node):
             )
         else:
             self.arm_state_sub = self.create_subscription(
-                PoseStamped, "/tidybot/arm/pose", self.arm_pose_callback, 10
+                Pose, "/tidybot/arm/pose", self.arm_pose_callback, 10
             )
 
         self.rc_br = TransformBroadcaster(self)
@@ -243,16 +243,16 @@ class WSRelay(Node):
                 self.get_logger().warn(f"Transform not found: {e}")
         else:
             self.arm_obs_pos = [
-                msg.pose.position.x,
-                msg.pose.position.y,
-                msg.pose.position.z,
+                msg.position.x,
+                msg.position.y,
+                msg.position.z,
             ]
             self.arm_obs_quat = R.from_quat(
                 [
-                    msg.pose.orientation.x,
-                    msg.pose.orientation.y,
-                    msg.pose.orientation.z,
-                    msg.pose.orientation.w,
+                    msg.orientation.x,
+                    msg.orientation.y,
+                    msg.orientation.z,
+                    msg.orientation.w,
                 ]
             )
 

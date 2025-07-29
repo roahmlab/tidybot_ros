@@ -23,8 +23,8 @@ def generate_launch_description():
     
     camera_streamer = Node(
         package="tidybot_driver",
-        executable="camera",
-        name="camera",
+        executable="webcamera",
+        name="webcamera",
         condition=IfCondition(PythonExpression([
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
         ]))

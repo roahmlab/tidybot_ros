@@ -20,8 +20,11 @@ class EpisodeRecorder : public rclcpp::Node
 private:
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr base_cmd_sub_;
-    rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_cmd_sub_;
-    rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr gripper_cmd_sub_;
+    rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_cmd_sim_sub_;
+    rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr gripper_cmd_sim_sub_;
+
+    rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_cmd_real_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_cmd_real_sub_;
 
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_recording_service_;
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr stop_recording_service_;
@@ -59,26 +62,26 @@ public:
             // if recording in simulation, subscribe to the ros2_controller topics
             base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
                 "/tidybot_base_pos_controller/commands", 10,
-                std::bind(&EpisodeRecorder::base_cmd_callback, this, std::placeholders::_1));
-            arm_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+                std::bind(&EpisodeRecorder::base_cmd_sim_callback, this, std::placeholders::_1));
+            arm_cmd_sim_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
                 "/gen3_7dof_controller/joint_trajectory", 10,
-                std::bind(&EpisodeRecorder::arm_cmd_callback, this, std::placeholders::_1));
-            gripper_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+                std::bind(&EpisodeRecorder::arm_cmd_sim_callback, this, std::placeholders::_1));
+            gripper_cmd_sim_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
                 "/robotiq_2f_85_controller/joint_trajectory", 10,
-                std::bind(&EpisodeRecorder::gripper_cmd_callback, this, std::placeholders::_1));
+                std::bind(&EpisodeRecorder::gripper_cmd_sim_callback, this, std::placeholders::_1));
         }
         // If not in simulation, subscribe to the tidybot_control topics
         else
         {
             base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
                 "/tidybot/base/commands", 10,
-                std::bind(&EpisodeRecorder::base_cmd_callback, this, std::placeholders::_1));
-            arm_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+                std::bind(&EpisodeRecorder::base_cmd_real_callback, this, std::placeholders::_1));
+            arm_cmd_real_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
                 "/tidybot/arm/pose", 10,
-                std::bind(&EpisodeRecorder::arm_cmd_callback, this, std::placeholders::_1));
-            gripper_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
+                std::bind(&EpisodeRecorder::arm_cmd_real_callback, this, std::placeholders::_1));
+            gripper_cmd_real_sub_ = this->create_subscription<std_msgs::msg::Float64>(
                 "/tidybot/gripper/state", 10,
-                std::bind(&EpisodeRecorder::gripper_cmd_callback, this, std::placeholders::_1));
+                std::bind(&EpisodeRecorder::gripper_cmd_real_callback, this, std::placeholders::_1));
         }
 
         // Create services for starting and stopping recording
@@ -100,36 +103,36 @@ public:
     //     RCLCPP_INFO(this->get_logger(), "Recorded joint state for episode_%d", episode_count_);
     // }
 
-    void base_cmd_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    void base_cmd_sim_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
     {
         // Write the base command message to the rosbag
         write_message<std_msgs::msg::Float64MultiArray>(msg, "/tidybot_base_pos_controller/commands");
     }
 
-    void arm_cmd_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+    void base_cmd_real_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
     {
-        // Write the arm command message to the rosbag
-        if (use_sim_)
-        {
-            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/gen3_7dof_controller/joint_trajectory");
-        }
-        else
-        {
-            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/tidybot/arm/command");
-        }
+        // Write the base command message to the rosbag
+        write_message<std_msgs::msg::Float64MultiArray>(msg, "/tidybot/base/commands");
     }
 
-    void gripper_cmd_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+    void arm_cmd_sim_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
+    {
+        // Write the arm command message to the rosbag
+        write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/gen3_7dof_controller/joint_trajectory");
+    }
+    void arm_cmd_real_callback(const geometry_msgs::msg::Pose::SharedPtr msg)
+    {
+        write_message<geometry_msgs::msg::Pose>(msg, "/tidybot/arm/command");
+    }
+
+    void gripper_cmd_sim_callback(const trajectory_msgs::msg::JointTrajectory::SharedPtr msg)
     {
         // Write the gripper command message to the rosbag
-        if (use_sim_)
-        {
-            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/robotiq_2f_85_controller/joint_trajectory");
-        }
-        else
-        {
-            write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/tidybot/gripper/command");
-        }
+        write_message<trajectory_msgs::msg::JointTrajectory>(msg, "/robotiq_2f_85_controller/joint_trajectory");
+    }
+
+    void gripper_cmd_real_callback(const std_msgs::msg::Float64::SharedPtr msg) {
+        write_message<std_msgs::msg::Float64>(msg, "/tidybot/gripper/command");
     }
 
     void start_recording_callback(

@@ -8,6 +8,7 @@ import time
 import math
 from multiprocessing.managers import BaseManager as MPBaseManager
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from tidybot_driver.arm_controller import JointCompliantController
@@ -33,6 +34,12 @@ class ArmServer(Node):
             self.cmd_callback,
             10
         )
+        self.arm_delta_cmd_sub = self.create_subscription(
+            Float64MultiArray,
+            '/tidybot/arm/delta_command', # Exclusively for use in VLA
+            self.delta_cmd_callback,
+            10
+        )
         self.gripper_cmd_sub = self.create_subscription(
             Float64,
             '/tidybot/gripper/command',
@@ -41,7 +48,7 @@ class ArmServer(Node):
         )
         # End effector pose
         self.arm_state_pub = self.create_publisher(
-            PoseStamped,
+            Pose,
             '/tidybot/arm/pose',
             10
         )
@@ -100,27 +107,65 @@ class ArmServer(Node):
         (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
         self.arm_trajectory_pub.publish(arm_traj_msg)
         self.gripper_trajectory_pub.publish(gripper_traj_msg)
+    
+    def delta_cmd_callback(self, msg):
+
+        # msg[0:3] = Δx, Δy, Δz
+        # msg[3:6] = Δroll, Δpitch, Δyaw (in radians)
+        # msg[6]   = gripper
+
+        # Apply delta position
+        target_pos = np.array([
+            self.ee_pose.position.x + msg.data[0],
+            self.ee_pose.position.y + msg.data[1],
+            self.ee_pose.position.z + msg.data[2]
+        ], dtype=np.float64)
+
+        # Apply delta orientation
+        current_quat = np.array([
+            self.ee_pose.orientation.x,
+            self.ee_pose.orientation.y,
+            self.ee_pose.orientation.z,
+            self.ee_pose.orientation.w
+        ], dtype=np.float64)
+
+        delta_rpy = msg.data[3:6]  # Δroll, Δpitch, Δyaw in radians
+        current_rot = R.from_quat(current_quat)
+        delta_rot = R.from_euler('xyz', delta_rpy)
+        new_rot = current_rot * delta_rot  # apply delta in the local frame
+        target_quat = new_rot.as_quat()  # [x, y, z, w]
+        
+        self.gripper_cmd.data = msg.data[6]
+
+        self.get_logger().info(f'Received delta command: {target_pos}')
+        action = {'arm_pos' : target_pos,
+                  'arm_quat' : target_quat,
+                  'gripper_pos' : np.array(self.gripper_cmd.data, dtype=np.float64)}
+        
+        (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
+        self.arm_trajectory_pub.publish(arm_traj_msg)
+        self.gripper_trajectory_pub.publish(gripper_traj_msg)
 
     def gripper_cmd_callback(self, msg):
         self.gripper_cmd = msg
 
     def control_callback(self):
         self.arm.arm.update_state()
-        pose = PoseStamped()
-        pose.header.stamp = self.clock.now().to_msg()
+        pose = Pose()
         state = self.arm.get_state()
 
         # Position
-        pose.pose.position.x = float(state['arm_pos'][0])
-        pose.pose.position.y = float(state['arm_pos'][1])
-        pose.pose.position.z = float(state['arm_pos'][2])
+        pose.position.x = float(state['arm_pos'][0])
+        pose.position.y = float(state['arm_pos'][1])
+        pose.position.z = float(state['arm_pos'][2])
 
         # Orientation (quaternion)
-        pose.pose.orientation.x = float(state['arm_quat'][0])
-        pose.pose.orientation.y = float(state['arm_quat'][1])
-        pose.pose.orientation.z = float(state['arm_quat'][2])
-        pose.pose.orientation.w = float(state['arm_quat'][3])
+        pose.orientation.x = float(state['arm_quat'][0])
+        pose.orientation.y = float(state['arm_quat'][1])
+        pose.orientation.z = float(state['arm_quat'][2])
+        pose.orientation.w = float(state['arm_quat'][3])
 
+        self.ee_pose = pose
         self.arm_state_pub.publish(pose)
         gripper_state = Float64()
         gripper_state.data = float(state['gripper_pos'])
