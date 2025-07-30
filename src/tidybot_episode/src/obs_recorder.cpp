@@ -133,10 +133,10 @@ public:
         recording_enabled_ = true;
         RCLCPP_INFO(this->get_logger(), "Starting episode recording");
         // Create a new bag file for the episode
-        storage_options_.uri = storage_uri_ + "/" + get_timestamped_filename(this->get_clock()->now(), "observations");
+        storage_options_.uri = storage_uri_ + "/" + get_timestamped_filename("observations");
         obs_writer_.open(storage_options_, converter_options_);
-        base_video_filename_ = storage_options_.uri + "/" + get_timestamped_filename(this->get_clock()->now(), "base_video") + ".mp4";
-        arm_video_filename_ = storage_options_.uri + "/" + get_timestamped_filename(this->get_clock()->now(), "arm_video") + ".mp4";
+        base_video_filename_ = storage_options_.uri + "/" + get_timestamped_filename("base_video") + ".mp4";
+        arm_video_filename_ = storage_options_.uri + "/" + get_timestamped_filename( "arm_video") + ".mp4";
         return;
     }
 
@@ -174,6 +174,17 @@ public:
 
     void record_timer_callback()
     {
+        // check for time jump back
+        if (last_record_time_.nanoseconds() > this->get_clock()->now().nanoseconds())
+        {
+            RCLCPP_WARN(this->get_logger(), "Time jump detected, resetting tf_buffer and tf_listener...");
+            tf_buffer_.reset();
+            tf_listener_.reset();
+
+            tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+            tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_, this);
+            return;
+        }
         if (!recording_enabled_)
         {
             return;
@@ -324,20 +335,31 @@ private:
             this->get_clock()->now()); // rclcpp::Time
     }
 
-    std::string get_timestamped_filename(const rclcpp::Time &time, const std::string &prefix)
+    std::string get_timestamped_filename(const std::string &prefix)
     {
-        auto epoch_sec = static_cast<std::time_t>(time.seconds());
-        std::tm local_tm = *std::localtime(&epoch_sec);
-        std::ostringstream oss;
-        int year = local_tm.tm_year + 1900;
-        int month = local_tm.tm_mon + 1;
-        int day = local_tm.tm_mday;
-        int hour = local_tm.tm_hour;
-        int minute = local_tm.tm_min;
-        int second = local_tm.tm_sec;
-        oss << prefix << "_" << year << "_" << month << "_"
-            << day << "_" << hour << "_" << minute << "_" << second;
-        return oss.str();
+    // 1) Grab current system time_point
+    auto now = std::chrono::system_clock::now();  
+    // std::chrono::system_clock::now() returns the current wall‑clock time_point :contentReference[oaicite:0]{index=0}
+
+    // 2) Convert to time_t for calendar operations
+    std::time_t t = std::chrono::system_clock::to_time_t(now);
+    // system_clock::to_time_t converts a time_point to time_t :contentReference[oaicite:1]{index=1}
+
+    // 3) Break out into local calendar time (thread‑safe)
+    std::tm local_tm;
+#if defined(_MSC_VER)
+    localtime_s(&local_tm, &t);
+#else
+    localtime_r(&t, &local_tm);
+#endif
+
+    // 4) Format as YYYY_MM_DD_HH_MM_SS
+    std::ostringstream oss;
+    oss << prefix << "_"
+        << std::put_time(&local_tm, "%Y_%m_%d_%H_%M_%S");
+    // std::put_time with local_tm and format specifier to output timestamp :contentReference[oaicite:2]{index=2}
+
+    return oss.str();
     }
 };
 

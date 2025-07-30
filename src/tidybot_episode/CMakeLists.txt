@@ -20,6 +20,9 @@ find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(tf2_ros REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2 REQUIRED)
+find_package(HDF5 REQUIRED COMPONENTS C CXX)
 
 add_executable(actions_recorder src/actions_recorder.cpp)
 ament_target_dependencies(actions_recorder
@@ -55,11 +58,35 @@ ament_target_dependencies(obs_recorder
   tf2_ros
 )
 
+add_executable(obs_reader src/obs_reader.cpp)
+ament_target_dependencies(obs_reader
+  rclcpp
+  rosbag2_cpp
+  rosbag2_storage
+  tf2
+  std_msgs
+  std_srvs
+  sensor_msgs
+  geometry_msgs
+  trajectory_msgs
+  tf2_geometry_msgs
+  OpenCV
+  HDF5
+)
+
 install(TARGETS actions_recorder
   DESTINATION lib/${PROJECT_NAME}
 )
 install(TARGETS obs_recorder
   DESTINATION lib/${PROJECT_NAME}
+)
+install(TARGETS obs_reader
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}/
 )
 
 if(BUILD_TESTING)
