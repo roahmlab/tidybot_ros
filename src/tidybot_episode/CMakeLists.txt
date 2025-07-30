@@ -19,9 +19,10 @@ find_package(rosidl_runtime_cpp REQUIRED)
 find_package(cv_bridge REQUIRED)
 find_package(image_transport REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(tf2_ros REQUIRED)
 
-add_executable(record_episode src/record_episode.cpp)
-ament_target_dependencies(record_episode
+add_executable(actions_recorder src/actions_recorder.cpp)
+ament_target_dependencies(actions_recorder
   rclcpp
   rosbag2_cpp
   rosbag2_storage
@@ -34,9 +35,30 @@ ament_target_dependencies(record_episode
   cv_bridge
   image_transport
   OpenCV
+  tf2_ros
 )
 
-install(TARGETS record_episode
+add_executable(obs_recorder src/obs_recorder.cpp)
+ament_target_dependencies(obs_recorder
+  rclcpp
+  rosbag2_cpp
+  rosbag2_storage
+  std_msgs
+  std_srvs
+  sensor_msgs
+  geometry_msgs
+  trajectory_msgs
+  rosidl_runtime_cpp
+  cv_bridge
+  image_transport
+  OpenCV
+  tf2_ros
+)
+
+install(TARGETS actions_recorder
+  DESTINATION lib/${PROJECT_NAME}
+)
+install(TARGETS obs_recorder
   DESTINATION lib/${PROJECT_NAME}
 )
 

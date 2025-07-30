@@ -95,10 +95,10 @@ def generate_launch_description():
 
     episode_recorder = Node(
         package="tidybot_episode",
-        executable="record_episode",
-        name="record_episode",
+        executable="obs_recorder",
+        name="episode_recorder",
         output="screen",
-        parameters=[{"use_sim": LaunchConfiguration("use_sim")}]
+        parameters=[{"use_sim": LaunchConfiguration("use_sim")}],
     )
 
     return LaunchDescription([
