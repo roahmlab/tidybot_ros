@@ -129,21 +129,27 @@ class RemoteController(Node):
 
         self.get_logger().info(f"Base pose: {rep_base_pose}, Arm pos: {rep_arm_pos}, Arm quat: {rep_arm_quat}, Gripper: {rep_gripper}")
         # Offset the arm position by the base offset
-        rep_arm_pos = rep_arm_pos + [rep_base_pose[0] + 0.12, rep_base_pose[1], 0.374775]
-        abs_arm_quat = quaternion_multiply([0, 0, np.sin(rep_base_pose[2] / 2), np.cos(rep_base_pose[2] / 2)], rep_arm_quat)
+        try:
+            offset = self.tf_buffer.lookup_transform(
+                "world", "arm_base_link", Time()
+            )
+        except (LookupException, ExtrapolationException) as e:
+            self.get_logger().error(f"TF lookup failed: {e}")
+            return None, None
 
+        abs_arm_pos = [rep_arm_pos[0] + offset.transform.translation.x,
+                       rep_arm_pos[1] + offset.transform.translation.y,
+                       rep_arm_pos[2] + offset.transform.translation.z]
+        # abs_arm_quat = quaternion_multiply([offset.transform.rotation.w, offset.transform.rotation.x, offset.transform.rotation.y, offset.transform.rotation.z], rep_arm_quat)
+        abs_arm_quat = rep_arm_quat
         arm_command = Pose()
-        arm_command.position.x = rep_arm_pos[0]
-        arm_command.position.y = rep_arm_pos[1]
-        arm_command.position.z = rep_arm_pos[2]
+        arm_command.position.x = abs_arm_pos[0]
+        arm_command.position.y = abs_arm_pos[1]
+        arm_command.position.z = abs_arm_pos[2]
         arm_command.orientation.x = abs_arm_quat[0]
         arm_command.orientation.y = abs_arm_quat[1]
         arm_command.orientation.z = abs_arm_quat[2]
         arm_command.orientation.w = abs_arm_quat[3]
-        # arm_command.orientation.x = rep_arm_quat[0]
-        # arm_command.orientation.y = rep_arm_quat[1]
-        # arm_command.orientation.z = rep_arm_quat[2]
-        # arm_command.orientation.w = rep_arm_quat[3]
         self.arm_pub.publish(arm_command)
 
         base_command = Float64MultiArray()
@@ -155,7 +161,7 @@ class RemoteController(Node):
 
         if rep_gripper is not None:
             gripper_command = Float64()
-            gripper_command.data = rep_gripper[0]
+            gripper_command.data = rep_gripper[0] / 0.81
             self.gripper_pub.publish(gripper_command)
 
     def reset_env_callback(self, request, response):
