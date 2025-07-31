@@ -27,31 +27,38 @@ public:
         : Node("obs_reader")
     {
         this->declare_parameter<std::string>("input_dir", "episode_bag");
-        // Optional: if an output directory is specified, convert the bag to hdf5
-        // else just replay the messages
-        this->declare_parameter<std::string>("output_dir", "data");
+        this->declare_parameter<std::string>("output_dir", "data.hdf5");
         this->get_parameter("input_dir", root_dir_);
         this->get_parameter("output_dir", output_dir_);
         inspect_bags();
     }
 
 private:
+    // The .hdf5 file structure:
+    // /root
+    // |-- /data
+    //     |-- /demo_<demo_id>
+    //         |-- actions (N x 10)
+    //         |-- /obs
+    //             |-- arm_pos (N x 3)
+    //             |-- arm_quat (N x 4)
+    //             |-- base_image (N x 84 x 84 x 3)
+    //             |-- base_pose (N x 3)
+    //             |-- gripper_pos (N x 1)
+    //             |-- wrist_image (N x 84 x 84 x 3)
     void inspect_bags()
     {
-        // Open output HDF5 file if output_dir is set
+        // Open output HDF5 file
         H5::H5File *h5file = nullptr;
-        if (output_dir_ != "none")
+        // Ensure output directory exists (omitted for brevity)
+        std::string out_path = output_dir_;
+        // If output_dir_ is a directory, append a file name
+        if (fs::is_directory(output_dir_))
         {
-            // Ensure output directory exists (omitted for brevity)
-            std::string out_path = output_dir_;
-            // If output_dir_ is a directory, append a file name
-            if (fs::is_directory(output_dir_))
-            {
-                std::string fname = fs::path(root_dir_).filename().string() + ".h5";
-                out_path = (fs::path(output_dir_) / fname).string();
-            }
-            h5file = new H5::H5File(out_path, H5F_ACC_TRUNC);
+            std::string fname = fs::path(root_dir_).filename().string() + ".hdf5";
+            out_path = (fs::path(output_dir_) / fname).string();
         }
+        h5file = new H5::H5File(out_path, H5F_ACC_TRUNC);
 
         H5::Group dataGroup = h5file->createGroup("/data");
 

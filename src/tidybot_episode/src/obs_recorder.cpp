@@ -337,15 +337,15 @@ private:
 
     std::string get_timestamped_filename(const std::string &prefix)
     {
-    // 1) Grab current system time_point
+    // Grab current system time_point
     auto now = std::chrono::system_clock::now();  
     // std::chrono::system_clock::now() returns the current wall‑clock time_point :contentReference[oaicite:0]{index=0}
 
-    // 2) Convert to time_t for calendar operations
+    // Convert to time_t for calendar operations
     std::time_t t = std::chrono::system_clock::to_time_t(now);
     // system_clock::to_time_t converts a time_point to time_t :contentReference[oaicite:1]{index=1}
 
-    // 3) Break out into local calendar time (thread‑safe)
+    // Break out into local calendar time (thread‑safe)
     std::tm local_tm;
 #if defined(_MSC_VER)
     localtime_s(&local_tm, &t);
@@ -353,7 +353,7 @@ private:
     localtime_r(&t, &local_tm);
 #endif
 
-    // 4) Format as YYYY_MM_DD_HH_MM_SS
+    // Format as YYYY_MM_DD_HH_MM_SS
     std::ostringstream oss;
     oss << prefix << "_"
         << std::put_time(&local_tm, "%Y_%m_%d_%H_%M_%S");

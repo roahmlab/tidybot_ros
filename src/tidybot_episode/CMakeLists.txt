@@ -58,8 +58,8 @@ ament_target_dependencies(obs_recorder
   tf2_ros
 )
 
-add_executable(obs_reader src/obs_reader.cpp)
-ament_target_dependencies(obs_reader
+add_executable(rosbag_to_hdf5 src/rosbag_to_hdf5.cpp)
+ament_target_dependencies(rosbag_to_hdf5
   rclcpp
   rosbag2_cpp
   rosbag2_storage
@@ -80,7 +80,7 @@ install(TARGETS actions_recorder
 install(TARGETS obs_recorder
   DESTINATION lib/${PROJECT_NAME}
 )
-install(TARGETS obs_reader
+install(TARGETS rosbag_to_hdf5
   DESTINATION lib/${PROJECT_NAME}
 )
 

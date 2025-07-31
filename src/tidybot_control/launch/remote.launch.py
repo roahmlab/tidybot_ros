@@ -94,14 +94,6 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
-    episode_recorder = Node(
-        package="tidybot_episode",
-        executable="record_episode",
-        name="record_episode",
-        output="screen",
-        parameters=[{"use_sim": LaunchConfiguration("use_sim")}]
-    )
-
     return LaunchDescription([
         use_sim,
         moveit_launch,
@@ -109,6 +101,5 @@ def generate_launch_description():
         teleop_server,
         teleop_controller,
         state_controller,
-        teleop_to_moveit,
-        episode_recorder,
+        teleop_to_moveit
     ])
