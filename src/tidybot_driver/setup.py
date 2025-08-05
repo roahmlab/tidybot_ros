@@ -36,9 +36,11 @@ setup(
             'base_server = tidybot_driver.base_server:main',
             'base_demo = tidybot_driver.base:main',
             'arm_server = tidybot_driver.arm_server:main',
-            'camera = tidybot_driver.camera:main',
-            'webcamera = tidybot_driver.camera_external:main',
+            'camera_wrist = tidybot_driver.camera_wrist:main',
+            'camera_ext = tidybot_driver.camera_external:main',
             'tidybot = tidybot_driver.tidybot:main',
+            'play_csv_delta = tidybot_driver.play_csv_delta:main',
+            'play_csv_pose = tidybot_driver.play_csv_pose:main'
         ],
     },
 )

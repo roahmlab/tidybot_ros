@@ -21,10 +21,19 @@ def generate_launch_description():
         ]))
     )
     
-    camera_streamer = Node(
+    camera_wrist_streamer = Node(
         package="tidybot_driver",
-        executable="webcamera",
-        name="webcamera",
+        executable="camera_wrist",
+        name="camera_wrist",
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+        ]))
+    )
+    
+    camera_ext_streamer = Node(
+        package="tidybot_driver",
+        executable="camera_ext",
+        name="camera_ext",
         condition=IfCondition(PythonExpression([
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
         ]))
@@ -49,7 +58,8 @@ def generate_launch_description():
     return LaunchDescription([
         mode,
         arm_server,
-        camera_streamer,
+        camera_wrist_streamer,
+        camera_ext_streamer,
         base_server,
         tidybot_jsp
     ])

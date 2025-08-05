@@ -7,7 +7,7 @@
   <Domain Id="1">
     <General>
       <Interfaces>
-        <NetworkInterface address="35.7.3.151"/>
+        <NetworkInterface address="35.7.15.86"/>
       </Interfaces>
       <AllowMulticast>false</AllowMulticast>
       <MaxMessageSize>65500B</MaxMessageSize>

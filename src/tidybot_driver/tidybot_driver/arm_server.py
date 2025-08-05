@@ -82,6 +82,7 @@ class ArmServer(Node):
             self.handle_reset_request
         )
 
+        self.target_ee_pose = None
         self.gripper_cmd = Float64()
         self.clock = self.get_clock()
         self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_callback)
@@ -107,45 +108,38 @@ class ArmServer(Node):
         (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
         self.arm_trajectory_pub.publish(arm_traj_msg)
         self.gripper_trajectory_pub.publish(gripper_traj_msg)
+
+        self.target_ee_pose = {
+            'pos': target_pos,
+            'quat': target_quat
+        }
     
     def delta_cmd_callback(self, msg):
+        # Position deltas
+        self.target_ee_pose['pos'] += np.array(msg.data[0:3])
 
-        # msg[0:3] = Δx, Δy, Δz
-        # msg[3:6] = Δroll, Δpitch, Δyaw (in radians)
-        # msg[6]   = gripper
-
-        # Apply delta position
-        target_pos = np.array([
-            self.ee_pose.position.x + msg.data[0],
-            self.ee_pose.position.y + msg.data[1],
-            self.ee_pose.position.z + msg.data[2]
-        ], dtype=np.float64)
-
-        # Apply delta orientation
-        current_quat = np.array([
-            self.ee_pose.orientation.x,
-            self.ee_pose.orientation.y,
-            self.ee_pose.orientation.z,
-            self.ee_pose.orientation.w
-        ], dtype=np.float64)
-
-        delta_rpy = msg.data[3:6]  # Δroll, Δpitch, Δyaw in radians
-        current_rot = R.from_quat(current_quat)
+        # Orientation: apply delta RPY to current target quaternion
+        delta_rpy = msg.data[3:6]
+        current_rot = R.from_quat(self.target_ee_pose['quat'])
         delta_rot = R.from_euler('xyz', delta_rpy)
-        new_rot = current_rot * delta_rot  # apply delta in the local frame
-        target_quat = new_rot.as_quat()  # [x, y, z, w]
-        
+        new_rot = current_rot * delta_rot  # local frame
+        self.target_ee_pose['quat'] = new_rot.as_quat()
+
+        # Gripper
         self.gripper_cmd.data = msg.data[6]
 
-        self.get_logger().info(f'Received delta command: {target_pos}')
-        action = {'arm_pos' : target_pos,
-                  'arm_quat' : target_quat,
-                  'gripper_pos' : np.array(self.gripper_cmd.data, dtype=np.float64)}
-        
+        # Compose action
+        action = {
+            'arm_pos': self.target_ee_pose['pos'],
+            'arm_quat': self.target_ee_pose['quat'],
+            'gripper_pos': np.array(self.gripper_cmd.data, dtype=np.float64)
+        }
+
+        self.get_logger().info(f"Target pose: {self.target_ee_pose['pos']}")
         (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
         self.arm_trajectory_pub.publish(arm_traj_msg)
         self.gripper_trajectory_pub.publish(gripper_traj_msg)
-
+        
     def gripper_cmd_callback(self, msg):
         self.gripper_cmd = msg
 
@@ -166,6 +160,11 @@ class ArmServer(Node):
         pose.orientation.w = float(state['arm_quat'][3])
 
         self.ee_pose = pose
+        if self.target_ee_pose is None:
+            self.target_ee_pose = {
+                'pos': np.array([pose.position.x, pose.position.y, pose.position.z], dtype=np.float64),
+                'quat': np.array([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w], dtype=np.float64)
+        }
         self.arm_state_pub.publish(pose)
         gripper_state = Float64()
         gripper_state.data = float(state['gripper_pos'])

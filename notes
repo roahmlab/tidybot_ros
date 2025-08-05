@@ -75,3 +75,57 @@ export ROS_DOMAIN_ID=1
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI=$(realpath cyclonedds.xml)
 source /opt/ros/jazzy/setup.bash && source install/setup.bash
+
+unset RMW_IMPLEMENTATION
+unset CYCLONEDDS_URI
+
+sudo chmod 666 /dev/video0
+
+                    'images': tfds.features.FeaturesDict({
+                        'cam_exterior': tfds.features.Video(
+                            shape=(480, 640, 3),
+                            dtype=np.uint8,
+                            encoding_format='mp4',
+                            doc='Exterior RGB camera video, 15 FPS, 480x640, no audio.',
+                        ),
+                        'cam_wrist': tfds.features.Video(
+                            shape=(480, 640, 3),
+                            dtype=np.uint8,
+                            encoding_format='mp4',
+                            doc='Wrist RGB camera video, 15 FPS, 480x640, no audio.',
+                        ),
+                        
+                    }),
+
+INFO[build.py]: Loading dataset  from path: /home/yuandi/openvla-finetuning/rlds_dataset_builder/Fnii_VLA_Kinova/Fnii_VLA_Kinova.py
+2025-07-31 19:12:42.284850: I tensorflow/tsl/cuda/cudart_stub.cc:28] Could not find cuda drivers on your machine, GPU will not be used.
+2025-07-31 19:12:42.320553: I tensorflow/tsl/cuda/cudart_stub.cc:28] Could not find cuda drivers on your machine, GPU will not be used.
+2025-07-31 19:12:42.320933: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2025-07-31 19:12:42.931714: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+2025-07-31 19:12:43.202528: W tensorflow/core/common_runtime/gpu/gpu_device.cc:1960] Cannot dlopen some GPU libraries. Please make sure the missing libraries mentioned above are installed properly if you would like to use GPU. Follow the guide at https://www.tensorflow.org/install/gpu for how to download and setup the required libraries for your platform.
+Skipping registering GPU devices...
+WARNING[dtype_utils.py]: You use TensorFlow DType <dtype: 'uint8'> in tfds.features This will soon be deprecated in favor of NumPy DTypes. In the meantime it was converted to uint8.
+2025-07-31 19:12:43.735773: W tensorflow/tsl/platform/cloud/google_auth_provider.cc:184] All attempts to get a Google authentication bearer token failed, returning an empty token. Retrieving token from files failed with "NOT_FOUND: Could not locate the credentials file.". Retrieving token from GCE failed with "FAILED_PRECONDITION: Error executing an HTTP request: libcurl code 6 meaning 'Couldn't resolve host name', error details: Could not resolve host: metadata.google.internal".
+INFO[resolver.py]: Using /tmp/tfhub_modules to cache modules.
+Fatal Python error: Segmentation fault
+
+Current thread 0x00007f0fae7d2b80 (most recent call first):
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow/python/framework/function_def_to_graph.py", line 86 in function_def_to_graph
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow/python/saved_model/function_deserialization.py", line 422 in load_function_def_library
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow/python/saved_model/load.py", line 161 in __init__
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow/python/saved_model/load.py", line 988 in load_partial
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow/python/saved_model/load.py", line 858 in load
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_hub/module_v2.py", line 120 in load
+  File "/home/yuandi/openvla-finetuning/rlds_dataset_builder/Fnii_VLA_Kinova/Fnii_VLA_Kinova.py", line 20 in __init__
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_datasets/scripts/cli/build.py", line 444 in _make_builder
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_datasets/scripts/cli/build.py", line 329 in _make_builders
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_datasets/scripts/cli/build.py", line 278 in _build_datasets
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_datasets/scripts/cli/main.py", line 104 in main
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/absl/app.py", line 254 in _run_main
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/absl/app.py", line 308 in run
+  File "/home/yuandi/miniforge3/envs/rlds_env/lib/python3.9/site-packages/tensorflow_datasets/scripts/cli/main.py", line 109 in launch_cli
+  File "/home/yuandi/miniforge3/envs/rlds_env/bin/tfds", line 8 in <module>
+Segmentation fault (core dumped)
+
+

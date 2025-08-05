@@ -9,7 +9,7 @@ import numpy as np
 
 class Camera(Node):
     def __init__(self):
-        super().__init__('tidybot_ext_camera')
+        super().__init__('tidybot_wrist_camera')
 
         qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
@@ -17,40 +17,36 @@ class Camera(Node):
             depth=10
         )
 
-        self.raw_publisher_ = self.create_publisher(
-            Image, 
-            '/tidybot/camera_ext/color/raw', 
-            qos
-        )
-
-        self.publisher_ = self.create_publisher(
-            CompressedImage, 
-            '/tidybot/camera_ext/color/compressed', 
-            qos
-        )
+        self.publisher_raw_ = self.create_publisher(Image, '/tidybot/camera_wrist/color/raw', qos)
+        self.publisher_ = self.create_publisher(CompressedImage, '/tidybot/camera_wrist/color/compressed', qos)
         self.br = CvBridge()
 
-        # Use webcam
-        self.cap = cv2.VideoCapture(4)
-
+        # RTSP stream URL
+        self.cap = cv2.VideoCapture(
+            'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp latency=0 ! rtph264depay ! avdec_h264 ! videoconvert ! appsink drop=true sync=false',
+            cv2.CAP_GSTREAMER
+        )
         if not self.cap.isOpened():
-            self.get_logger().error("Failed to open webcam (/dev/video0)")
+            self.get_logger().error(f"Failed to open RTSP stream")
             return
-
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+        
         w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        self.get_logger().info(f"Webcam resolution: {w}x{h}")
-
-        fps = 5
-        self.timer = self.create_timer(1.0 / fps, self.timer_callback)
+        self.get_logger().info(f"Wrist camera resolution: {w}x{h}")
+        timer_period = 1.0 / 5.0
+        self.timer = self.create_timer(timer_period, self.timer_callback)
 
     def timer_callback(self):
         ret, frame = self.cap.read()
         if not ret:
-            self.get_logger().warn("Failed to read frame from webcam")
+            self.get_logger().warn('Failed to read frame from RTSP stream')
+            self.cap.release()
+            time.sleep(1)
+            self.cap = cv2.VideoCapture(
+                'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp latency=0 ! rtph264depay ! avdec_h264 ! videoconvert ! appsink drop=true sync=false',
+                cv2.CAP_GSTREAMER)
             return
+
         frame = self.crop_and_resize_opencv(frame, crop_scale=1, output_size=(224, 224))
 
         success, encoded_image = cv2.imencode('.jpg', frame)
@@ -66,10 +62,10 @@ class Camera(Node):
         msg_raw = self.br.cv2_to_imgmsg(frame, encoding="bgr8")
         msg_raw.header.stamp = self.get_clock().now().to_msg()
 
-        self.raw_publisher_.publish(msg_raw)
+        self.publisher_raw_.publish(msg_raw)
         self.publisher_.publish(msg)
-        self.get_logger().info("Published webcam image")
-    
+        self.get_logger().info('published image')
+
     @staticmethod
     def crop_and_resize_opencv(image: np.ndarray, crop_scale: float, output_size=(224, 224)) -> np.ndarray:
         """
