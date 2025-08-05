@@ -37,6 +37,7 @@ setup(
             'state_controller = tidybot_control.state_controller:main',
             'reset_env = tidybot_control.reset_env:main',
             'remote_controller = tidybot_control.remote_controller:main',
+            'joystick_controller = tidybot_control.joystick_controller:main',
         ],
     },
 )

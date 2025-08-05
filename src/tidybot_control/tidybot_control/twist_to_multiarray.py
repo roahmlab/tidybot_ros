@@ -14,7 +14,7 @@ class TwistToMultiArray(Node):
         )
         self.publisher = self.create_publisher(
             Float64MultiArray,
-            '/base_controller/commands',
+            '/tidybot_base_vel_controller/commands',
             10
         )
     def twist_callback(self, msg):

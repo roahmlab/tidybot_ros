@@ -5,6 +5,7 @@ from launch.actions import (
     IncludeLaunchDescription,
     TimerAction,
     DeclareLaunchArgument,
+    LogInfo,
     OpaqueFunction,
 )
 from launch.launch_description_sources import PythonLaunchDescriptionSource
@@ -34,6 +35,28 @@ def launch_world(context, *args, **kwargs):
             ),
             launch_arguments={"gz_args": f"-r {world_path}"}.items(),
         )
+    ]
+
+def launch_robot_description(context, *args, **kwargs):
+    robot_description_content = Command(
+        [
+            "xacro ",
+            PathJoinSubstitution([tidybot_pkg, "urdf", "tidybot.xacro"]),
+            " hardware_plugin:=gz_ros2_control/GazeboSimSystem",
+            " base_mode:=", LaunchConfiguration("base_mode"),
+        ],
+    ).perform(context)
+    return [
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                PathJoinSubstitution([tidybot_pkg, "launch", "description.launch.py"])
+            ),
+            launch_arguments={
+                "robot_description": robot_description_content,
+                "use_sim_time": "true",
+                "ignore_timestamp": "true",
+            }.items(),
+        ),
     ]
 
 def generate_launch_description():
@@ -82,24 +105,8 @@ def generate_launch_description():
     ld.add_action(
         OpaqueFunction(function=launch_world)
     )
-    # launch the robot description
     ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                PathJoinSubstitution([tidybot_pkg, "launch", "description.launch.py"])
-            ),
-            launch_arguments={
-                "robot_description_content": Command(
-                    [
-                        "xacro ",
-                        PathJoinSubstitution([tidybot_pkg, "urdf", "tidybot.xacro"]),
-                        " hardware_plugin:=gz_ros2_control/GazeboSimSystem",
-                    ]
-                ),
-                "use_sim_time": "true",
-                "ignore_timestamp": "true",
-            }.items(),
-        )
+        OpaqueFunction(function=launch_robot_description)
     )
     ld.add_action(
         Node(

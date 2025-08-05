@@ -2,7 +2,8 @@
 
 <robot name="ros2_control" xmlns:xacro="http://ros.org/wiki/xacro">
 
-    <xacro:macro name="load_ros2_control" params="hardware_plugin arm gripper">
+    <xacro:macro name="load_ros2_control" params="hardware_plugin arm gripper base_mode">
+
         <xacro:macro name="add_joint" params="name gain cmd_interface init_pos">
             <joint name="${name}">
                 <command_interface name="${cmd_interface}"/>
@@ -13,16 +14,17 @@
                 <param name="position_proportional_gain">${gain}</param>
             </joint>
         </xacro:macro>
+        
         <ros2_control name="TidybotSystem" type="system">
+
         <hardware>
             <plugin>${hardware_plugin}</plugin>
         </hardware>
-        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="velocity" init_pos="0.0"/>
-        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="position" init_pos="0.0"/>
-        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="velocity" init_pos="0.0"/>
-        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="position" init_pos="0.0"/>
-        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="velocity" init_pos="0.0"/>
-        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="position" init_pos="0.0"/>
+
+        <xacro:add_joint name="joint_x" gain="0.1" cmd_interface="${base_mode}" init_pos="0.0"/>
+        <xacro:add_joint name="joint_y" gain="0.1" cmd_interface="${base_mode}" init_pos="0.0"/>
+        <xacro:add_joint name="joint_th" gain="0.1" cmd_interface="${base_mode}" init_pos="0.0"/>
+
         <xacro:add_joint name="joint_1" gain="0.1" cmd_interface="position" init_pos="0.0"/>
         <xacro:add_joint name="joint_2" gain="0.1" cmd_interface="position" init_pos="-0.348927"/>
         <xacro:add_joint name="joint_3" gain="0.1" cmd_interface="position" init_pos="3.141522"/>
