@@ -87,10 +87,16 @@ class JoystickController(Node):
         self.control_thread = threading.Thread(target=self.control_loop)
         self.control_thread.start()
 
+        self.control_enabled = False
+
     def joy_callback(self, msg: Joy):
         if self.cmd_queue.full():
             self.cmd_queue.get()
-        self.cmd_queue.put(msg)
+        if msg.buttons[4] != 0 or msg.buttons[5] != 0:
+            self.control_enabled = True
+        else:
+            self.control_enabled = False
+        
 
     def time_jump_callback(self, time: Time):
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
@@ -114,33 +120,32 @@ class JoystickController(Node):
     def control_loop(self):
         base_cmd = Float64MultiArray()
         base_cmd.data = [0.0, 0.0, 0.0]
-        if not self.cmd_queue.empty():
-            # check if the control is enabled
+        # if the command queue is not empty and control is enabled
+        if not self.cmd_queue.empty() and self.control_enabled:
             cmd = self.cmd_queue.get()
-            if cmd.buttons[4] != 0 or cmd.buttons[5] != 0:
-                # Base control (scale x and y by 0.5 for sensitivity)
-                base_cmd_raw = np.array([cmd.axes[1] * 0.5, cmd.axes[0] * 0.5, cmd.axes[3]])
-                # get transform from world to base
-                try:
-                    base_tf = self.tf_buffer.lookup_transform(
-                        "world", "base", Time()
-                    )
-                    # transform the joystick input to base frame
-                    base_cmd.data = np.dot(
-                    R.from_quat(
-                        [
-                            base_tf.transform.rotation.x,
-                            base_tf.transform.rotation.y,
-                            base_tf.transform.rotation.z,
-                            base_tf.transform.rotation.w,
-                        ]
-                    ).as_matrix(),
-                    base_cmd_raw,
+            # Base control (scale x and y by 0.5 for sensitivity)
+            base_cmd_raw = np.array([cmd.axes[1] * 0.5, cmd.axes[0] * 0.5, cmd.axes[3]])
+            # get transform from world to base
+            try:
+                base_tf = self.tf_buffer.lookup_transform(
+                    "world", "base", Time()
                 )
-                except tf2_ros.LookupException as e:
-                    self.get_logger().warning(
-                        f"Failed to get transform: {e}. Skipping base control."
-                    )
+                # transform the joystick input to base frame
+                base_cmd.data = np.dot(
+                R.from_quat(
+                    [
+                        base_tf.transform.rotation.x,
+                        base_tf.transform.rotation.y,
+                        base_tf.transform.rotation.z,
+                        base_tf.transform.rotation.w,
+                    ]
+                ).as_matrix(),
+                base_cmd_raw,
+            )
+            except tf2_ros.LookupException as e:
+                self.get_logger().warning(
+                    f"Failed to get transform: {e}. Skipping base control."
+                )
         self.base_pub.publish(base_cmd)
 
 def main(args=None):

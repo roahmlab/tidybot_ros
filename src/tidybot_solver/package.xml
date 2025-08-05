@@ -1,23 +1,16 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tidybot_moveit_config</name>
-  <version>0.3.0</version>
-  <description>
-     An automatically generated package with all the configuration and launch files for using the tidybot with the MoveIt Motion Planning Framework
-  </description>
+  <name>tidybot_solver</name>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
-  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
-
-  <license>BSD-3-Clause</license>
-
-  <url type="website">http://moveit.ros.org/</url>
-  <url type="bugtracker">https://github.com/moveit/moveit2/issues</url>
-  <url type="repository">https://github.com/moveit/moveit2</url>
-
-  <author email="janchen@umich.edu">janchen</author>
+  <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <test_depend>ament_lint_auto</test_depend>
+  <test_depend>ament_lint_common</test_depend>
 
   <exec_depend>moveit_ros_move_group</exec_depend>
   <exec_depend>moveit_kinematics</exec_depend>
@@ -45,8 +38,12 @@
   <exec_depend>tidybot_description</exec_depend>
   <exec_depend>warehouse_ros_mongo</exec_depend>
 
+  <depend>moveit_ros_planning_interface</depend>
+  <depend>rclcpp</depend>
+  <depend>moveit_visual_tools</depend>
+  <depend>tidybot_utils</depend>
 
   <export>
-      <build_type>ament_cmake</build_type>
+    <build_type>ament_cmake</build_type>
   </export>
 </package>

@@ -12,6 +12,8 @@ from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 import xacro
 from pathlib import Path
+from moveit_configs_utils import MoveItConfigsBuilder
+from moveit_configs_utils.launches import generate_move_group_launch
 
 def generate_launch_description():
     tidybot_moveit_pkg = FindPackageShare("tidybot_moveit_config")
@@ -28,13 +30,8 @@ def generate_launch_description():
     urdf_xml = doc.toxml()
     outpath = Path(robot_description_path) / "urdf/tidybot.urdf"
     outpath.write_text(urdf_xml, encoding="utf-8")
-
-    moveit_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([tidybot_moveit_pkg, "launch", "demo.launch.py"])
-        ),
-        condition=IfCondition(LaunchConfiguration("use_sim"))
-    )
+    moveit_config = MoveItConfigsBuilder("tidybot", package_name="tidybot_moveit_config").to_moveit_configs()
+    moveit_config.robot_description["use_sim_time"] = True
 
     rviz_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -85,7 +82,7 @@ def generate_launch_description():
     )
     
     teleop_to_moveit = Node(
-        package="tidybot_moveit_config",
+        package="tidybot_solver",
         executable="teleop_to_moveit",
         name="teleop_to_moveit",
         output="screen",
@@ -93,12 +90,14 @@ def generate_launch_description():
         condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
+    move_group_launch = generate_move_group_launch(moveit_config)
+
     return LaunchDescription([
         use_sim,
-        moveit_launch,
         rviz_launch,
         teleop_server,
         teleop_controller,
         state_controller,
         teleop_to_moveit,
+        move_group_launch,
     ])
