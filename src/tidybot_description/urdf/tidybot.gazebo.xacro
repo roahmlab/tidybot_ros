@@ -2,17 +2,17 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-<xacro:macro name="load_gazebo_plugins" params="config_path">
+<xacro:macro name="load_gazebo_plugins" params="config_path prefix arm vision">
 
   <gazebo>
       <plugin name="gz_ros2_control::GazeboSimROS2ControlPlugin" filename="gz_ros2_control-system">
           <parameters>${config_path}</parameters>
           <robot_description_param>robot_description</robot_description_param>
       </plugin>
-      <self_collide>true</self_collide>
+      <plugin name="ignition::gazebo::systems::Sensors" filename="libignition-gazebo-sensors-system.so"/>
   </gazebo>
 
-  <gazebo>
+  <!-- <gazebo>
     <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher"/>
 
     <plugin
@@ -23,7 +23,73 @@
         <use_pose_vector_msg>true</use_pose_vector_msg>
     </plugin>
 
-  </gazebo>
+  </gazebo> -->
+
+  <xacro:if value="${vision}">
+    <gazebo reference="${prefix}arm_camera_link">
+      <sensor name="${prefix}arm_camera" type="rgbd_camera">
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
+				<topic>/arm_camera</topic>
+        <gz_frame_id>${prefix}arm_camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.247</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>480</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.03</near>
+            <far>3.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </gazebo>
+    <gazebo reference="${prefix}base_camera_link">
+      <sensor name="${prefix}base_camera" type="rgbd_camera">
+        <always_on>1</always_on>
+        <update_rate>30</update_rate>
+        <visualize>true</visualize>
+        <pose>0 0 0 0 0 0</pose>
+				<topic>/base_camera</topic>
+        <gz_frame_id>${prefix}base_camera_link</gz_frame_id>
+        <camera>
+          <horizontal_fov>1.434</horizontal_fov>
+          <image>
+            <width>640</width>
+            <height>360</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>0.03</near>
+            <far>3.0</far>
+          </clip>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.007</stddev>
+          </noise>
+        </camera>
+      </sensor>
+    </gazebo>
+  </xacro:if>
+
+  <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_transmission.xacro" />
+  <xacro:load_arm_transmission prefix="${prefix}" />
+
+  <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_transmission.xacro" />
+  <xacro:load_base_transmission prefix="${prefix}" />
+
+  <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_2f_85_transmission.xacro" />
+  <xacro:load_gripper_transmission prefix="${prefix}" />
 
 </xacro:macro>
 </robot>

@@ -1,6 +1,6 @@
 Panels:
   - Class: rviz_common/Displays
-    Help Height: 316
+    Help Height: 0
     Name: Displays
     Property Tree Widget:
       Expanded:
@@ -8,7 +8,7 @@ Panels:
         - /Status1
         - /RobotModel1
       Splitter Ratio: 0.5
-    Tree Height: 454
+    Tree Height: 770
   - Class: rviz_common/Selection
     Name: Selection
   - Class: rviz_common/Tool Properties
@@ -71,16 +71,32 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        arm_link:
+        arm_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        base_link:
+        base_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        bracelet_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
+        camera_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         end_effector_link:
           Alpha: 1
           Show Axes: false
@@ -90,7 +106,12 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        gripper_base_link:
+        half_arm_1_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        half_arm_2_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -107,27 +128,57 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        left_finger_dist_link:
+        left_inner_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        left_finger_prox_link:
+        left_inner_finger_pad:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        lower_wrist_link:
+        left_inner_knuckle:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_finger_dist_link:
+        left_outer_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        right_finger_prox_link:
+        left_outer_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_finger_pad:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_inner_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_outer_finger:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        right_outer_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        robotiq_arg2f_base_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -137,15 +188,20 @@ Visualization Manager:
           Show Axes: false
           Show Trail: false
           Value: true
-        tool_frame:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        upper_wrist_link:
+        spherical_wrist_1_link:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
+        spherical_wrist_2_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tool_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         world:
           Alpha: 1
           Show Axes: false
@@ -158,24 +214,70 @@ Visualization Manager:
       Update Interval: 0
       Value: true
       Visual Enabled: true
-    - Name: Visual Pose
+    - Alpha: 1
+      Axes Length: 0.30000001192092896
+      Axes Radius: 0.009999999776482582
       Class: rviz_default_plugins/Pose
+      Color: 255; 25; 0
       Enabled: true
+      Head Length: 0.05000000074505806
+      Head Radius: 0.05000000074505806
+      Name: Visual Pose
+      Shaft Length: 0.10000000149011612
+      Shaft Radius: 0.019999999552965164
+      Shape: Arrow
       Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /visual_pose
-      Alpha: 1
-      Arrow Color: 255; 25; 0
-      Shaft Radius: 0.02
-      Head Radius: 0.05
-      Shaft Length: 0.1
-      Head Length: 0.05
-      Position Tolerance: 0.01
-      Angle Tolerance: 0.01
-      Queue Size: 10
-      History Length: 1
-      Unreliable: false
-      Axes Length: 0.3
-      Axes Radius: 0.01
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /arm_camera/image
+      Value: true
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Image
+      Normalize Range: true
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /base_camera/image
+      Value: true
+    - Class: rviz_default_plugins/TF
+      Enabled: false
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 1
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
+      Show Names: false
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -248,7 +350,9 @@ Window Geometry:
   Height: 1150
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd00000004000000000000035500000374fc0200000008fb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b200fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000070000003740000018600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261000000010000015d00000374fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000070000003740000013800fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000087d0000005efc0100000002fb0000000800540069006d006501000000000000087d0000047a00fffffffb0000000800540069006d00650100000000000004500000000000000000000003b30000037400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Image:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd00000004000000000000035500000374fc020000000afb0000001200530065006c0065006300740069006f006e00000001e10000009b000000b200fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afb000000100044006900730070006c0061007900730100000070000003740000018600fffffffb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb0000000a0049006d006100670065030000010c0000014f00000355000002dcfb0000000a0049006d00610067006503000000ee0000041a000003550000021c000000010000015d00000374fc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a005600690065007700730100000070000003740000013800fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b200000000000000000000000200000490000000a9fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000087d0000005efc0100000002fb0000000800540069006d006501000000000000087d0000047a00fffffffb0000000800540069006d00650100000000000004500000000000000000000003b30000037400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
@@ -258,5 +362,5 @@ Window Geometry:
   Views:
     collapsed: false
   Width: 2173
-  X: 582
-  Y: 107
+  X: 1188
+  Y: 171

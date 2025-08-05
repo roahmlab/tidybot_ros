@@ -7,7 +7,7 @@ class JointStatesListener(Node):
         super().__init__('joint_states_listener')
         self.subscription = self.create_subscription(
             JointState,
-            'joint_states',
+            '/tidybot/joint_states',
             self.listener_callback,
             10
         )

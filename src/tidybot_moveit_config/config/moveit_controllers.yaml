@@ -4,10 +4,9 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 
 moveit_simple_controller_manager:
   controller_names:
-    - gen3_lite_controller
-    - gen3_lite_2f_controller
+    - gen3_7dof_controller
 
-  gen3_lite_controller:
+  gen3_7dof_controller:
     type: FollowJointTrajectory
     joints:
       - joint_1
@@ -16,15 +15,6 @@ moveit_simple_controller_manager:
       - joint_4
       - joint_5
       - joint_6
-    action_ns: follow_joint_trajectory
-    default: true
-
-  gen3_lite_2f_controller:
-    type: FollowJointTrajectory
-    joints:
-      - right_finger_bottom_joint
-      - right_finger_tip_joint
-      - left_finger_bottom_joint
-      - left_finger_tip_joint
+      - joint_7
     action_ns: follow_joint_trajectory
     default: true

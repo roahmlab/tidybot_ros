@@ -17,7 +17,7 @@ RUN apt-get -y update \
     && apt-get -y install \
       python3-pip sudo vim wget \
       curl software-properties-common \
-      doxygen git tmux \
+      doxygen git tmux dialog \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get -y update \
@@ -48,27 +48,27 @@ RUN useradd -m -l -u ${USER_ID} -s /bin/bash ${USER_NAME} \
 
 RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-USER ${USER_NAME}
-WORKDIR /home/${USER_NAME}/tidybot_platform
- 
-# Setup ROS 2 Jazzy + ROS 2 Control
-RUN sudo apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
-    sudo apt-add-repository universe 
+RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+RUN bash Miniforge3.sh -b -p "${HOME}/conda"
 
-RUN sudo apt-get update && sudo apt-get install curl -y && \
-    sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o \ 
+# Setup ROS 2 Jazzy + ROS 2 Control
+RUN apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
+    apt-add-repository universe 
+
+RUN apt-get update && sudo apt-get install curl -y && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o \ 
     /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \ 
-    | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+    | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-RUN sudo curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o \
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o \
     /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \ 
     http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \ 
-    | sudo tee /etc/apt/sources.list.d/ros2.list > /dev/null
+    | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-RUN sudo apt-get update && sudo apt-get upgrade -y && \
-    sudo apt-get install -y \
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install -y \
         ros-dev-tools \
         ros-${ROS_DISTRO}-desktop \
         python3-colcon-common-extensions \
@@ -83,30 +83,49 @@ RUN sudo apt-get update && sudo apt-get upgrade -y && \
     sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo
-RUN sudo apt-get update && sudo apt-get upgrade && \
-    sudo apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
+RUN apt-get update && sudo apt-get upgrade && \
+    apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
+
+# Setup Gazebo sensors
+RUN apt-get update && \
+    apt-get install -y lsb-release wget gnupg && \
+    echo "deb [arch=$(dpkg --print-architecture)] \
+      http://packages.osrfoundation.org/gazebo/ubuntu-stable \
+      $(lsb_release -cs) main" \
+      > /etc/apt/sources.list.d/gazebo-stable.list && \
+    wget http://packages.osrfoundation.org/gazebo.key -O - | apt-key add - && \
+    apt-get update && \
+    apt-cache search libgz-sensors
 
 # Setup MoveIt2 
-RUN sudo apt-get install ros-${ROS_DISTRO}-moveit -y
+RUN apt-get install ros-${ROS_DISTRO}-moveit -y
 
 # Setup Teleop
-RUN sudo apt-get install python3-flask python3-flask-socketio -y
+RUN apt-get install python3-flask python3-flask-socketio -y
+
+# Setup Phoenix6 and CANivore for base control
+RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg" && \
+    curl -s --compressed -o /etc/apt/sources.list.d/ctr2025.list "https://deb.ctr-electronics.com/ctr2025.list"
+
+RUN apt-get update && sudo apt-get install -y \
+    can-utils
+
+RUN pip install phoenix6 ruckig threadpoolctl --break-system-packages
+
+# Note: sudo apt install canivore-usb is requried for CANivore support, 
+# but it is not available at build time. Do this manually after running the container.
 
 # Build the workspace
-COPY ./src ./src
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build
+USER ${USER_NAME}
+WORKDIR /home/${USER_NAME}/tidybot_platform
 
-# Setup base Tidybot packages
-RUN sudo git clone https://github.com/jimmyyhwu/tidybot2.git /opt/tidybot2
-RUN sudo curl -L -O https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-$(uname -m).sh && \
-    sudo bash Miniforge3-Linux-$(uname -m).sh -b -p /opt/conda && sudo rm Miniforge3-Linux-$(uname -m).sh
-RUN export PATH="/opt/conda/bin:$PATH" && \
-    sudo chown -R $(whoami) /opt/conda && \
-    conda install mamba -n base -c conda-forge && \
-    mamba create -n tidybot2 python=3.10.14 -y && \
-    mamba run -n tidybot2 pip install -r /opt/tidybot2/requirements.txt
+COPY ./src ./src
+# RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+#     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+#     colcon build
+
+# RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
+#     sudo chown -R ${USER_NAME} /opt/tidybot2
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 

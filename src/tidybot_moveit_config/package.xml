@@ -7,6 +7,7 @@
      An automatically generated package with all the configuration and launch files for using the tidybot with the MoveIt Motion Planning Framework
   </description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
 
   <license>BSD-3-Clause</license>
 
@@ -40,7 +41,7 @@
   <exec_depend>rviz2</exec_depend>
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_default_plugins</exec_depend>
-  <exec_depend>simulation</exec_depend>
+  <exec_depend>tidybot_description</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>warehouse_ros_mongo</exec_depend>
   <exec_depend>xacro</exec_depend>
@@ -48,7 +49,7 @@
   <depend>moveit_ros_planning_interface</depend>
   <depend>rclcpp</depend>
   <depend>moveit_visual_tools</depend>
-
+  <depend>tidybot_utils</depend>
 
   <export>
       <build_type>ament_cmake</build_type>

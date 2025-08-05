@@ -35,9 +35,11 @@
         </geometry>
       </collision>
     </link>
+    
     <gazebo reference="${prefix}arm_base_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <link name="${prefix}shoulder_link">
       <inertial>
         <origin xyz="2.477E-05 0.02213531 0.09937686" rpy="0 0 0" />
@@ -60,9 +62,11 @@
         </geometry>
       </collision>
     </link>
+
     <gazebo reference="${prefix}shoulder_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <joint name="${prefix}joint_1" type="revolute">
       <origin xyz="0 0 0.12825" rpy="0 0 0" />
       <parent link="${prefix}arm_base_link" />
@@ -71,13 +75,7 @@
       <limit lower="-2.69" upper="2.69" effort="10" velocity="1.6" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint1_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_1" />
-      <actuator name="joint1_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
+
     <link name="${prefix}arm_link">
       <inertial>
         <origin xyz="0.02998299 0.21154808 0.0453031" rpy="0 0 0" />
@@ -100,9 +98,11 @@
         </geometry>
       </collision>
     </link>
+
     <gazebo reference="${prefix}arm_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <joint name="${prefix}joint_2" type="revolute">
       <origin xyz="0 -0.03 0.115" rpy="1.5708 0 0" />
       <parent link="${prefix}shoulder_link" />
@@ -111,13 +111,7 @@
       <limit lower="-2.69" upper="2.69" effort="14" velocity="1.6" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint2_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_2" />
-      <actuator name="joint2_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
+
     <link name="${prefix}forearm_link">
       <inertial>
         <origin xyz="0.0301559 0.09502206 0.0073555" rpy="0 0 0" />
@@ -140,9 +134,11 @@
         </geometry>
       </collision>
     </link>
+
     <gazebo reference="${prefix}forearm_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <joint name="${prefix}joint_3" type="revolute">
       <origin xyz="0 0.28 0" rpy="-3.1416 0 0" />
       <parent link="${prefix}arm_link" />
@@ -151,13 +147,7 @@
       <limit lower="-2.69" upper="2.69" effort="10" velocity="1.6" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint3_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_3" />
-      <actuator name="joint3_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
+
     <link name="${prefix}lower_wrist_link">
       <inertial>
         <origin xyz="0.00575149 0.01000443 0.08719207" rpy="0 0 0" />
@@ -180,9 +170,11 @@
         </geometry>
       </collision>
     </link>
+
     <gazebo reference="${prefix}lower_wrist_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <joint name="${prefix}joint_4" type="revolute">
       <origin xyz="0 -0.14 0.02" rpy="1.5708 0 0" />
       <parent link="${prefix}forearm_link" />
@@ -191,13 +183,7 @@
       <limit lower="-2.59" upper="2.59" effort="7" velocity="1.6" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint4_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_4" />
-      <actuator name="joint4_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
+
     <link name="${prefix}upper_wrist_link">
       <inertial>
         <origin xyz="0.08056517 0.00980409 0.01872799" rpy="0 0 0" />
@@ -220,9 +206,11 @@
         </geometry>
       </collision>
     </link>
+
     <gazebo reference="${prefix}upper_wrist_link">
       <material>Gazebo/Gray</material>
     </gazebo>
+
     <joint name="${prefix}joint_5" type="revolute">
       <origin xyz="0.0285 0 0.105" rpy="0 1.5708 0" />
       <parent link="${prefix}lower_wrist_link" />
@@ -231,13 +219,7 @@
       <limit lower="-2.57" upper="2.57" effort="7" velocity="1.6" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint5_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_5" />
-      <actuator name="joint5_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
+
     <link name="${prefix}end_effector_link" />
     <joint name="${prefix}joint_6" type="revolute">
       <origin xyz="-0.105 0 0.0285" rpy="0 -1.5708 0" />
@@ -247,12 +229,5 @@
       <limit lower="-2.59" upper="2.59" effort="7" velocity="3.2" />
       <dynamics damping="1.0" friction="1.0"/>
     </joint>
-    <transmission name="joint6_trans">
-      <type>transmission_interface/SimpleTransmission</type>
-      <joint name="${prefix}joint_6" />
-      <actuator name="joint6_motor">
-        <mechanicalReduction>1</mechanicalReduction>
-      </actuator>
-    </transmission>
   </xacro:macro>
 </robot>

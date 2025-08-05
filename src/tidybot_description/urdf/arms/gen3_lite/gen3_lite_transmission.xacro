@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+
+<robot xmlns:xacro="http://ros.org/wiki/xacro">
+
+    <xacro:macro name="load_arm_transmission" params="prefix">
+
+        <transmission name="joint1_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_1" />
+        <actuator name="joint1_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+        <transmission name="joint2_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_2" />
+        <actuator name="joint2_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+        <transmission name="joint3_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_3" />
+        <actuator name="joint3_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+        <transmission name="joint4_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_4" />
+        <actuator name="joint4_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+        <transmission name="joint5_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_5" />
+        <actuator name="joint5_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+        <transmission name="joint6_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${prefix}joint_6" />
+        <actuator name="joint6_motor">
+            <mechanicalReduction>1</mechanicalReduction>
+        </actuator>
+        </transmission>
+
+    </xacro:macro>
+
+</robot>

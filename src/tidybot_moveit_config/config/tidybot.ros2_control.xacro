@@ -50,10 +50,10 @@
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
-            <joint name="right_finger_bottom_joint">
+            <joint name="joint_7">
                 <command_interface name="position"/>
                 <state_interface name="position">
-                  <param name="initial_value">${initial_positions['right_finger_bottom_joint']}</param>
+                  <param name="initial_value">${initial_positions['joint_7']}</param>
                 </state_interface>
                 <state_interface name="velocity"/>
             </joint>
