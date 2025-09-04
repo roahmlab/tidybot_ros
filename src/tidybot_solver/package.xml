@@ -12,6 +12,8 @@
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
+  <depend>moveit_common</depend>
+
   <exec_depend>moveit_ros_move_group</exec_depend>
   <exec_depend>moveit_kinematics</exec_depend>
   <exec_depend>moveit_planners</exec_depend>
@@ -35,6 +37,7 @@
   <exec_depend>rviz_common</exec_depend>
   <exec_depend>rviz_default_plugins</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>tf2_geometry_msgs</exec_depend>
   <exec_depend>tidybot_description</exec_depend>
   <exec_depend>warehouse_ros_mongo</exec_depend>
 
@@ -42,6 +45,11 @@
   <depend>rclcpp</depend>
   <depend>moveit_visual_tools</depend>
   <depend>tidybot_utils</depend>
+  <depend>geometry_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>moveit_servo</depend>
+
+
 
   <export>
     <build_type>ament_cmake</build_type>

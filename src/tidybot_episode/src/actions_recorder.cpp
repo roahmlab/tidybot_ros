@@ -44,7 +44,7 @@ public:
           recording_enabled_(false)
     {
         declare_parameter<std::string>("storage_uri", "episode_bag");
-        declare_parameter<bool>("use_sim", false);
+        declare_parameter<bool>("use_sim", true);
         get_parameter("storage_uri", storage_uri_);
         get_parameter("use_sim", use_sim_);
         // Initialize storage options

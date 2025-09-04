@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, Float64MultiArray
-from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import Pose, PoseStamped, TwistStamped
 from sensor_msgs.msg import JointState, Joy
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import quaternion_multiply, quaternion_inverse
@@ -17,22 +17,23 @@ import gc
 import threading
 from queue import Queue
 import threading
+from enum import Enum
 
 """Joystick Message mapping:
 - Axes:
-  - 0: Left stick horizontal (base x)
-  - 1: Left stick vertical (base y)
-  - 2: Left trigger (1 - -1)
-  - 3: Right stick horizontal (base theta)
-  - 4: Right stick vertical (y)
-  - 5: Right trigger (1 - -1)
-  - 6: D-pad horizontal (1 | 0 | -1)
-  - 7: D-pad vertical (1 | 0 | -1)
+  - 0: Left stick horizontal (base x | arm linear x)
+  - 1: Left stick vertical (base y | arm linear y)
+  - 2: Left trigger 
+  - 3: Right stick horizontal (base theta | arm angular x)
+  - 4: Right stick vertical (base y | arm angular y)
+  - 5: Right trigger 
+  - 6: D-pad horizontal (arm linear z)
+  - 7: D-pad vertical (arm angular z)
 - Buttons:
-  - 0: A button (gripper open)
-  - 1: B button (gripper close)
-  - 2: X button (arm up)
-  - 3: Y button (arm down)
+  - 0: A button (arm mode)
+  - 1: B button (base mode)
+  - 2: X button 
+  - 3: Y button 
   - 4: Left bumper (enable)
   - 5: Right bumper (enable)
   - 6: Overview button (reset arm)
@@ -41,13 +42,16 @@ import threading
 - Additional buttons can be mapped as needed.
 """
 
+class ControlMode(Enum):
+    BASE = 0
+    ARM = 1
 
 class JoystickController(Node):
     def __init__(self):
         super().__init__("joystick_controller")
         self.declare_parameter("use_sim", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
-        self.declare_parameter("control_frequency", 40.0)
+        self.declare_parameter("control_frequency", 2.0)
         self.control_frequency = (
             self.get_parameter("control_frequency").get_parameter_value().double_value
         )
@@ -62,7 +66,7 @@ class JoystickController(Node):
             raise NotImplementedError("Non-simulation mode is not implemented yet.")
 
         self.arm_pub = self.create_publisher(
-            Float64MultiArray, "/tidybot/arm/command", 10
+            TwistStamped, "/tidybot/arm/twist", 10
         )
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/command", 10
@@ -88,15 +92,24 @@ class JoystickController(Node):
         self.control_thread.start()
 
         self.control_enabled = False
+        self.control_mode = None
 
     def joy_callback(self, msg: Joy):
         if self.cmd_queue.full():
             self.cmd_queue.get()
-        if msg.buttons[4] != 0 or msg.buttons[5] != 0:
+        if (msg.buttons[4] != 0 or msg.buttons[5] != 0) and not self.control_enabled:
             self.control_enabled = True
-        else:
+            self.get_logger().info("Joystick control enabled")
+        elif msg.buttons[4] == 0 and msg.buttons[5] == 0 and self.control_enabled:
             self.control_enabled = False
-        
+            self.get_logger().info("Joystick control disabled")
+        if msg.buttons[0] == 1 and msg.buttons[1] == 0 and self.control_mode != ControlMode.ARM:
+            self.control_mode = ControlMode.ARM
+            self.get_logger().info("Switch to ARM mode")
+        elif msg.buttons[1] == 1 and msg.buttons[0] == 0 and self.control_mode != ControlMode.BASE:
+            self.control_mode = ControlMode.BASE
+            self.get_logger().info("Switch to BASE mode")
+        self.cmd_queue.put(msg)
 
     def time_jump_callback(self, time: Time):
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
@@ -119,34 +132,57 @@ class JoystickController(Node):
 
     def control_loop(self):
         base_cmd = Float64MultiArray()
+        arm_cmd = TwistStamped()
         base_cmd.data = [0.0, 0.0, 0.0]
+        arm_cmd.header.stamp = self.get_clock().now().to_msg()
+        arm_cmd.header.frame_id = "end_effector_link"  # Adjust to your robot's base
+        arm_cmd.twist.linear.x = 0.0
+        arm_cmd.twist.linear.y = 0.0
+        arm_cmd.twist.linear.z = 0.0
+        arm_cmd.twist.angular.x = 0.0
+        arm_cmd.twist.angular.y = 0.0
+        arm_cmd.twist.angular.z = 0.0
         # if the command queue is not empty and control is enabled
         if not self.cmd_queue.empty() and self.control_enabled:
             cmd = self.cmd_queue.get()
-            # Base control (scale x and y by 0.5 for sensitivity)
-            base_cmd_raw = np.array([cmd.axes[1] * 0.5, cmd.axes[0] * 0.5, cmd.axes[3]])
-            # get transform from world to base
-            try:
-                base_tf = self.tf_buffer.lookup_transform(
-                    "world", "base", Time()
+            if self.control_mode == ControlMode.BASE:
+                # Base control (scale x and y by 0.5 for sensitivity)
+                base_cmd_raw = np.array([cmd.axes[1] * 0.5, cmd.axes[0] * 0.5, cmd.axes[3]])
+                # get transform from world to base
+                try:
+                    base_tf = self.tf_buffer.lookup_transform(
+                        "world", "base", Time()
+                    )
+                    # transform the joystick input to base frame
+                    base_cmd.data = np.dot(
+                    R.from_quat(
+                        [
+                            base_tf.transform.rotation.x,
+                            base_tf.transform.rotation.y,
+                            base_tf.transform.rotation.z,
+                            base_tf.transform.rotation.w,
+                        ]
+                    ).as_matrix(),
+                    base_cmd_raw,
                 )
-                # transform the joystick input to base frame
-                base_cmd.data = np.dot(
-                R.from_quat(
-                    [
-                        base_tf.transform.rotation.x,
-                        base_tf.transform.rotation.y,
-                        base_tf.transform.rotation.z,
-                        base_tf.transform.rotation.w,
-                    ]
-                ).as_matrix(),
-                base_cmd_raw,
-            )
-            except tf2_ros.LookupException as e:
-                self.get_logger().warning(
-                    f"Failed to get transform: {e}. Skipping base control."
+                except tf2_ros.LookupException as e:
+                    self.get_logger().warning(
+                        f"Failed to get transform: {e}. Skipping base control."
+                    )
+            elif self.control_mode == ControlMode.ARM:
+                arm_cmd.twist.linear.x = cmd.axes[0] * 0.05
+                arm_cmd.twist.linear.y = cmd.axes[1] * 0.05
+                arm_cmd.twist.linear.z = cmd.axes[6] * 0.05
+                arm_cmd.twist.angular.x = cmd.axes[3] * 0.05
+                arm_cmd.twist.angular.y = cmd.axes[4] * 0.05
+                arm_cmd.twist.angular.z = cmd.axes[7] * 0.05
+                self.get_logger().info(
+                    f"Arm command: linear({arm_cmd.twist.linear.x}, {arm_cmd.twist.linear.y}, {arm_cmd.twist.linear.z}), "
+                    f"angular({arm_cmd.twist.angular.x}, {arm_cmd.twist.angular.y}, {arm_cmd.twist.angular.z})"
                 )
+
         self.base_pub.publish(base_cmd)
+        self.arm_pub.publish(arm_cmd)
 
 def main(args=None):
     rclpy.init(args=args)
