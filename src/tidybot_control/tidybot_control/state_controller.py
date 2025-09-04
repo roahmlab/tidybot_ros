@@ -45,9 +45,7 @@ class StateController(Node):
 
         self.reset_arm_cli = self.create_client(Empty, "/tidybot/arm/reset")
         self.reset_base_cli = self.create_client(Empty, "/tidybot_base/reset")
-
-        self.reset_arm_cli = self.create_client(Empty, "/tidybot/arm/reset")
-
+        
         if (self.use_remote):
             self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")
 
