@@ -41,9 +41,6 @@ RUN set -eux; \
       userdel -r "$USERNAME"; \
     fi
 
-# Avoid shipping driver packages in the image
-RUN apt-get purge -y 'nvidia-*' 'libnvidia-*' || true
-
 # Create a new user with the specified USER_ID and USER_NAME
 RUN useradd -m -l -u ${USER_ID} -s /bin/bash ${USER_NAME} \
     && usermod -aG video ${USER_NAME} \
@@ -101,7 +98,7 @@ RUN apt-get update && \
     apt-cache search libgz-sensors
 
 # Setup MoveIt2 
-RUN apt-get install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-moveit-servo -y
+RUN apt-get install ros-${ROS_DISTRO}-moveit -y
 
 # Setup Teleop
 RUN apt-get install python3-flask python3-flask-socketio -y

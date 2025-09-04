@@ -5,7 +5,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
-DATA_DIR=/home/$(whoami)/Documents/tidybot_platform
+DATA_DIR=/home/$(whoami)/data
 XRUN="/run/user/$(id -u)"
 
 capabilities_str=\""capabilities=compute,utility,graphics,display\""
@@ -16,13 +16,13 @@ DOCKER_OPTIONS+="-it "
 DOCKER_OPTIONS+="-e DISPLAY=$DISPLAY "
 DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix "
 DOCKER_OPTIONS+="-v $(realpath $SCRIPT_DIR/../):/home/${USER_NAME}/$(basename $(realpath $SCRIPT_DIR/../)) "
-DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/Documents/tidybot_platform "
+DOCKER_OPTIONS+="-v $HOME/.Xauthority:/home/$(whoami)/.Xauthority "
+DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/data "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
 # installing the canivore-usb package may modify the host modules
 DOCKER_OPTIONS+="-v /lib/modules:/lib/modules:rw "
 DOCKER_OPTIONS+="-v $XRUN:$XRUN:rw "
-DOCKER_OPTIONS+="-v /dev/input:/dev/input:ro "
 DOCKER_OPTIONS+="-e XDG_RUNTIME_DIR=$XRUN "
 DOCKER_OPTIONS+="--name $CONTAINER_NAME "
 DOCKER_OPTIONS+="--privileged "
@@ -33,16 +33,6 @@ DOCKER_OPTIONS+="--shm-size 32G "
 DOCKER_OPTIONS+="--cap-add SYS_MODULE "
 DOCKER_OPTIONS+="--device /dev/dri:/dev/dri "
 DOCKER_OPTIONS+="--group-add video "
-DOCKER_OPTIONS+="--group-add render "
-
-XAUTH=/tmp/.docker.xauth
-if [ ! -f "$XAUTH" ]; then
-  touch "$XAUTH"
-  xauth nlist "$DISPLAY" | sed -e 's/^..../ffff/' | xauth -f "$XAUTH" nmerge -
-fi
-chmod a+r "$XAUTH"
-DOCKER_OPTIONS+="-e XAUTHORITY=$XAUTH "
-DOCKER_OPTIONS+="-v $XAUTH:$XAUTH:ro "
 
 for cam in /dev/video*; do
   DOCKER_OPTIONS+="--device=${cam} "
@@ -51,7 +41,6 @@ done
 if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
   echo "✔ NVIDIA GPU detected. Enabling GPU support."
   DOCKER_OPTIONS+="--gpus all "
-  DOCKER_OPTIONS+="-e NVIDIA_VISIBLE_DEVICES=all "
   DOCKER_OPTIONS+="-e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,display "
 else
   echo "No NVIDIA GPU found. Running without GPU support."
