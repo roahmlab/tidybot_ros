@@ -3,8 +3,8 @@
 # by @sethgi
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-IMAGE_TAG=arm_integration
-CONTAINER_NAME=arm_integration
+IMAGE_TAG=tidybot-openvla
+CONTAINER_NAME=tidybot-openvla
 DATA_DIR=/home/$(whoami)/data
 XRUN="/run/user/$(id -u)"
 

@@ -34,6 +34,9 @@
   <exec_depend>tf_transformations</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
 
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+
   <export>
     <build_type>ament_python</build_type>
   </export>

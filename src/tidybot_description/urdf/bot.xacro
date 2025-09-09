@@ -10,7 +10,7 @@
     <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_macro.xacro" />
 
     <!-- load the base -->
-    <xacro:load_base parent="" prefix="${prefix}" />
+    <xacro:load_base parent="" prefix="${prefix}" vision="${vision}" />
 
     <!-- load the arm -->
     <xacro:load_arm parent="${last_base_link}" vision="${vision}" prefix="${prefix}">

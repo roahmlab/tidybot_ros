@@ -34,7 +34,7 @@ class Camera(Node):
         self.cap = cv2.VideoCapture(4)
 
         if not self.cap.isOpened():
-            self.get_logger().error("Failed to open webcam (/dev/video0)")
+            self.get_logger().error("Failed to open webcam (/dev/video4)")
             return
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)

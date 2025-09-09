@@ -82,4 +82,4 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 
-# ros2 topic pub /tidybot/arm/command geometry_msgs/msg/Pose "{position: {x: 0.3024991,y: -0.054297563,z: 0.5487616},orientation: {x: 0.703183137270208,y: 0.710732772271335,z: 0.019590555382053117,w: 0.0029346240224369276}}"
+# ros2 topic pub --rate 10 /tidybot/arm/command geometry_msgs/msg/Pose "{position: {x: 0.3024991, y: -0.054297563, z: 0.5487616}, orientation: {x: 0.703183137270208, y: 0.710732772271335, z: 0.019590555382053117, w: 0.0029346240224369276}}"

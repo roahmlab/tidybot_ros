@@ -4,6 +4,7 @@ FROM ${BASE_IMAGE}
 ARG USER_NAME=default
 ARG USER_ID=1000
 ARG ROS_DISTRO=jazzy
+ARG ROS_DISTRO=jazzy
 
 # Prevent anything requiring user input
 ENV DEBIAN_FRONTEND=noninteractive
@@ -18,10 +19,16 @@ RUN apt-get -y update \
       python3-pip sudo vim wget \
       curl software-properties-common \
       doxygen git tmux dialog \
+      python3-pip sudo vim wget \
+      curl software-properties-common \
+      doxygen git tmux dialog \
     && rm -rf /var/lib/apt/lists/*
 
 RUN apt-get -y update \
     && apt-get -y install \
+        libglew-dev libassimp-dev libboost-all-dev \
+        libgtk-3-dev libglfw3-dev libavdevice-dev \
+        libavcodec-dev libeigen3-dev libxxf86vm-dev \
         libglew-dev libassimp-dev libboost-all-dev \
         libgtk-3-dev libglfw3-dev libavdevice-dev \
         libavcodec-dev libeigen3-dev libxxf86vm-dev \
@@ -48,6 +55,12 @@ RUN useradd -m -l -u ${USER_ID} -s /bin/bash ${USER_NAME} \
 
 RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
+RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+RUN bash Miniforge3.sh -b -p "${HOME}/conda"
+
+# Setup ROS 2 Jazzy + ROS 2 Control
+RUN apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
+    apt-add-repository universe 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
 RUN bash Miniforge3.sh -b -p "${HOME}/conda"
 
@@ -120,9 +133,9 @@ USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_platform
 
 COPY ./src ./src
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build
+# RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+#     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+#     colcon build
 
 # RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
 #     sudo chown -R ${USER_NAME} /opt/tidybot2

@@ -1,7 +1,8 @@
 controller_manager:
   ros__parameters:
     use_sim_time: true
-    update_rate: 100
+    update_rate: 50
+    enforce_command_limits: true
 
     joint_state_broadcaster:
       type: joint_state_broadcaster/JointStateBroadcaster
@@ -14,12 +15,9 @@ controller_manager:
 
     gen3_7dof_controller:
       type: joint_trajectory_controller/JointTrajectoryController
-
-    # gen3_lite_2f_controller:
-    #   type: joint_trajectory_controller/JointTrajectoryController
   
     robotiq_2f_85_controller:
-      type: joint_trajectory_controller/JointTrajectoryController
+      type: position_controllers/JointGroupPositionController
   
 tidybot_base_vel_controller:
   ros__parameters:
@@ -73,28 +71,7 @@ gen3_7dof_controller:
 robotiq_2f_85_controller:
   ros__parameters:
     joints:
-      - right_inner_finger_joint
-      - right_outer_knuckle_joint
-      - right_inner_knuckle_joint
-      - left_inner_finger_joint
       - left_outer_knuckle_joint
-      - left_inner_knuckle_joint
-    command_interfaces:
-      - position
-    state_interfaces:
-      - position
-      - velocity
-    state_publish_rate: 50
-    action_monitor_rate: 20.0
-    allow_partial_joints_goal: false
-    
-gen3_lite_2f_controller:
-  ros__parameters:
-    joints:
-      - right_finger_bottom_joint
-      - right_finger_tip_joint
-      - left_finger_bottom_joint
-      - left_finger_tip_joint
     command_interfaces:
       - position
     state_interfaces:

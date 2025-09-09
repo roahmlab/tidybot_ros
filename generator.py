@@ -333,20 +333,20 @@ SHA256 fail:
 pip cache purge
 pip install --upgrade pip-tools
 
-torchrun --standalone --nnodes 1 --nproc-per-node 4 vla-scripts/finetune.py \
+torchrun --standalone --nnodes 1 --nproc-per-node 2 vla-scripts/finetune.py \
   --vla_path "openvla/openvla-7b" \
   --data_root_dir ~/tensorflow_datasets/ \
   --dataset_name kinova_99 \
   --run_root_dir ~/openvla_finetune_logs/ \
   --adapter_tmp_dir ~/openvla_finetune_adapter_tmp/ \
   --lora_rank 32 \
-  --batch_size 8 \
-  --grad_accumulation_steps 2 \
+  --batch_size 4 \
+  --grad_accumulation_steps 4 \
   --learning_rate 5e-4 \
   --image_aug False \
   --wandb_project tidybot-openvla \
   --wandb_entity yuandi-huang-university-of-michigan \
-  --save_steps 500 
+  --save_steps 2000 
 
 /home/yuandi/tensorflow_datasets/dataset_statistics_aef531d2c5a8775d45398cc8cd6fc62f042c82e55b7ade3b35a4c010aa2a24a7.json
 
@@ -404,6 +404,14 @@ sudo ln -sf /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.535.183.01 /usr/lib/x86_64
 
 *** torch has no attribute uint64: pip install safetensors==0.3.3
 *** numpy has no attribute _core: pip install accelerate==0.25.0
+
+"kinova_99": { 
+   "image_obs_keys": {"primary": "image", "secondary": None, "wrist": "wrist_image"}, 
+   "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None}, 
+   "state_obs_keys": ["state", "state_ros"], 
+   "state_encoding": StateEncoding.JOINT, 
+   "action_encoding": ActionEncoding.EEF_POS, 
+},
 
 Traceback (most recent call last):                                                                                                                                                                                 
   File "/home/yuandi/tidybot_platform/src/tidybot_openvla/openvla/vla-scripts/finetune.py", line 373, in <module>                                                                                                  

@@ -7,14 +7,14 @@
   <Domain Id="1">
     <General>
       <Interfaces>
-        <NetworkInterface address="35.7.15.86"/>
+	      <NetworkInterface address="35.7.33.57"/> 
       </Interfaces>
       <AllowMulticast>false</AllowMulticast>
       <MaxMessageSize>65500B</MaxMessageSize>
     </General>
     <Discovery>
       <Peers>
-        <Peer address="141.212.77.163"/> <!-- Server IP -->
+        <Peer address="141.212.77.155"/> <!-- Server IP -->
       </Peers>
     </Discovery>
     <Tracing>

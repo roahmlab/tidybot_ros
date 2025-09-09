@@ -179,7 +179,7 @@ def main(args=None):
                 "joint_state_broadcaster",
                 "tidybot_base_pos_controller",
                 "gen3_7dof_controller",
-                "gen3_lite_2f_controller",
+                "robotiq_2f_85_controller",
             ]
         )
     except KeyboardInterrupt:

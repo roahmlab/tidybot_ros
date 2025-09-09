@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
   <xacro:macro name="robotiq_arg2f_base_link" params="parent prefix">
+    <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_arg2f_85_model_macro.xacro" />
 
     <!-- This joint was added by Kinova -->
     <joint name="${prefix}gripper_base_joint" type="fixed">
@@ -29,7 +30,7 @@
       <collision>
         <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
-           <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl" />
+          <mesh filename="file://$(find tidybot_description)/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl" />
         </geometry>
       </collision>
     </link>

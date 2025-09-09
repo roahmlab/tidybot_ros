@@ -17,21 +17,14 @@ def generate_launch_description():
         parameters=[joy_params],
     )
     
-    teleop_node = Node(
-        package='teleop_twist_joy',
-        executable='teleop_node',
-        name='teleop_node',
-        parameters=[joy_params],
-    )
-
-    twist_to_multiarray_node = Node(
+    joystick_controller_node = Node(
         package='tidybot_control',
-        executable='twist_to_multiarray',
-        name='twist_to_multiarray',
+        executable='joystick_controller',
+        name='joystick_controller',
+        parameters=[{'use_sim_time': True}],
     )
 
     return LaunchDescription([
         joy_node,
-        teleop_node,
-        twist_to_multiarray_node,
+        joystick_controller_node,
     ])
