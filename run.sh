@@ -6,6 +6,7 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
 DATA_DIR=/home/$(whoami)/Documents/tidybot_platform
+MOVEIT_DIR=/home/$(whoami)/ws_moveit2
 XRUN="/run/user/$(id -u)"
 
 capabilities_str=\""capabilities=compute,utility,graphics,display\""
@@ -17,6 +18,7 @@ DOCKER_OPTIONS+="-e DISPLAY=$DISPLAY "
 DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix "
 DOCKER_OPTIONS+="-v $(realpath $SCRIPT_DIR/../):/home/${USER_NAME}/$(basename $(realpath $SCRIPT_DIR/../)) "
 DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/Documents/tidybot_platform "
+DOCKER_OPTIONS+="-v $MOVEIT_DIR:/home/$(whoami)/ws_moveit2 "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
 # installing the canivore-usb package may modify the host modules
@@ -30,6 +32,7 @@ DOCKER_OPTIONS+="--net=host "
 DOCKER_OPTIONS+="-e SDL_VIDEODRIVER=x11 "
 DOCKER_OPTIONS+="-u $(id -u):$(id -g) "
 DOCKER_OPTIONS+="--shm-size 32G "
+DOCKER_OPTIONS+="-m 32g "
 DOCKER_OPTIONS+="--cap-add SYS_MODULE "
 DOCKER_OPTIONS+="--device /dev/dri:/dev/dri "
 DOCKER_OPTIONS+="--group-add video "

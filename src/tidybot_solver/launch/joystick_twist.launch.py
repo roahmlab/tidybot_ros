@@ -10,13 +10,13 @@ from moveit_configs_utils.launches import generate_move_group_launch
 
 def generate_launch_description():
     moveit_config = (MoveItConfigsBuilder("tidybot", package_name="tidybot_moveit_config")
-                     .robot_description(file_path="config/arm.urdf.xacro")
+                     .robot_description(file_path="config/tidybot.urdf.xacro")
                      .joint_limits(file_path="config/joint_limits.yaml")
                      .robot_description_semantic()
                      .to_moveit_configs()
     )
     servo_params = {
-        "moveit_servo": ParameterBuilder("tidybot_solver").yaml("config/demo_servo_config.yaml").to_dict()
+        "moveit_servo": ParameterBuilder("tidybot_solver").yaml("config/tidybot_servo_config.yaml").to_dict()
     }
 
     servo_node = launch_ros.actions.Node(
@@ -36,18 +36,21 @@ def generate_launch_description():
         output="screen",
     )
 
-    launch_sim = launch.actions.IncludeLaunchDescription(
-        launch.launch_description_sources.PythonLaunchDescriptionSource(
-            os.path.join(
-                get_package_share_directory("tidybot_description"),
-                "launch",
-                "sim_arm.launch.py",
-            )
-        )
-    )
+    # launch_sim = launch.actions.IncludeLaunchDescription(
+    #     launch.launch_description_sources.PythonLaunchDescriptionSource(
+    #         os.path.join(
+    #             get_package_share_directory("tidybot_description"),
+    #             "launch",
+    #             "sim_tidybot.launch.py",
+    #         )
+    #     ),
+    #     launch_arguments={
+    #             "base_mode": "velocity",
+    #         }.items(),
+    # )
     # move_group_launch = generate_move_group_launch(moveit_config)
     return launch.LaunchDescription([
         servo_node,
         # move_group_launch
-        launch_sim,
+        # launch_sim,
     ])

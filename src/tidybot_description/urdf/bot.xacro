@@ -14,7 +14,7 @@
 
     <!-- load the arm -->
     <xacro:load_arm parent="${last_base_link}" vision="${vision}" prefix="${prefix}">
-        <origin xyz="0 0 0" rpy="0 0 0" />
+        <origin xyz="0.12 3.76986e-15 0.374775" rpy="0 0 0" />
     </xacro:load_arm>
 
     <!-- load the gripper -->

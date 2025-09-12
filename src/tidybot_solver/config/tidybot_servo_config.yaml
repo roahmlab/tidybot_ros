@@ -13,7 +13,7 @@ publish_joint_positions: true
 publish_joint_velocities: true
 publish_joint_accelerations: false
 
-use_smoothing: false
+use_smoothing: true
 smoothing_filter_plugin_name: "online_signal_smoothing::AccelerationLimitedPlugin"
 
 is_primary_planning_scene_monitor: false
