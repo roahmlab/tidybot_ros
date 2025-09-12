@@ -104,10 +104,10 @@ public:
 
         // Create services for starting and stopping recording
         start_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "start_recording",
+            "/obs/start_recording",
             std::bind(&ObsRecorder::start_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
         stop_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "stop_recording",
+            "/obs/stop_recording",
             std::bind(&ObsRecorder::stop_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
 
         // Create a timer to periodically record data

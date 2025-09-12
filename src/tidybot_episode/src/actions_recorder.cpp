@@ -44,7 +44,7 @@ public:
           recording_enabled_(false)
     {
         declare_parameter<std::string>("storage_uri", "episode_bag");
-        declare_parameter<bool>("use_sim", false);
+        declare_parameter<bool>("use_sim", true);
         get_parameter("storage_uri", storage_uri_);
         get_parameter("use_sim", use_sim_);
         // Initialize storage options
@@ -82,10 +82,10 @@ public:
 
         // Create services for starting and stopping recording
         start_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "start_recording",
+            "/actions/start_recording",
             std::bind(&EpisodeRecorder::start_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
         stop_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "stop_recording",
+            "/actions/stop_recording",
             std::bind(&EpisodeRecorder::stop_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
 
         RCLCPP_INFO(this->get_logger(), "Episode Recorder Node Initialized");

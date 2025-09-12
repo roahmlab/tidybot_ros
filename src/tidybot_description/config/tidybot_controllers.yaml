@@ -1,7 +1,7 @@
 controller_manager:
   ros__parameters:
     use_sim_time: true
-    update_rate: 50
+    update_rate: 100
     enforce_command_limits: true
 
     joint_state_broadcaster:
@@ -30,7 +30,7 @@ tidybot_base_vel_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 50
+    state_publish_rate: 100
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
 
@@ -45,7 +45,7 @@ tidybot_base_pos_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 50
+    state_publish_rate: 100
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
 
@@ -64,9 +64,10 @@ gen3_7dof_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 50
+    state_publish_rate: 100
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
+    allow_nonzero_velocity_at_trajectory_end: true
 
 robotiq_2f_85_controller:
   ros__parameters:
@@ -77,6 +78,6 @@ robotiq_2f_85_controller:
     state_interfaces:
       - position
       - velocity
-    state_publish_rate: 50
+    state_publish_rate: 100
     action_monitor_rate: 20.0
     allow_partial_joints_goal: false
