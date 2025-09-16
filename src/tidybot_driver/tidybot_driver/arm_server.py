@@ -175,7 +175,7 @@ class ArmServer(Node):
         joint_state.name = [
             'joint_1', 'joint_2', 'joint_3',
             'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            'finger_joint'
+            'left_outer_knuckle_joint'
         ]
         joint_state.position = [angle for angle in self.arm.arm.q] + \
                                [0.8 * self.arm.arm.gripper_pos]
@@ -228,13 +228,10 @@ class Arm:
         arm_traj_msg.points = [point]
 
         gripper_traj_msg = JointTrajectory()
-        gripper_traj_msg.joint_names = [
-            'left_outer_knuckle_joint', 'left_inner_knuckle_joint', 'left_inner_finger_joint',
-            'right_outer_knuckle_joint', 'right_inner_knuckle_joint', 'right_inner_finger_joint'
-        ]
+        gripper_traj_msg.joint_names = ['left_outer_knuckle_joint']
         point = JointTrajectoryPoint()
         gripper_pos = 0.8 * float(action['gripper_pos'])  # gripper_pos corresponds to left_outer_knuckle_joint
-        point.positions = [gripper_pos, gripper_pos, -gripper_pos, gripper_pos, gripper_pos, -gripper_pos]
+        point.positions = [gripper_pos]
         point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
         gripper_traj_msg.points = [point]
 

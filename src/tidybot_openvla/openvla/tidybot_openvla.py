@@ -105,6 +105,7 @@ class OpenVLANode(Node):
             # Predict action
             with torch.no_grad():
                 action = self.vla.predict_action(**inputs, unnorm_key="kinova_99", do_sample=False)
+                action[6] = 0.6 if action[6] > 0.2 else 0.0
             with self.action_lock:
                 self.latest_action = action
 
