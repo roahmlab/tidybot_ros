@@ -46,7 +46,7 @@ class TeleopController(Node):
             WSMsg, "/ws_commands", self.ws_callback, 10
         )
 
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/command", 10)
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/pose_command", 10)
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/command", 10
         )

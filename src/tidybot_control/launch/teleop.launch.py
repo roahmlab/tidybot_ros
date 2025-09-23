@@ -87,7 +87,6 @@ def generate_launch_description():
         name="teleop_to_moveit",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
-        condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
     move_group_launch = generate_move_group_launch(moveit_config)

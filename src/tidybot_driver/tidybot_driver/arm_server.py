@@ -15,6 +15,8 @@ from tidybot_driver.constants import ARM_RPC_HOST, ARM_RPC_PORT, RPC_AUTHKEY
 from tidybot_driver.ik_solver import IKSolver
 from tidybot_driver.kinova import TorqueControlledArm
 from std_srvs.srv import Empty
+from scipy.spatial.transform import Rotation as R
+import os
 
 CONTROL_FREQ = 20                    # 20 Hz
 CONTROL_PERIOD = 1.0 / CONTROL_FREQ  # 50 ms
@@ -28,9 +30,15 @@ class ArmServer(Node):
 
         # Create a subscription to the command topic
         self.arm_cmd_sub = self.create_subscription(
-            Pose,
+            JointState,
             '/tidybot/arm/command',
-            self.cmd_callback,
+            self.arm_cmd_callback,
+            10
+        )
+        self.arm_delta_cmd_sub = self.create_subscription(
+            Float64MultiArray,
+            '/tidybot/arm/delta_command', # Exclusively for use in VLA
+            self.delta_ee_cmd_callback,
             10
         )
         self.gripper_cmd_sub = self.create_subscription(
@@ -41,30 +49,14 @@ class ArmServer(Node):
         )
         # End effector pose
         self.arm_state_pub = self.create_publisher(
-            PoseStamped,
+            Pose,
             '/tidybot/arm/pose',
             10
         )
-        # Arm joint states (joint_1 to joint_7)
+        # Arm joint states (joint_1 to joint_7) + Gripper state
         self.joint_state_pub = self.create_publisher(
             JointState,
             '/tidybot/arm/joint_states',
-            10
-        )
-        # Sent IK trajectories
-        self.arm_trajectory_pub = self.create_publisher(
-            JointTrajectory,
-            '/tidybot/arm/trajectory',
-            10
-        )
-        self.gripper_state_pub = self.create_publisher(
-            Float64,
-            '/tidybot/gripper/state',
-            10
-        )
-        self.gripper_trajectory_pub = self.create_publisher(
-            JointTrajectory,
-            '/tidybot/gripper/trajectory',
             10
         )
 
@@ -75,7 +67,8 @@ class ArmServer(Node):
             self.handle_reset_request
         )
 
-        self.gripper_cmd = Float64()
+        self.gripper_command = 0.0
+        self.target_ee_pose = self.arm.get_state() # Used in delta EE commands
         self.clock = self.get_clock()
         self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_callback)
 
@@ -85,56 +78,95 @@ class ArmServer(Node):
         self.get_logger().info("Arm reset complete")
         return response
 
-    def cmd_callback(self, msg):
-        target_pos = np.array([msg.position.x, msg.position.y, msg.position.z], dtype=np.float64)
-        target_quat = np.array([msg.orientation.x, 
-                                msg.orientation.y,
-                                msg.orientation.z, 
-                                msg.orientation.w], 
-                                dtype=np.float64)
-        self.get_logger().info(f'Received command: {target_pos}')
-        action = {'arm_pos' : target_pos,
-                  'arm_quat' : target_quat,
-                  'gripper_pos' : np.array(self.gripper_cmd.data, dtype=np.float64)}
-        
-        (arm_traj_msg, gripper_traj_msg) = self.arm.execute_action(action, self.clock.now().to_msg())
-        self.arm_trajectory_pub.publish(arm_traj_msg)
-        self.gripper_trajectory_pub.publish(gripper_traj_msg)
+    def arm_cmd_callback(self, msg):
+        # Extract in order of joint_states topic
+        joint_order = [f"joint_{i}" for i in range(1, 8)]
+        joint_dict = dict(zip(msg.name, msg.position))
 
+        target_joint_state = np.array([joint_dict[j] for j in joint_order], dtype=np.float64)
+        self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')        
+
+        self.arm.execute_action(np.concatenate([target_joint_state, [self.gripper_command]]).tolist())
+        self.target_ee_pose = self.arm.get_state()
+    
+    def delta_ee_cmd_callback(self, msg):
+        # Position deltas
+        self.target_ee_pose['arm_pos'] += np.array(msg.data[0:3])
+
+        # Orientation: apply delta RPY to current target quaternion
+        delta_rpy = msg.data[3:6]
+        current_rot = R.from_quat(self.target_ee_pose['arm_quat'])
+        delta_rot = R.from_euler('xyz', delta_rpy)
+        new_rot = current_rot * delta_rot  # local frame
+        self.target_ee_pose['arm_quat'] = new_rot.as_quat()
+        self.get_logger().info(f"Target pose: {self.target_ee_pose['arm_pos']}")
+
+        qpos = self.ik_solver.solve(self.target_ee_pose['arm_pos'], self.target_ee_pose['arm_quat'], self.arm.q)
+        self.arm.execute_action(np.concatenate([qpos, [msg[6]]]).tolist())
+        
     def gripper_cmd_callback(self, msg):
-        self.gripper_cmd = msg
+        self.gripper_command = msg.data
 
     def control_callback(self):
         self.arm.arm.update_state()
-        pose = PoseStamped()
-        pose.header.stamp = self.clock.now().to_msg()
         state = self.arm.get_state()
 
-        # Position
-        pose.pose.position.x = float(state['arm_pos'][0])
-        pose.pose.position.y = float(state['arm_pos'][1])
-        pose.pose.position.z = float(state['arm_pos'][2])
+        # Reformat into Pose message
+        pose = Pose()
+        pose.position.x = float(state['arm_pos'][0])
+        pose.position.y = float(state['arm_pos'][1])
+        pose.position.z = float(state['arm_pos'][2])
+        pose.orientation.x = float(state['arm_quat'][0])
+        pose.orientation.y = float(state['arm_quat'][1])
+        pose.orientation.z = float(state['arm_quat'][2])
+        pose.orientation.w = float(state['arm_quat'][3])
 
-        # Orientation (quaternion)
-        pose.pose.orientation.x = float(state['arm_quat'][0])
-        pose.pose.orientation.y = float(state['arm_quat'][1])
-        pose.pose.orientation.z = float(state['arm_quat'][2])
-        pose.pose.orientation.w = float(state['arm_quat'][3])
-
+        if self.target_ee_pose is None:
+            self.target_ee_pose = state
         self.arm_state_pub.publish(pose)
-        gripper_state = Float64()
-        gripper_state.data = float(state['gripper_pos'])
-        self.gripper_state_pub.publish(gripper_state)
+
+        def wrap_to_bounds(angle: float, min_val: float, max_val: float) -> float:
+            """
+            Wrap a joint angle to lie within [min_val, max_val] by adding/subtracting 2*pi.
+            """
+            while angle < min_val:
+                angle += 2 * math.pi
+            while angle > max_val:
+                angle -= 2 * math.pi
+            # If wrapping overshoots by multiple revolutions, do modulo
+            if angle < min_val or angle > max_val:
+                angle = ((angle - min_val) % (2 * math.pi)) + min_val
+            return angle
+
+        # Define joint bounds; None = continuous joint
+        joint_bounds = {
+            'joint_1': None,                  # continuous
+            'joint_2': (-2.240000,  2.240000),
+            'joint_3': None,                  # continuous
+            'joint_4': (-2.570000,  2.570000),
+            'joint_5': None,                  # continuous
+            'joint_6': (-2.090000,  2.090000),
+            'joint_7': None,                  # continuous
+        }
+
+        raw_positions = list(self.arm.arm.q)
+        bounded_positions = []
+
+        for i, name in enumerate(joint_bounds.keys()):
+            bounds = joint_bounds[name]
+            angle = raw_positions[i]
+            if bounds is None:
+                # continuous joint → wrap to [-pi, pi]
+                angle = (angle + math.pi) % (2 * math.pi) - math.pi
+            else:
+                # limited joint → wrap to [min, max] by adding/subtracting 2pi
+                angle = wrap_to_bounds(angle, *bounds)
+            bounded_positions.append(angle)
 
         joint_state = JointState()
         joint_state.header.stamp = self.clock.now().to_msg()
-        joint_state.name = [
-            'joint_1', 'joint_2', 'joint_3',
-            'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            'finger_joint'
-        ]
-        joint_state.position = [angle for angle in self.arm.arm.q] + \
-                               [0.8 * self.arm.arm.gripper_pos]
+        joint_state.name = list(joint_bounds.keys()) + ['left_outer_knuckle_joint']
+        joint_state.position = bounded_positions + [0.8 * self.arm.arm.gripper_pos]
         self.joint_state_pub.publish(joint_state)
 
 class Arm:
@@ -165,37 +197,10 @@ class Arm:
         self.arm.init_cyclic(self.controller.control_callback)
         while not self.arm.cyclic_running:
             time.sleep(0.01)
-
-    def execute_action(self, action, timestamp):
-        qpos = self.ik_solver.solve(action['arm_pos'], action['arm_quat'], self.arm.q)
-
-        arm_traj_msg = JointTrajectory()
-        # arm_traj_msg.header = Header()
-        # arm_traj_msg.header.stamp = timestamp
-        arm_traj_msg.joint_names = [
-            'joint_1', 'joint_2', 'joint_3',
-            'joint_4', 'joint_5', 'joint_6', 'joint_7',
-            # 'finger_joint'
-        ]
-        point = JointTrajectoryPoint()
-        wrapped_qpos = [(angle + np.pi) % (2 * np.pi) - np.pi for angle in qpos]
-        point.positions = wrapped_qpos # + [0.8 * action['gripper_pos'].item()]
-        point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
-        arm_traj_msg.points = [point]
-
-        gripper_traj_msg = JointTrajectory()
-        gripper_traj_msg.joint_names = [
-            'left_outer_knuckle_joint', 'left_inner_knuckle_joint', 'left_inner_finger_joint',
-            'right_outer_knuckle_joint', 'right_inner_knuckle_joint', 'right_inner_finger_joint'
-        ]
-        point = JointTrajectoryPoint()
-        gripper_pos = 0.8 * float(action['gripper_pos'])  # gripper_pos corresponds to left_outer_knuckle_joint
-        point.positions = [gripper_pos, gripper_pos, -gripper_pos, gripper_pos, gripper_pos, -gripper_pos]
-        point.time_from_start = Duration(nanosec=int(CONTROL_PERIOD * 1e9))
-        gripper_traj_msg.points = [point]
-
-        self.command_queue.put((qpos, action['gripper_pos'].item()))
-        return (arm_traj_msg, gripper_traj_msg)
+    
+    def execute_action(self, action):
+        # Action corresponds to target joint + gripper state
+        self.command_queue.put((action[0:7], action[7]))
 
     def get_state(self):
         arm_pos, arm_quat = self.arm.get_tool_pose()
