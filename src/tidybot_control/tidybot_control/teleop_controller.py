@@ -46,7 +46,7 @@ class TeleopController(Node):
             WSMsg, "/ws_commands", self.ws_callback, 10
         )
 
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/command", 10)
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/pose_command", 10)
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/command", 10
         )
@@ -239,9 +239,9 @@ class TeleopController(Node):
                 self.get_logger().warn(f"Transform not found: {e}")
         else:
             self.arm_obs_pos = [
-                msg.position.x,
+                msg.position.x + 0.120,
                 msg.position.y,
-                msg.position.z,
+                msg.position.z + 0.375,
             ]
             self.arm_obs_quat = R.from_quat(
                 [

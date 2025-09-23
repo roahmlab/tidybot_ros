@@ -20,6 +20,7 @@ import cv2
 import json
 import threading
 import time
+import os
 
 class OpenVLANode(Node):
     def __init__(self):
@@ -38,7 +39,7 @@ class OpenVLANode(Node):
         # Subscriber to camera feed
         self.visual_sub = self.create_subscription(
             CompressedImage,
-            '/tidybot/camera/color/compressed',
+            '/tidybot/camera_ext/color/compressed',
             self.image_callback,
             qos
         )
@@ -108,6 +109,10 @@ class OpenVLANode(Node):
                 action[6] = 0.6 if action[6] > 0.2 else 0.0
             with self.action_lock:
                 self.latest_action = action
+
+            log_path = os.path.join(os.path.expanduser("~"), "actions_log.txt")
+            with open(log_path, "a") as f:
+                f.write(" ".join(map(str, action.tolist())) + "\n")
 
             time.sleep(interval)
 

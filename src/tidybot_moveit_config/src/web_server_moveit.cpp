@@ -28,7 +28,7 @@ class WebServerMoveit : public rclcpp::Node {
 
         // Listen to global tidybot commands
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
-            "/tidybot/arm/command", 1,
+            "/tidybot/arm/pose_command", 1,
             std::bind(&WebServerMoveit::publish_arm, this, std::placeholders::_1));
         gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float64>(
             "/tidybot/gripper/command", 1,
@@ -39,6 +39,8 @@ class WebServerMoveit : public rclcpp::Node {
             "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/robotiq_2f_85_controller/joint_trajectory", 10);
+        arm_state_pub = this->create_publisher<sensor_msgs::msg::JointState>(
+            "/tidybot/arm/command", 10);
 
         // Debugging
         pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
@@ -108,9 +110,16 @@ class WebServerMoveit : public rclcpp::Node {
         end_point.time_from_start = rclcpp::Duration::from_seconds(0.05);
         traj.points.push_back(end_point);
 
-        // Publish trajectory
+        // Publish trajectory for sim
         arm_traj_pub->publish(traj);
         RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Trajectory sent");
+
+        // Publish joint states for real hardware
+        sensor_msgs::msg::JointState joint_state_msg;
+        joint_state_msg.header.stamp = this->now(); 
+        joint_state_msg.name = joint_names;
+        joint_state_msg.position = joint_values;
+        arm_state_pub->publish(joint_state_msg);
     }
 
     void publish_gripper(const std_msgs::msg::Float64 gripper_delta) {

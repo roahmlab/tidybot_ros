@@ -64,7 +64,6 @@ class Camera(Node):
 
         self.publisher_raw_.publish(msg_raw)
         self.publisher_.publish(msg)
-        self.get_logger().info('published image')
 
     @staticmethod
     def crop_and_resize_opencv(image: np.ndarray, crop_scale: float, output_size=(224, 224)) -> np.ndarray:

@@ -12,7 +12,7 @@ class Camera(Node):
         super().__init__('tidybot_ext_camera')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )
@@ -31,10 +31,10 @@ class Camera(Node):
         self.br = CvBridge()
 
         # Use webcam
-        self.cap = cv2.VideoCapture(4)
+        self.cap = cv2.VideoCapture(0)
 
         if not self.cap.isOpened():
-            self.get_logger().error("Failed to open webcam (/dev/video4)")
+            self.get_logger().error("Failed to open webcam (/dev/video0)")
             return
 
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -68,7 +68,6 @@ class Camera(Node):
 
         self.raw_publisher_.publish(msg_raw)
         self.publisher_.publish(msg)
-        self.get_logger().info("Published webcam image")
     
     @staticmethod
     def crop_and_resize_opencv(image: np.ndarray, crop_scale: float, output_size=(224, 224)) -> np.ndarray:
