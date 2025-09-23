@@ -75,16 +75,11 @@ Shared utilities and message definitions.
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/janChen0310/tidybot2.git
+   git clone https://github.com/roahmlab/tidybot_platform.git
    cd tidybot_platform
    ```
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Build the workspace:**
+2. **Build the workspace:**
    ```bash
    ./build.sh
    ```
@@ -100,7 +95,22 @@ Shared utilities and message definitions.
 ./run.sh
 
 # Install the canivore-usb inside the container
-sudo apt update && sudo apt install canivore-usb
+sudo apt update && sudo apt install canivore-usb -y
+
+# Create a python virtual environment
+python3 -m venv venv && source venv/bin/activate
+
+# Install all required python packages
+pip install -r requirements.txt
+
+# Install Kortex-API
+wget https://artifactory.kinovaapps.com:443/artifactory/generic-public/kortex/API/2.6.0/kortex_api-2.6.0.post3-py3-none-any.whl && pip install ./kortex_api-2.6.0.post3-py3-none-any.whl && pip install protobuf==3.20.0 && rm ./kortex_api-2.6.0.post3-py3-none-any.whl
+
+# Ignore venv when colcon build
+touch venv/COLCON_IGNORE
+
+# Source the environment
+   colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
 ```
 then in another host terminal:
 ```bash
