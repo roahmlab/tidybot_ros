@@ -75,7 +75,7 @@ Shared utilities and message definitions.
 
 1. **Clone the repository:**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/janChen0310/tidybot2.git
    cd tidybot_platform
    ```
 
@@ -98,6 +98,14 @@ Shared utilities and message definitions.
 
 # Run the container
 ./run.sh
+
+# Install the canivore-usb inside the container
+sudo apt update && sudo apt install canivore-usb
+```
+then in another host terminal:
+```bash
+# Setup the CAN connection
+./setup_can.sh
 ```
 
 #### Option 2: Native Installation

@@ -82,10 +82,10 @@ public:
 
         // Create services for starting and stopping recording
         start_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "/actions/start_recording",
+            "/start_recording",
             std::bind(&EpisodeRecorder::start_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
         stop_recording_service_ = this->create_service<std_srvs::srv::Empty>(
-            "/actions/stop_recording",
+            "/stop_recording",
             std::bind(&EpisodeRecorder::stop_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
 
         RCLCPP_INFO(this->get_logger(), "Episode Recorder Node Initialized");

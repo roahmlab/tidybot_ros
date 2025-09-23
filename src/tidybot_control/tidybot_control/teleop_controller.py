@@ -224,7 +224,7 @@ class TeleopController(Node):
             try:
                 transform = self.tf_buffer.lookup_transform(
                     target_frame="world",
-                    source_frame="end_effector_link",
+                    source_frame="bracelet_link",
                     time=rclpy.time.Time(),
                     timeout=rclpy.duration.Duration(seconds=0.5),
                 )
