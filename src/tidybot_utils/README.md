@@ -9,7 +9,7 @@ This package defines custom message and service types specific to the TidyBot++ 
 ```
 tidybot_utils/
 ├── msg/
-│   ├── WSMsg.msg                    # WebXR teleoperation message
+│   ├── TeleopMsg.msg                    # Phone teleoperation message
 ├── srv/
 │   ├── ResetEnv.srv                # Environment reset service
 ├── include/
@@ -22,7 +22,7 @@ tidybot_utils/
 ### **WSMsg**
 WebXR teleoperation command message from smartphone/web interface.
 
-**File**: `msg/WSMsg.msg`
+**File**: `msg/TeleopMsg.msg`
 
 ```
 # Timestamp for synchronization
@@ -100,14 +100,14 @@ ament_target_dependencies(your_node tidybot_utils)
 
 ### **Python Import**
 ```python
-from tidybot_utils.msg import WSMsg, RobotState, EpisodeMarker, SafetyStatus
-from tidybot_utils.srv import ResetEnv, GripperCommand, SetControlMode
+from tidybot_utils.msg import TeleopMsg
+from tidybot_utils.srv import ResetEnv
 ```
 
 ### **C++ Include**
 ```cpp
-#include "tidybot_utils/msg/ws_msg.hpp"
-#include "tidybot_utils/srv/reset_env.hpp"
+#include "tidybot_utils/msg/TeleopMsg.hpp"
+#include "tidybot_utils/srv/ResetEnv.hpp"
 ```
 
 ## 🐛 Troubleshooting
@@ -121,7 +121,7 @@ colcon build --packages-select tidybot_utils
 source install/setup.bash
 
 # Verify message availability
-ros2 interface show tidybot_utils/msg/WSMsg
+ros2 interface show tidybot_utils/msg/TeleopMsg
 ```
 
 ### **Import Errors**

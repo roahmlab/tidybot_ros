@@ -22,11 +22,11 @@ class BaseServer(Node):
         )
 
         self.state_pub = self.create_publisher(
-            JointState, "/tidybot/base/joint_states", 10
+            JointState, "/joint_states", 10
         )
         self.base_state_timer = self.create_timer(0.05, self.publish_base_state)
 
-        self.reset_srv = self.create_service(Empty, "/tidybot_base/reset", self.reset)
+        self.reset_srv = self.create_service(Empty, "/tidybot/physical_base/reset", self.reset)
         self.vehicle.start_control()
 
     def cmd_callback(self, msg):

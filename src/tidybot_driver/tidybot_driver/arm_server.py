@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, Float64MultiArray, Header
 from geometry_msgs.msg import Pose, PoseStamped
+from geometry_msgs.msg import TransformStamped
 from builtin_interfaces.msg import Duration
 import queue
 import time
@@ -16,6 +17,7 @@ from tidybot_driver.ik_solver import IKSolver
 from tidybot_driver.kinova import TorqueControlledArm
 from std_srvs.srv import Empty
 from scipy.spatial.transform import Rotation as R
+from tf2_ros import TransformBroadcaster
 import os
 
 CONTROL_FREQ = 20                    # 20 Hz
@@ -31,46 +33,52 @@ class ArmServer(Node):
         # Create a subscription to the command topic
         self.arm_cmd_sub = self.create_subscription(
             JointState,
-            '/tidybot/arm/command',
+            '/tidybot/physical_arm/commands',
             self.arm_cmd_callback,
             10
         )
         self.arm_delta_cmd_sub = self.create_subscription(
             Float64MultiArray,
-            '/tidybot/arm/delta_command', # Exclusively for use in VLA
+            '/tidybot/physical_arm/delta_commands', # Exclusively for use in VLA
             self.delta_ee_cmd_callback,
             10
         )
         self.gripper_cmd_sub = self.create_subscription(
             Float64,
-            '/tidybot/gripper/command',
+            '/tidybot/gripper/commands',
             self.gripper_cmd_callback,
-            10
-        )
-        # End effector pose
-        self.arm_state_pub = self.create_publisher(
-            Pose,
-            '/tidybot/arm/pose',
-            10
-        )
-        # Arm joint states (joint_1 to joint_7) + Gripper state
-        self.joint_state_pub = self.create_publisher(
-            JointState,
-            '/tidybot/arm/joint_states',
             10
         )
 
         # Create reset service
         self.reset_srv = self.create_service(
             Empty,
-            '/tidybot/arm/reset',
+            '/tidybot/physical_arm/reset',
             self.handle_reset_request
         )
 
-        self.gripper_command = 0.0
-        self.target_ee_pose = self.arm.get_state() # Used in delta EE commands
+        self.target_gripper_pos = 0.0
+        self.target_joint_state = np.zeros(7, dtype=np.float64)
+        self.arm_state = self.arm.get_state() # Used in delta EE commands
         self.clock = self.get_clock()
-        self.control_timer = self.create_timer(CONTROL_PERIOD, self.control_callback)
+        self.jsp_timer = self.create_timer(0.05, self.publish_joint_states)  # 20 Hz
+
+        # Arm joint states (joint_1 to joint_7) + Gripper state
+        self.joint_state_pub = self.create_publisher(
+            JointState,
+            '/joint_states',
+            10
+        )
+
+        self.joint_bounds = {
+            'joint_1': None,                  # continuous
+            'joint_2': (-2.240000,  2.240000),
+            'joint_3': None,                  # continuous
+            'joint_4': (-2.570000,  2.570000),
+            'joint_5': None,                  # continuous
+            'joint_6': (-2.090000,  2.090000),
+            'joint_7': None,                  # continuous
+        }
 
     def handle_reset_request(self, request, response):
         self.get_logger().info("Resetting arm")
@@ -84,90 +92,67 @@ class ArmServer(Node):
         joint_dict = dict(zip(msg.name, msg.position))
 
         target_joint_state = np.array([joint_dict[j] for j in joint_order], dtype=np.float64)
-        self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')        
+        self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')
 
-        self.arm.execute_action(np.concatenate([target_joint_state, [self.gripper_command]]).tolist())
-        self.target_ee_pose = self.arm.get_state()
-    
+        # Put the command in the queue for the controller to pick up
+        self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())\
+
     def delta_ee_cmd_callback(self, msg):
         # Position deltas
-        self.target_ee_pose['arm_pos'] += np.array(msg.data[0:3])
+        self.arm_state['arm_pos'] += np.array(msg.data[0:3])
 
         # Orientation: apply delta RPY to current target quaternion
         delta_rpy = msg.data[3:6]
-        current_rot = R.from_quat(self.target_ee_pose['arm_quat'])
+        current_rot = R.from_quat(self.arm_state['arm_quat'])
         delta_rot = R.from_euler('xyz', delta_rpy)
         new_rot = current_rot * delta_rot  # local frame
-        self.target_ee_pose['arm_quat'] = new_rot.as_quat()
-        self.get_logger().info(f"Target pose: {self.target_ee_pose['arm_pos']}")
+        self.arm_state['arm_quat'] = new_rot.as_quat()
+        self.get_logger().info(f"Target pose: {self.arm_state['arm_pos']}")
 
-        qpos = self.ik_solver.solve(self.target_ee_pose['arm_pos'], self.target_ee_pose['arm_quat'], self.arm.q)
+        qpos = self.ik_solver.solve(self.arm_state['arm_pos'], self.arm_state['arm_quat'], self.arm.q)
         self.arm.execute_action(np.concatenate([qpos, [msg[6]]]).tolist())
         
     def gripper_cmd_callback(self, msg):
-        self.gripper_command = msg.data
+        # Buffer the target gripper position
+        self.target_gripper_pos = msg.data
 
-    def control_callback(self):
-        self.arm.arm.update_state()
-        state = self.arm.get_state()
+    def publish_joint_states(self): 
+        # Send back current state as feedback
+        joint_states = list(self.arm.arm.q)
+        bounded_joint_states = []
 
-        # Reformat into Pose message
-        pose = Pose()
-        pose.position.x = float(state['arm_pos'][0])
-        pose.position.y = float(state['arm_pos'][1])
-        pose.position.z = float(state['arm_pos'][2])
-        pose.orientation.x = float(state['arm_quat'][0])
-        pose.orientation.y = float(state['arm_quat'][1])
-        pose.orientation.z = float(state['arm_quat'][2])
-        pose.orientation.w = float(state['arm_quat'][3])
-
-        if self.target_ee_pose is None:
-            self.target_ee_pose = state
-        self.arm_state_pub.publish(pose)
-
-        def wrap_to_bounds(angle: float, min_val: float, max_val: float) -> float:
-            """
-            Wrap a joint angle to lie within [min_val, max_val] by adding/subtracting 2*pi.
-            """
-            while angle < min_val:
-                angle += 2 * math.pi
-            while angle > max_val:
-                angle -= 2 * math.pi
-            # If wrapping overshoots by multiple revolutions, do modulo
-            if angle < min_val or angle > max_val:
-                angle = ((angle - min_val) % (2 * math.pi)) + min_val
-            return angle
-
-        # Define joint bounds; None = continuous joint
-        joint_bounds = {
-            'joint_1': None,                  # continuous
-            'joint_2': (-2.240000,  2.240000),
-            'joint_3': None,                  # continuous
-            'joint_4': (-2.570000,  2.570000),
-            'joint_5': None,                  # continuous
-            'joint_6': (-2.090000,  2.090000),
-            'joint_7': None,                  # continuous
-        }
-
-        raw_positions = list(self.arm.arm.q)
-        bounded_positions = []
-
-        for i, name in enumerate(joint_bounds.keys()):
-            bounds = joint_bounds[name]
-            angle = raw_positions[i]
+        for i, name in enumerate(self.joint_bounds.keys()):
+            bounds = self.joint_bounds[name]
+            angle = joint_states[i]
             if bounds is None:
                 # continuous joint → wrap to [-pi, pi]
                 angle = (angle + math.pi) % (2 * math.pi) - math.pi
             else:
                 # limited joint → wrap to [min, max] by adding/subtracting 2pi
-                angle = wrap_to_bounds(angle, *bounds)
-            bounded_positions.append(angle)
+                angle = self.wrap_to_bounds(angle, *bounds)
+            bounded_joint_states.append(angle)
 
-        joint_state = JointState()
-        joint_state.header.stamp = self.clock.now().to_msg()
-        joint_state.name = list(joint_bounds.keys()) + ['left_outer_knuckle_joint']
-        joint_state.position = bounded_positions + [0.8 * self.arm.arm.gripper_pos]
-        self.joint_state_pub.publish(joint_state)
+        msg = JointState()
+        msg.header.stamp = self.clock.now().to_msg()
+        msg.name = list(self.joint_bounds.keys()) + ['left_outer_knuckle_joint']
+        msg.position = bounded_joint_states + [0.81 * self.arm.arm.gripper_pos]
+        # Extend base joints with fixed values
+        msg.name.extend(['joint_x', 'joint_y', 'joint_th'])
+        msg.position.extend([0.0, 0.0, 0.0])
+        self.joint_state_pub.publish(msg)
+
+    def wrap_to_bounds(self, angle: float, min_val: float, max_val: float) -> float:
+        """
+        Wrap a joint angle to lie within [min_val, max_val] by adding/subtracting 2*pi.
+        """
+        while angle < min_val:
+            angle += 2 * math.pi
+        while angle > max_val:
+            angle -= 2 * math.pi
+        # If wrapping overshoots by multiple revolutions, do modulo
+        if angle < min_val or angle > max_val:
+            angle = ((angle - min_val) % (2 * math.pi)) + min_val
+        return angle
 
 class Arm:
     def __init__(self):

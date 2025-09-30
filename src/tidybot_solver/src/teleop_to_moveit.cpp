@@ -20,36 +20,37 @@
 using moveit::planning_interface::MoveGroupInterface;
 #include "sensor_msgs/msg/joint_state.hpp"
 
-class WebServerMoveit : public rclcpp::Node {
+class TeleopToMoveit : public rclcpp::Node {
     public:
-    WebServerMoveit() : Node("web_server_moveit") {
+    TeleopToMoveit() : Node("teleop_to_moveit") {
         sensitivity = 0.01; // Incoming end effector position must not be within 1cm of previous pose
         options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
         options.lock_redundant_joints = false;
         options.return_approximate_solution = true;
 
-        // Listen to global tidybot commands
+        // Listen to global tidybot commands (end effector pose)
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
-            "/tidybot/arm/pose_command", 1,
-            std::bind(&WebServerMoveit::publish_arm, this, std::placeholders::_1));
+            "/tidybot/arm/commands", 1,
+            std::bind(&TeleopToMoveit::publish_arm, this, std::placeholders::_1));
         gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float64>(
-            "/tidybot/gripper/command", 1,
-            std::bind(&WebServerMoveit::publish_gripper, this, std::placeholders::_1));
+            "/tidybot/gripper/commands", 1,
+            std::bind(&TeleopToMoveit::publish_gripper, this, std::placeholders::_1));
 
         // Publish to ros2_control controllers
         arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_pos_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/robotiq_2f_85_controller/commands", 10);
+        // Publish to real hardware
         arm_state_pub = this->create_publisher<sensor_msgs::msg::JointState>(
-            "/tidybot/arm/command", 10);
+            "/tidybot/physical_arm/commands", 10);
 
         // Debugging
         pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
         joint_state_pub = this->create_publisher<sensor_msgs::msg::JointState>("/joint_states", 10);
         joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
             "/joint_states", 1,
-        std::bind(&WebServerMoveit::joint_state_callback, this, std::placeholders::_1));
+        std::bind(&TeleopToMoveit::joint_state_callback, this, std::placeholders::_1));
 
         gripper_timer = this->create_wall_timer(
             std::chrono::milliseconds(20),
@@ -248,7 +249,7 @@ class WebServerMoveit : public rclcpp::Node {
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<WebServerMoveit>();
+    auto node = std::make_shared<TeleopToMoveit>();
     node->initialize_moveit();
     rclcpp::spin(node);
     rclcpp::shutdown();

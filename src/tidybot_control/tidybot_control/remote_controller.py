@@ -4,7 +4,7 @@ from rclpy.node import Node
 from rclpy.time import Time
 from rclpy.clock import JumpThreshold
 from rclpy.duration import Duration
-from tidybot_utils.msg import WSMsg
+from tidybot_utils.msg import TeleopMsg
 from sensor_msgs.msg import JointState, Image
 from std_msgs.msg import Float64MultiArray, Float64
 from geometry_msgs.msg import Pose
@@ -57,7 +57,7 @@ class RemoteController(Node):
         self.bridge = CvBridge()
 
         self.command_listener = self.create_subscription(
-            WSMsg, "/ws_commands", self.command_callback, 10
+            TeleopMsg, "/teleop_commands", self.command_callback, 10
         )
         self.enabled = False
 

@@ -37,7 +37,7 @@ setup(
             'base_demo = tidybot_driver.base:main',
             'arm_server = tidybot_driver.arm_server:main',
             'camera = tidybot_driver.camera:main',
-            'tidybot = tidybot_driver.tidybot:main',
+            'tidybot_joint_state_publisher = tidybot_driver.joint_state_publisher:main',
         ],
     },
 )
