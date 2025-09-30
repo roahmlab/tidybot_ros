@@ -22,7 +22,7 @@ def generate_launch_description():
         name='joy_node',
         parameters=[joy_params],
     )
-    
+
     joystick_controller_node = Node(
         package='tidybot_control',
         executable='joystick_controller',
@@ -39,6 +39,14 @@ def generate_launch_description():
             )
         ),
     )
+
+    joystick_to_robot = Node(
+        package='tidybot_solver',
+        executable='joystick_to_robot',
+        name='joystick_to_robot',
+        parameters=[{'use_sim_time': True}],
+    )
+
     return LaunchDescription([
         joy_node,
         joystick_controller_node,

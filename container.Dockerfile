@@ -15,7 +15,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Basic packages
 RUN apt-get -y update \
     && apt-get -y install \
-      python3-pip sudo vim wget \
+      cmake python3-pip python3.12-venv sudo vim wget \
       curl software-properties-common \
       doxygen git tmux dialog dialog \
     && rm -rf /var/lib/apt/lists/*
@@ -25,12 +25,7 @@ RUN apt-get -y update \
         libglew-dev libassimp-dev libboost-all-dev \
         libgtk-3-dev libglfw3-dev libavdevice-dev \
         libavcodec-dev libeigen3-dev libxxf86vm-dev \
-        libembree-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN apt-get -y update \
-    && apt-get -y install \ 
-        cmake \
+        libembree-dev iputils-ping usbutils can-utils \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -80,8 +75,7 @@ RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o 
     | tee /etc/apt/sources.list.d/ros2.list > /dev/null
     | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y \
+# Additional ros packages
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install -y \
         ros-dev-tools \
@@ -94,7 +88,8 @@ RUN apt-get update && apt-get upgrade -y && \
         ros-${ROS_DISTRO}-joint-state-broadcaster \
         ros-${ROS_DISTRO}-joint-trajectory-controller \
         ros-${ROS_DISTRO}-rqt-controller-manager \
-        ros-${ROS_DISTRO}-rqt-joint-trajectory-controller && \
+        ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
+        ros-${ROS_DISTRO}-pinocchio && \
     sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo
@@ -135,25 +130,13 @@ RUN apt-get install python3-flask python3-flask-socketio -y
 # Setup Phoenix6 and CANivore for base control
 RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg" && \
     curl -s --compressed -o /etc/apt/sources.list.d/ctr2025.list "https://deb.ctr-electronics.com/ctr2025.list"
-
-RUN apt-get update && sudo apt-get install -y \
-    can-utils
-
-RUN pip install phoenix6 ruckig threadpoolctl --break-system-packages
-
 # Note: sudo apt install canivore-usb is requried for CANivore support, 
 # but it is not available at build time. Do this manually after running the container.
 RUN apt-get install python3-flask python3-flask-socketio -y
 
-# Setup Phoenix6 and CANivore for base control
+# Setup Phoenix6 and CANivore list for base control
 RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg" && \
     curl -s --compressed -o /etc/apt/sources.list.d/ctr2025.list "https://deb.ctr-electronics.com/ctr2025.list"
-
-RUN apt-get update && sudo apt-get install -y \
-    can-utils
-
-RUN pip install phoenix6 ruckig threadpoolctl --break-system-packages
-
 # Note: sudo apt install canivore-usb is requried for CANivore support, 
 # but it is not available at build time. Do this manually after running the container.
 
@@ -165,18 +148,11 @@ USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_platform
 
 COPY ./src ./src
-# RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-#     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-#     colcon build
+COPY ./requirements.txt ./requirements.txt
 
-# RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
-#     sudo chown -R ${USER_NAME} /opt/tidybot2
-# RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
-#     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-#     colcon build
-
-# RUN sudo git clone https://github.com/janChen0310/tidybot2.git /opt/tidybot2 && \
-#     sudo chown -R ${USER_NAME} /opt/tidybot2
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+    colcon build
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
 

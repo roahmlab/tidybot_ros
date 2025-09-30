@@ -60,7 +60,7 @@ def generate_launch_description():
         output="screen",
     )
 
-    teleop_controller = Node(
+    teleop_sim_controller = Node(
         package="tidybot_control",
         executable="teleop_controller",
         name="teleop_controller",
@@ -70,7 +70,18 @@ def generate_launch_description():
         remappings=[
             ("/tf", "/tf_relay"),
             ("/tf_static", "/tf_static_relay"),
-        ]
+        ],
+        condition=IfCondition(LaunchConfiguration("use_sim"))
+    )
+
+    teleop_real_controller = Node(
+        package="tidybot_control",
+        executable="teleop_controller",
+        name="teleop_controller",
+        output="screen",
+        parameters=[{"use_sim_time": False},
+                    {"use_sim": LaunchConfiguration("use_sim")}],
+        condition=UnlessCondition(LaunchConfiguration("use_sim"))
     )
 
     state_controller = Node(
@@ -87,7 +98,6 @@ def generate_launch_description():
         name="teleop_to_moveit",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
-        condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
     move_group_launch = generate_move_group_launch(moveit_config)
@@ -96,7 +106,8 @@ def generate_launch_description():
         use_sim,
         rviz_launch,
         teleop_server,
-        teleop_controller,
+        teleop_sim_controller,
+        teleop_real_controller,
         state_controller,
         teleop_to_moveit,
         move_group_launch,

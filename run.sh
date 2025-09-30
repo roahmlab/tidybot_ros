@@ -7,6 +7,8 @@ IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
 DATA_DIR=/home/$(whoami)/Documents/tidybot_platform
 MOVEIT_DIR=/home/$(whoami)/ws_moveit2
+ORBBEC_DIR=/home/$(whoami)/Downloads/OrbbecViewer_v1.10.22_202504110154_linux_x64_release
+ROS2_KORTEX_DIR=/home/$(whoami)/Documents/ros2_kortex_ws
 XRUN="/run/user/$(id -u)"
 
 capabilities_str=\""capabilities=compute,utility,graphics,display\""
@@ -19,6 +21,8 @@ DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix "
 DOCKER_OPTIONS+="-v $(realpath $SCRIPT_DIR/../):/home/${USER_NAME}/$(basename $(realpath $SCRIPT_DIR/../)) "
 DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/Documents/tidybot_platform "
 DOCKER_OPTIONS+="-v $MOVEIT_DIR:/home/$(whoami)/ws_moveit2 "
+DOCKER_OPTIONS+="-v $ORBBEC_DIR:/home/$(whoami)/Documents "
+DOCKER_OPTIONS+="-v $ROS2_KORTEX_DIR:/home/$(whoami)/Documents/ros2_kortex_ws "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
 # installing the canivore-usb package may modify the host modules

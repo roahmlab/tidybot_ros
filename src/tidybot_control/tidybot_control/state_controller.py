@@ -32,7 +32,7 @@ class StateController(Node):
         self.use_remote = self.get_parameter("use_remote").get_parameter_value().bool_value
 
         self.state_sub = self.create_subscription(
-            String, "/ws_state", self.state_callback, 10
+            String, "/teleop_state", self.state_callback, 10
         )
         self.start_recording_cli = self.create_client(Empty, "/start_recording")
         self.stop_recording_cli = self.create_client(Empty, "/stop_recording")
@@ -43,8 +43,8 @@ class StateController(Node):
         while not self.stop_recording_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for stop recording service...")
 
-        self.reset_arm_cli = self.create_client(Empty, "/tidybot/arm/reset")
-        self.reset_base_cli = self.create_client(Empty, "/tidybot_base/reset")
+        self.reset_arm_cli = self.create_client(Empty, "/tidybot/physical_arm/reset")
+        self.reset_base_cli = self.create_client(Empty, "/tidybot/physical_base/reset")
         
         if (self.use_remote):
             self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")

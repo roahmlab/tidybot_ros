@@ -1,4 +1,4 @@
-# webserver message type
+# phone teleop message type
 uint64 timestamp
 string state_update
 string device_id

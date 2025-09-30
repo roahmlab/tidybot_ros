@@ -26,7 +26,7 @@ endif()
 
 # generate messages
 rosidl_generate_interfaces(${PROJECT_NAME}
-  "msg/WSMsg.msg"
+  "msg/TeleopMsg.msg"
   "srv/ResetEnv.srv"
   DEPENDENCIES std_msgs
 )
