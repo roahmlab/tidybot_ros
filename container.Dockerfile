@@ -4,6 +4,7 @@ FROM ${BASE_IMAGE}
 ARG USER_NAME=default
 ARG USER_ID=1000
 ARG ROS_DISTRO=jazzy
+ARG ROS_DISTRO=jazzy
 
 # Prevent anything requiring user input
 ENV DEBIAN_FRONTEND=noninteractive

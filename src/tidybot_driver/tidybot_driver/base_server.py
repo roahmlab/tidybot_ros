@@ -26,7 +26,7 @@ class BaseServer(Node):
         )
         self.base_state_timer = self.create_timer(0.05, self.publish_base_state)
 
-        self.reset_srv = self.create_service(Empty, "/tidybot/physical_base/reset", self.reset)
+        self.reset_srv = self.create_service(Empty, "/tidybot/hardware/base/reset", self.reset)
         self.vehicle.start_control()
 
     def cmd_callback(self, msg):

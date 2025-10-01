@@ -43,8 +43,8 @@ class StateController(Node):
         while not self.stop_recording_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for stop recording service...")
 
-        self.reset_arm_cli = self.create_client(Empty, "/tidybot/physical_arm/reset")
-        self.reset_base_cli = self.create_client(Empty, "/tidybot/physical_base/reset")
+        self.reset_arm_cli = self.create_client(Empty, "/tidybot/hardware/arm/reset")
+        self.reset_base_cli = self.create_client(Empty, "/tidybot/hardware/base/reset")
         
         if (self.use_remote):
             self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")

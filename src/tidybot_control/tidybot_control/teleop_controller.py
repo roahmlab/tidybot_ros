@@ -35,7 +35,7 @@ class TeleopController(Node):
         else:
             # Publish to the hardware topic for base control
             self.base_pub = self.create_publisher(
-                Float64MultiArray, "/tidybotarm_state_callback/physical_base/commands", 10
+                Float64MultiArray, "/tidybot/hardware/base/commands", 10
             )
 
         # Listen to teleop commands
@@ -43,7 +43,7 @@ class TeleopController(Node):
             TeleopMsg, "/teleop_commands", self.teleop_callback, 10
         )
         # Publish arm pose to arm ik solver
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/commands", 10)
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/target_pose", 10)
         # Publish gripper command
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/commands", 10

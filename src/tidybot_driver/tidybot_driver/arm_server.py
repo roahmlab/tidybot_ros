@@ -9,6 +9,7 @@ import time
 import math
 from multiprocessing.managers import BaseManager as MPBaseManager
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import JointState
 from trajectory_msgs.msg import JointTrajectory, JointTrajectoryPoint
 from tidybot_driver.arm_controller import JointCompliantController
@@ -33,13 +34,13 @@ class ArmServer(Node):
         # Create a subscription to the command topic
         self.arm_cmd_sub = self.create_subscription(
             JointState,
-            '/tidybot/physical_arm/commands',
+            '/tidybot/hardware/arm/commands',
             self.arm_cmd_callback,
             10
         )
         self.arm_delta_cmd_sub = self.create_subscription(
             Float64MultiArray,
-            '/tidybot/physical_arm/delta_commands', # Exclusively for use in VLA
+            '/tidybot/hardware/arm/delta_commands', # Exclusively for use in VLA
             self.delta_ee_cmd_callback,
             10
         )
@@ -53,13 +54,13 @@ class ArmServer(Node):
         # Create reset service
         self.reset_srv = self.create_service(
             Empty,
-            '/tidybot/physical_arm/reset',
+            '/tidybot/hardware/arm/reset',
             self.handle_reset_request
         )
 
         self.target_gripper_pos = 0.0
         self.target_joint_state = np.zeros(7, dtype=np.float64)
-        self.arm_state = self.arm.get_state() # Used in delta EE commands
+        self.target_ee_pose = self.arm.get_state()
         self.clock = self.get_clock()
         self.jsp_timer = self.create_timer(0.05, self.publish_joint_states)  # 20 Hz
 
@@ -99,17 +100,17 @@ class ArmServer(Node):
 
     def delta_ee_cmd_callback(self, msg):
         # Position deltas
-        self.arm_state['arm_pos'] += np.array(msg.data[0:3])
+        self.target_ee_pose['arm_pos'] += np.array(msg.data[0:3])
 
         # Orientation: apply delta RPY to current target quaternion
         delta_rpy = msg.data[3:6]
-        current_rot = R.from_quat(self.arm_state['arm_quat'])
+        current_rot = R.from_quat(self.target_ee_pose['arm_quat'])
         delta_rot = R.from_euler('xyz', delta_rpy)
         new_rot = current_rot * delta_rot  # local frame
-        self.arm_state['arm_quat'] = new_rot.as_quat()
-        self.get_logger().info(f"Target pose: {self.arm_state['arm_pos']}")
+        self.target_ee_pose['arm_quat'] = new_rot.as_quat()
+        self.get_logger().info(f"Target pose: {self.target_ee_pose['arm_pos']}")
 
-        qpos = self.ik_solver.solve(self.arm_state['arm_pos'], self.arm_state['arm_quat'], self.arm.q)
+        qpos = self.ik_solver.solve(self.target_ee_pose['arm_pos'], self.target_ee_pose['arm_quat'], self.arm.q)
         self.arm.execute_action(np.concatenate([qpos, [msg[6]]]).tolist())
         
     def gripper_cmd_callback(self, msg):
