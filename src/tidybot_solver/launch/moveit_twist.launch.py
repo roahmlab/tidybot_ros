@@ -22,10 +22,10 @@ def generate_launch_description():
     }
 
     # Our custom joystick_to_moveit node that uses MoveIt Servo C++ API
-    joystick_to_moveit_node = launch_ros.actions.Node(
+    twist_to_moveit_node = launch_ros.actions.Node(
         package="tidybot_solver",
-        executable="joystick_to_moveit",
-        name="joystick_to_moveit",
+        executable="twist_to_moveit",
+        name="twist_to_moveit",
         parameters=[
             servo_params,
             {"update_period": 0.01},  # Update period in seconds
@@ -40,5 +40,5 @@ def generate_launch_description():
     )
 
     return launch.LaunchDescription([
-        joystick_to_moveit_node,
+        twist_to_moveit_node,
     ])
