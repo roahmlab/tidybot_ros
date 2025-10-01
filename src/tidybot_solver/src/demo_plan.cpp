@@ -17,7 +17,7 @@ int main(int argc, char * argv[])
 
   // Next step goes here
   using moveit::planning_interface::MoveGroupInterface;
-  auto move_group_interface = MoveGroupInterface(node, "gen3_lite");
+  auto move_group_interface = MoveGroupInterface(node, "gen3_7dof");
 
   auto const target_pos = []{
     geometry_msgs::msg::Pose target_pose;

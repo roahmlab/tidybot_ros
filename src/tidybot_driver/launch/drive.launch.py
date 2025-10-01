@@ -50,8 +50,8 @@ def generate_launch_description():
     
     tidybot_jsp = Node(
         package="tidybot_driver",
-        executable="tidybot",
-        name="tidybot",
+        executable="tidybot_joint_state_publisher",
+        name="tidybot_joint_state_publisher",
         parameters=[{"mode": LaunchConfiguration("mode")}]
     )
 
@@ -61,5 +61,5 @@ def generate_launch_description():
         camera_wrist_streamer,
         camera_ext_streamer,
         base_server,
-        tidybot_jsp
+        # tidybot_jsp
     ])

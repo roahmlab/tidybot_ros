@@ -7,7 +7,7 @@ from rclpy.duration import Duration
 from rclpy.logging import LoggingSeverity
 from geometry_msgs.msg import Pose, PoseStamped
 from std_msgs.msg import Float64, Float64MultiArray, String
-from tidybot_utils.msg import WSMsg
+from tidybot_utils.msg import TeleopMsg
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
 from scipy.spatial.transform import Rotation as R
@@ -28,43 +28,34 @@ class TeleopController(Node):
             "Teleop controller initialized with use_sim: {}".format(self.use_sim)
         )
         if self.use_sim:
-            self.joint_states_sub = self.create_subscription(
-                JointState, "/joint_states", self.base_state_callback, 10
-            )
+            # Publish to the ros2 control topic for base control
             self.base_pub = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
             )
         else:
-            self.base_state_sub = self.create_subscription(
-                JointState, "/tidybot/base/joint_states", self.base_state_callback, 10
-            )
+            # Publish to the hardware topic for base control
             self.base_pub = self.create_publisher(
-                Float64MultiArray, "/tidybot/base/commands", 10
+                Float64MultiArray, "/tidybot/hardware/base/commands", 10
             )
 
-        self.ws_sub = self.create_subscription(
-            WSMsg, "/ws_commands", self.ws_callback, 10
+        # Listen to teleop commands
+        self.teleop_sub = self.create_subscription(
+            TeleopMsg, "/teleop_commands", self.teleop_callback, 10
         )
-
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/pose_command", 10)
+        # Publish arm pose to arm ik solver
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/target_pose", 10)
+        # Publish gripper command
         self.gripper_pub = self.create_publisher(
-            Float64, "/tidybot/gripper/command", 10
+            Float64, "/tidybot/gripper/commands", 10
         )
-        if self.use_sim:
-            self.arm_state_sub = self.create_subscription(
-                JointState, "/joint_states", self.arm_pose_callback, 10
-            )
-        else:
-            self.arm_state_sub = self.create_subscription(
-                Pose, "/tidybot/arm/pose", self.arm_pose_callback, 10
-            )
 
-        self.rc_br = TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
         self.enable_counts = {}
 
         self.clock = self.get_clock()
+
+        self.state_timer = self.create_timer(0.05, self.get_robot_state)
 
         # time jump back callback to handle tf buffer reset
         threshold = JumpThreshold(
@@ -93,7 +84,7 @@ class TeleopController(Node):
         self.arm_obs_quat = R.from_quat([0.0, 0.0, 0.0, 1.0])
         self.gripper_obs = 0
 
-    def ws_callback(self, msg):
+    def teleop_callback(self, msg):
         if not msg.state_update:
             self.enable_counts[msg.device_id] = (
                 self.enable_counts.get(msg.device_id, 0) + 1 if msg.teleop_mode else 0
@@ -212,49 +203,43 @@ class TeleopController(Node):
             self.arm_ref_quat = None
             self.gripper_ref = None
 
-    def base_state_callback(self, msg):
-        self.base_obs[0] = msg.position[msg.name.index("joint_x")]
-        self.base_obs[1] = msg.position[msg.name.index("joint_y")]
-        self.base_obs[2] = msg.position[msg.name.index("joint_th")]
-        # self.get_logger().info(f'Base joint states: {self.base_obs}')
-
-    def arm_pose_callback(self, msg):
-        if self.use_sim:
-            # Forward kinematics to find end effector position
-            try:
-                transform = self.tf_buffer.lookup_transform(
-                    target_frame="world",
-                    source_frame="end_effector_link",
-                    time=rclpy.time.Time(),
-                    timeout=rclpy.duration.Duration(seconds=0.5),
-                )
-                # Position
-                t = transform.transform.translation
-                self.arm_obs_pos = [t.x, t.y, t.z]
-                # Orientation
-                q = transform.transform.rotation
-                self.arm_obs_quat = R.from_quat([q.x, q.y, q.z, q.w])
-
-            except tf2_ros.LookupException as e:
-                self.get_logger().warn(f"Transform not found: {e}")
-        else:
-            self.arm_obs_pos = [
-                msg.position.x + 0.120,
-                msg.position.y,
-                msg.position.z + 0.375,
-            ]
-            self.arm_obs_quat = R.from_quat(
-                [
-                    msg.orientation.x,
-                    msg.orientation.y,
-                    msg.orientation.z,
-                    msg.orientation.w,
-                ]
+    def get_robot_state(self):
+        try:
+            # Get base state from tf
+            transform = self.tf_buffer.lookup_transform(
+                target_frame="world",
+                source_frame="base",
+                time=rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5),
             )
+            t = transform.transform.translation
+            self.base_obs[0] = t.x
+            self.base_obs[1] = t.y
+            q = transform.transform.rotation
+            base_quat = R.from_quat([q.x, q.y, q.z, q.w])
+            _, _, yaw = base_quat.as_euler("xyz", degrees=False)
+            self.base_obs[2] = yaw
 
-        # self.get_logger().info(f'Arm position: {self.arm_obs_pos}')
+        except tf2_ros.LookupException as e:
+            self.get_logger().warn(f"Transform not found: {e}")
+
+        try:
+            # Get gripper state from tf
+            transform = self.tf_buffer.lookup_transform(
+                target_frame="world",
+                source_frame="bracelet_link",
+                time=rclpy.time.Time(),
+                timeout=rclpy.duration.Duration(seconds=0.5),
+            )
+            t = transform.transform.translation
+            self.arm_obs_pos = [t.x, t.y, t.z]
+            q = transform.transform.rotation
+            self.arm_obs_quat = R.from_quat([q.x, q.y, q.z, q.w])
+        except tf2_ros.LookupException as e:
+            self.get_logger().warn(f"Transform not found: {e}")
 
     def time_jump_callback(self, time: Time):
+        '''time jump handler'''
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
         self.destroy_subscription(self.tf_listener.tf_sub)
         self.destroy_subscription(self.tf_listener.tf_static_sub)

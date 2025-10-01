@@ -45,7 +45,6 @@
   <exec_depend>tidybot_description</exec_depend>
   <exec_depend>warehouse_ros_mongo</exec_depend>
 
-
   <export>
       <build_type>ament_cmake</build_type>
   </export>

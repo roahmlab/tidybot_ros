@@ -1,5 +1,11 @@
 from launch import LaunchDescription
+from launch.actions import IncludeLaunchDescription
 from launch_ros.actions import Node
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import PathJoinSubstitution
+from moveit_configs_utils import MoveItConfigsBuilder
+from moveit_configs_utils.launches import generate_move_group_launch
 
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -7,7 +13,7 @@ from ament_index_python.packages import get_package_share_directory
 def generate_launch_description():
 
     package_dir = get_package_share_directory('tidybot_control')
-    joystick_node_path = os.path.join(package_dir, 'tidybot_control', 'joystick_node.py')
+    solver_pkg_dir = get_package_share_directory('tidybot_solver')
     joy_params = os.path.join(package_dir, 'config', 'joystick.yaml')
 
     joy_node = Node(
@@ -16,7 +22,7 @@ def generate_launch_description():
         name='joy_node',
         parameters=[joy_params],
     )
-    
+
     joystick_controller_node = Node(
         package='tidybot_control',
         executable='joystick_controller',
@@ -24,7 +30,25 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
     )
 
+    moveit_servo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                solver_pkg_dir,
+                'launch',
+                'joystick_twist.launch.py',
+            )
+        ),
+    )
+
+    joystick_to_robot = Node(
+        package='tidybot_solver',
+        executable='joystick_to_robot',
+        name='joystick_to_robot',
+        parameters=[{'use_sim_time': True}],
+    )
+
     return LaunchDescription([
         joy_node,
         joystick_controller_node,
+        moveit_servo,
     ])

@@ -30,8 +30,6 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            'joint_states_listener = tidybot_control.joint_states_listener:main',
-            'twist_to_multiarray = tidybot_control.twist_to_multiarray:main',
             'teleop_server = tidybot_control.teleop_server:main',
             'teleop_controller = tidybot_control.teleop_controller:main',
             'state_controller = tidybot_control.state_controller:main',

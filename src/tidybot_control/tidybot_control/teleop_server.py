@@ -6,7 +6,7 @@ from queue import Queue
 import threading
 import rclpy
 from rclpy.node import Node
-from tidybot_utils.msg import WSMsg
+from tidybot_utils.msg import TeleopMsg
 from std_msgs.msg import String
 import json
 
@@ -65,11 +65,11 @@ class WebServer:
 
 class WebServerPublisher(Node):
     def __init__(self, queue):
-        super().__init__("ws_bridge_publisher")
+        super().__init__("teleop_bridge_publisher")
         self.pub = self.create_publisher(
-            WSMsg, "/ws_commands", 10
+            TeleopMsg, "/teleop_commands", 10
         )
-        self.state_pub = self.create_publisher(String, "/ws_state", 10)
+        self.state_pub = self.create_publisher(String, "/teleop_state", 10)
 
         self.queue = queue
         self.create_timer(0.0001, self._publish_loop)
@@ -79,7 +79,7 @@ class WebServerPublisher(Node):
                 data = self.queue.get()
             else:
                 return
-            msg = WSMsg()
+            msg = TeleopMsg()
             msg.timestamp = data["timestamp"]
             if "state_update" in data:
                 msg.state_update = data["state_update"]

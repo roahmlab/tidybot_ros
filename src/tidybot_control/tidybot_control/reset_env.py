@@ -18,6 +18,9 @@ robot_description_path = get_package_share_directory("tidybot_description")
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
+        self.declare_parameter("base_mode", "position")
+        self.base_mode = self.get_parameter("base_mode").get_parameter_value().string_value
+        self.get_logger().info(f"Base mode: {self.base_mode}")
         self.reset_world_cli = self.create_client(ControlWorld, "/world/empty/control")
         self.spawn_tidybot_cli = self.create_client(SpawnEntity, "/world/empty/create")
         self.reset_tf_buffer_cli = self.create_client(
@@ -174,14 +177,26 @@ def main(args=None):
         time.sleep(5)  # Wait a moment before spawning controllers
         # node.reset_time()
         node.unpause_world()
-        node.spawn_controllers(
-            [
-                "joint_state_broadcaster",
-                "tidybot_base_pos_controller",
-                "gen3_7dof_controller",
-                "robotiq_2f_85_controller",
-            ]
-        )
+        if node.base_mode == "position":
+            node.get_logger().info("Respawning base controller in position mode")
+            node.spawn_controllers(
+                [
+                    "joint_state_broadcaster",
+                    "tidybot_base_pos_controller",
+                    "gen3_7dof_controller",
+                    "robotiq_2f_85_controller",
+                ]
+            )
+        elif node.base_mode == "velocity":
+            node.get_logger().info("Respawning base controller in velocity mode")
+            node.spawn_controllers(
+                [
+                    "joint_state_broadcaster",
+                    "tidybot_base_vel_controller",
+                    "gen3_7dof_controller",
+                    "robotiq_2f_85_controller",
+                ]
+            )
     except KeyboardInterrupt:
         node.get_logger().info("Node interrupted by user")
     finally:

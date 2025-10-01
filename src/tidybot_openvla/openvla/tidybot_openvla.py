@@ -44,7 +44,7 @@ class OpenVLANode(Node):
             qos
         )
         # Publisher of inferred action
-        self.action_pub = self.create_publisher(Float64MultiArray, '/tidybot/arm/delta_command', 10)
+        self.action_pub = self.create_publisher(Float64MultiArray, '/tidybot/hardware/arm/delta_commands', 10)
 
         # Run inference at fixed 5 Hz, publish action at 15hz
         self._inference_thread_running = True

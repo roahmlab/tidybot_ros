@@ -6,9 +6,11 @@
   <description>tidybot control package</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
   <license>Apache 2License 2.0</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
+  <build_depend>tidybot_utils</build_depend>
   <build_depend>tidybot_utils</build_depend>
   
   <test_depend>ament_copyright</test_depend>
@@ -30,9 +32,14 @@
   <exec_depend>os</exec_depend>
   <exec_depend>threading</exec_depend>
   <exec_depend>tidybot_utils</exec_depend>
+  <exec_depend>tidybot_utils</exec_depend>
   <exec_depend>rosidl_default_runtime</exec_depend>
   <exec_depend>tf_transformations</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>python3-opencv</exec_depend>
+  <exec_depend>moveit_servo</exec_depend>
 
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>python3-opencv</exec_depend>
