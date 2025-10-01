@@ -11,13 +11,14 @@ find_package(control_msgs REQUIRED)
 find_package(tidybot_utils REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(trajectory_msgs REQUIRED)
-find_package(sensor_msgs REQUIRED)
+find_package(moveit_ros_planning REQUIRED)
+find_package(tf2_geometry_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 
 add_executable(demo_plan src/demo_plan.cpp)
 add_executable(teleop_to_moveit src/teleop_to_moveit.cpp)
-add_executable(joystick_to_moveit src/joystick_to_moveit.cpp)
+add_executable(twist_to_moveit src/twist_to_moveit.cpp)
 add_executable(keyboard_input src/keyboard_input.cpp)
-add_executable(trajectory_to_joint_state src/trajectory_to_joint_state.cpp)
 
 ament_target_dependencies(demo_plan
   "rclcpp"
@@ -30,12 +31,18 @@ ament_target_dependencies(teleop_to_moveit
   "moveit_visual_tools"
   "tidybot_utils")
 
-  ament_target_dependencies(joystick_to_moveit
+  ament_target_dependencies(twist_to_moveit
   "rclcpp"
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
   "tidybot_utils"
-  "moveit_servo")
+  "moveit_servo"
+  "moveit_msgs"
+  "geometry_msgs"
+  "trajectory_msgs"
+  "moveit_ros_planning"
+  "tf2_geometry_msgs"
+  "tf2_ros")
 
 ament_target_dependencies(keyboard_input
   "rclcpp"
@@ -43,12 +50,7 @@ ament_target_dependencies(keyboard_input
   "control_msgs"
   "moveit_msgs")
 
-ament_target_dependencies(trajectory_to_joint_state
-  "rclcpp"
-  "trajectory_msgs"
-  "sensor_msgs")
-
-install(TARGETS demo_plan teleop_to_moveit joystick_to_moveit keyboard_input trajectory_to_joint_state
+install(TARGETS demo_plan teleop_to_moveit twist_to_moveit keyboard_input
 DESTINATION lib/${PROJECT_NAME}
 )
 

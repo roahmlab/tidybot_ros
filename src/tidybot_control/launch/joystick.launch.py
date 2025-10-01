@@ -30,21 +30,15 @@ def generate_launch_description():
         parameters=[{'use_sim_time': True}],
     )
 
+    # Use our custom joystick_to_moveit node with C++ Servo API
     moveit_servo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
                 solver_pkg_dir,
                 'launch',
-                'joystick_twist.launch.py',
+                'moveit_twist.launch.py',
             )
         ),
-    )
-
-    joystick_to_robot = Node(
-        package='tidybot_solver',
-        executable='joystick_to_robot',
-        name='joystick_to_robot',
-        parameters=[{'use_sim_time': True}],
     )
 
     return LaunchDescription([

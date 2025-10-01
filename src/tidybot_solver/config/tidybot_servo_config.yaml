@@ -1,11 +1,11 @@
-publish_period: 0.01
+publish_period: 0.01  
 max_expected_latency: 0.1
 
 command_in_type: "unitless"
 scale:
-  linear: 0.2
-  angular: 0.8
-  joint: 0.5
+  linear: 1.0  # Increased from 0.2 for faster linear movement
+  angular: 1.0  # Increased from 0.8 for faster rotation
+  joint: 1.0   # Increased from 0.5 for faster joint movement
 
 command_out_type: trajectory_msgs/JointTrajectory
 
@@ -21,7 +21,7 @@ check_octomap_collisions: false
 
 move_group_name: gen3_7dof
 
-lower_singularity_threshold: 10.0
+lower_singularity_threshold: 17.0
 hard_stop_singularity_threshold: 30.0
 leaving_singularity_threshold_multiplier: 2.0
 

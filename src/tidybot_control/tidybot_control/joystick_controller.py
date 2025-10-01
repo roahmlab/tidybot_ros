@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float64, Float64MultiArray
 from geometry_msgs.msg import Pose, PoseStamped, TwistStamped
-from moveit_msgs.srv import ServoCommandType
+# ServoCommandType import removed - no longer needed with C++ API
 from sensor_msgs.msg import JointState, Joy
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import quaternion_multiply, quaternion_inverse
@@ -72,23 +72,7 @@ class JoystickController(Node):
         self.control_mode = None
         self.arm_control_frame = ArmControlFrame.EE
 
-        self.gripper_state = 0.0  # initial gripper state (open)
-
-        self.moveit_servo_cmd_cli = self.create_client(
-            ServoCommandType, "/servo_node/switch_command_type"
-        )
-        while not self.moveit_servo_cmd_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info("Waiting for /servo_node/switch_command_type service...")
-
-        future = self.moveit_servo_cmd_cli.call_async(
-            ServoCommandType.Request(command_type=ServoCommandType.Request.TWIST)
-        )
-        rclpy.spin_until_future_complete(self, future)
-        if future.result() is not None:
-            self.get_logger().info("Switched MoveIt Servo to TWIST command mode.")
-        else:
-            self.get_logger().error("Failed to call service to switch MoveIt Servo command mode.")
-            raise RuntimeError("Failed to switch MoveIt Servo command mode.")
+        self.gripper_state = 0.0  # initial gripper state (opened)
         
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
         
@@ -203,12 +187,12 @@ class JoystickController(Node):
                         f"Failed to get transform: {e}. Skipping base control."
                     )
             elif self.control_mode == ControlMode.ARM:
-                arm_cmd.twist.linear.x = cmd.axes[0] * 0.5
-                arm_cmd.twist.linear.y = -cmd.axes[1] * 0.5
-                arm_cmd.twist.linear.z = -cmd.axes[7] * 0.5
-                arm_cmd.twist.angular.x = -cmd.axes[4] * 0.5
-                arm_cmd.twist.angular.y = -cmd.axes[3] * 0.5
-                arm_cmd.twist.angular.z = (-(cmd.axes[2] - 1) + (cmd.axes[5] - 1)) / 2 * 0.5
+                arm_cmd.twist.linear.x = cmd.axes[0] * 1.0
+                arm_cmd.twist.linear.y = -cmd.axes[1] * 1.0
+                arm_cmd.twist.linear.z = -cmd.axes[7] * 1.0
+                arm_cmd.twist.angular.x = -cmd.axes[4] * 1.0
+                arm_cmd.twist.angular.y = -cmd.axes[3] * 1.0
+                arm_cmd.twist.angular.z = (-(cmd.axes[2] - 1) + (cmd.axes[5] - 1)) / 2 * 1.0
 
             # Gripper control
             if cmd.axes[6] > 0.1:  # D-pad right
