@@ -24,11 +24,16 @@ import os
 CONTROL_FREQ = 20                    # 20 Hz
 CONTROL_PERIOD = 1.0 / CONTROL_FREQ  # 50 ms
 
+GREEN = "\x1b[32m"
+YELLOW = "\x1b[33m"
+RED = "\x1b[31m"
+RESET = "\x1b[0m"
+BOLD = "\x1b[1m"
+
 class ArmServer(Node):
     def __init__(self):
         super().__init__('tidybot_arm_server')
         self.arm = Arm()
-        self.get_logger().info('Tidybot arm server started')
         self.arm.reset()
 
         # Create a subscription to the command topic
@@ -62,12 +67,12 @@ class ArmServer(Node):
         self.target_joint_state = np.zeros(7, dtype=np.float64)
         self.target_ee_pose = self.arm.get_state()
         self.clock = self.get_clock()
-        self.jsp_timer = self.create_timer(0.001, self.publish_joint_states)  # 1k Hz
+        self.jsp_timer = self.create_timer(0.01, self.publish_joint_states)  # 1k Hz
 
         # Arm joint states (joint_1 to joint_7) + Gripper state
         self.joint_state_pub = self.create_publisher(
             JointState,
-            '/joint_states',
+            '/tidybot/hardware/arm/joint_states',
             10
         )
 
@@ -81,10 +86,12 @@ class ArmServer(Node):
             'joint_7': None,                  # continuous
         }
 
+        self.get_logger().info(f'{GREEN}{BOLD}Arm server initialized successfully{RESET}')
+
     def handle_reset_request(self, request, response):
-        self.get_logger().info("Resetting arm")
+        self.get_logger().info(f"{GREEN}Resetting arm...{RESET}")
         self.arm.reset()
-        self.get_logger().info("Arm reset complete")
+        self.get_logger().info(f"{GREEN}Arm reset complete{RESET}")
         return response
 
     def arm_cmd_callback(self, msg):
@@ -93,7 +100,7 @@ class ArmServer(Node):
         joint_dict = dict(zip(msg.name, msg.position))
 
         target_joint_state = np.array([joint_dict[j] for j in joint_order], dtype=np.float64)
-        self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')
+        # self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')
 
         # Put the command in the queue for the controller to pick up
         self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())
@@ -116,7 +123,7 @@ class ArmServer(Node):
     def gripper_cmd_callback(self, msg):
         # Buffer the target gripper position
         self.target_gripper_pos = msg.data
-        self.get_logger().info(f"Target gripper pos: {self.target_gripper_pos}")
+        # self.get_logger().info(f"Target gripper pos: {self.target_gripper_pos}")
 
     def publish_joint_states(self): 
         # Send back current state as feedback
@@ -138,9 +145,6 @@ class ArmServer(Node):
         msg.header.stamp = self.clock.now().to_msg()
         msg.name = list(self.joint_bounds.keys()) + ['left_outer_knuckle_joint']
         msg.position = bounded_joint_states + [0.81 * self.arm.arm.gripper_pos]
-        # Extend base joints with fixed values
-        msg.name.extend(['joint_x', 'joint_y', 'joint_th'])
-        msg.position.extend([0.0, 0.0, 0.0])
         self.joint_state_pub.publish(msg)
 
     def wrap_to_bounds(self, angle: float, min_val: float, max_val: float) -> float:

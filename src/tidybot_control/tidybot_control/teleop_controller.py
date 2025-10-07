@@ -35,7 +35,7 @@ class TeleopController(Node):
         else:
             # Publish to the hardware topic for base control
             self.base_pub = self.create_publisher(
-                Float64MultiArray, "/tidybot/hardware/base/commands", 10
+                Float64MultiArray, "/tidybot/hardware/base/target_pos", 10
             )
 
         # Listen to teleop commands

@@ -70,7 +70,7 @@ class JoystickController(Node):
         if self.use_sim:
             base_topic = "/tidybot_base_vel_controller/commands"
         else:
-            base_topic = "/tidybot/hardware/base/commands"
+            base_topic = "/tidybot/hardware/base/target_vel"
         self.base_pub = self.create_publisher(Float64MultiArray, base_topic, 10)
 
         self.control_enabled = False
@@ -78,11 +78,6 @@ class JoystickController(Node):
         self.arm_control_frame = ArmControlFrame.EE
 
         self.gripper_state = 0.0  # initial gripper state (opened)
-
-        # Reference frames captured at the start of each control episode
-        self.base_ref_rot_world = None
-        self.arm_base_ref_rot_world = None
-        self.ee_ref_rot_world = None
         self.last_control_enabled = False
         
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
@@ -124,21 +119,15 @@ class JoystickController(Node):
         if hardware_enabled and not self.control_enabled:
             self.control_enabled = True
             self.get_logger().info(f"{GREEN}Joystick control enabled{RESET}")
-            self.record_reference_frames()
         elif not hardware_enabled and self.control_enabled:
             self.control_enabled = False
             self.get_logger().info(f"{RED}Joystick control disabled{RESET}")
-            self.reset_reference_frames()
         if msg.buttons[0] == 1 and msg.buttons[1] == 0 and self.control_mode != ControlMode.ARM:
             self.control_mode = ControlMode.ARM
             self.get_logger().info(f"{GREEN}Switch to ARM mode{RESET}")
-            if self.control_enabled:
-                self.capture_arm_reference()
         elif msg.buttons[1] == 1 and msg.buttons[0] == 0 and self.control_mode != ControlMode.BASE:
             self.control_mode = ControlMode.BASE
             self.get_logger().info(f"{GREEN}Switch to BASE mode{RESET}")
-            if self.control_enabled:
-                self.capture_base_reference()
         if msg.buttons[2] == 1 and msg.buttons[3] == 0 and self.arm_control_frame != ArmControlFrame.BASE:
             self.arm_control_frame = ArmControlFrame.BASE
             self.get_logger().info(f"{GREEN}Switch to ARM BASE frame{RESET}")
@@ -195,12 +184,11 @@ class JoystickController(Node):
 
         if self.control_mode == ControlMode.BASE:
             base_cmd_raw = np.array([
-                cmd.axes[1] * 0.5 if cmd else 0.0,
-                cmd.axes[0] * 0.5 if cmd else 0.0,
-                cmd.axes[3] if cmd else 0.0,
+                cmd.axes[1] * 0.2 if cmd else 0.0,
+                cmd.axes[0] * 0.2 if cmd else 0.0,
+                cmd.axes[3] * 0.2 if cmd else 0.0,
             ], dtype=np.float64)
-            base_cmd_vec = self.transform_base_command(base_cmd_raw)
-            base_cmd.data = base_cmd_vec.tolist()
+            base_cmd.data = base_cmd_raw.tolist()
             self.base_pub.publish(base_cmd)
 
         elif self.control_mode == ControlMode.ARM:
@@ -230,69 +218,6 @@ class JoystickController(Node):
                     self.gripper_state = max(self.gripper_state - 0.02, 0.0)  # close
             self.arm_pub.publish(arm_cmd)
             self.publish_gripper()
-
-    def record_reference_frames(self):
-        self.capture_base_reference()
-        self.capture_arm_reference()
-
-    def capture_base_reference(self):
-        try:
-            transform = self.tf_buffer.lookup_transform(
-                "world", "base", Time(), Duration(seconds=0.5)
-            )
-            q = transform.transform.rotation
-            self.base_ref_rot_world = R.from_quat([q.x, q.y, q.z, q.w])
-            self.get_logger().info(f"{GREEN}Base reference frame captured{RESET}")
-        except tf2_ros.LookupException as exc:
-            self.base_ref_rot_world = None
-            self.get_logger().warning(f"Failed to capture base reference: {exc}")
-
-    def capture_arm_reference(self):
-        try:
-            base_tf = self.tf_buffer.lookup_transform(
-                "world", "arm_base_link", Time(), Duration(seconds=0.5)
-            )
-            q_base = base_tf.transform.rotation
-            self.arm_base_ref_rot_world = R.from_quat([q_base.x, q_base.y, q_base.z, q_base.w])
-        except tf2_ros.LookupException as exc:
-            self.arm_base_ref_rot_world = None
-            self.get_logger().warning(f"Failed to capture arm base frame: {exc}")
-
-        try:
-            ee_tf = self.tf_buffer.lookup_transform(
-                "world", "bracelet_link", Time(), Duration(seconds=0.5)
-            )
-            q_ee = ee_tf.transform.rotation
-            self.ee_ref_rot_world = R.from_quat([q_ee.x, q_ee.y, q_ee.z, q_ee.w])
-        except tf2_ros.LookupException as exc:
-            self.ee_ref_rot_world = None
-            self.get_logger().warning(f"Failed to capture wrist frame: {exc}")
-
-        if self.arm_base_ref_rot_world is not None or self.ee_ref_rot_world is not None:
-            self.get_logger().info(f"{GREEN}Arm reference frames captured{RESET}")
-
-    def reset_reference_frames(self):
-        self.base_ref_rot_world = None
-        self.arm_base_ref_rot_world = None
-        self.ee_ref_rot_world = None
-
-    def transform_base_command(self, base_cmd_raw: np.ndarray) -> np.ndarray:
-        if self.base_ref_rot_world is None:
-            return base_cmd_raw
-
-        try:
-            current_tf = self.tf_buffer.lookup_transform(
-                "world", "base", Time(), Duration(seconds=0.2)
-            )
-            q = current_tf.transform.rotation
-            current_rot = R.from_quat([q.x, q.y, q.z, q.w])
-        except tf2_ros.LookupException as exc:
-            self.get_logger().warning(f"Failed to update base frame: {exc}")
-            return base_cmd_raw
-
-        world_vec = self.base_ref_rot_world.apply([base_cmd_raw[0], base_cmd_raw[1], 0.0])
-        base_vec = current_rot.inv().apply(world_vec)
-        return np.array([base_vec[0], base_vec[1], base_cmd_raw[2]], dtype=np.float64)
 
     def publish_gripper(self):
         if self.use_sim:

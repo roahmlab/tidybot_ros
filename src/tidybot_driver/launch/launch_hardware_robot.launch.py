@@ -16,6 +16,12 @@ def generate_launch_description():
         description="Control mode: full, arm_only, base_only"
     )
 
+    base_mode = DeclareLaunchArgument(
+        "base_mode", 
+        default_value="position", 
+        description="Base control mode: position or velocity"
+    )
+
     rsp_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([tidybot_description_pkg, "launch", "description.launch.py"])
@@ -74,20 +80,22 @@ def generate_launch_description():
         package="tidybot_driver",
         executable="base_server",
         name="base_server",
+        parameters=[{"mode": LaunchConfiguration("base_mode")}],
         condition=IfCondition(PythonExpression([
             "'", LaunchConfiguration("mode"), "' == 'base_only' or '", LaunchConfiguration("mode"), "' == 'full'"
         ]))
     )
-    
-    jsp_launch = Node(
+
+    jsp_node = Node(
         package="tidybot_driver",
-        executable="tidybot_joint_state_publisher",
+        executable="joint_state_publisher",
         name="tidybot_joint_state_publisher",
         parameters=[{"mode": LaunchConfiguration("mode")}]
     )
 
     return LaunchDescription([
         mode,
+        base_mode,
         rsp_launch,
         rviz_node,
         tf_relay,
@@ -95,5 +103,5 @@ def generate_launch_description():
         camera_wrist_streamer,
         camera_ext_streamer,
         base_server,
-        # tidybot_jsp
+        jsp_node,
     ])
