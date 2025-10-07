@@ -77,7 +77,7 @@ class RemoteController(Node):
         self.base_pub = self.create_publisher(
             Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
         )
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/command", 10)
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/hardware/arm/command", 10)
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/command", 10
         )

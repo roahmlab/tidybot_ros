@@ -13,16 +13,16 @@ class TidybotJointStatePublisher(Node):
         self.joint_state_pub = self.create_publisher(JointState, '/joint_states', 10)
 
         if self.mode == 'full':
-            self.arm_sub = Subscriber(self, JointState, '/tidybot/arm/joint_states')
-            self.base_sub = Subscriber(self, JointState, '/tidybot/base/joint_states')
+            self.arm_sub = Subscriber(self, JointState, '/tidybot/hardware/arm/joint_states')
+            self.base_sub = Subscriber(self, JointState, '/tidybot/hardware/base/joint_states')
             self.ts = ApproximateTimeSynchronizer([self.arm_sub, self.base_sub], queue_size=10, slop=0.05)
             self.ts.registerCallback(self.callback_full)
 
         elif self.mode == 'arm_only':
-            self.arm_sub = self.create_subscription(JointState, '/tidybot/arm/joint_states', self.callback_arm, 10)
+            self.arm_sub = self.create_subscription(JointState, '/tidybot/hardware/arm/joint_states', self.callback_arm, 10)
 
         elif self.mode == 'base_only':
-            self.base_sub = self.create_subscription(JointState, '/tidybot/base/joint_states', self.callback_base, 10)
+            self.base_sub = self.create_subscription(JointState, '/tidybot/hardware/base/joint_states', self.callback_base, 10)
 
         else:
             self.get_logger().error(f"Invalid joint_mode: {self.mode}. Use 'arm_only', 'base_only', or 'full'.")

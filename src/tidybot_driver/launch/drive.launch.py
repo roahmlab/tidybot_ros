@@ -61,5 +61,5 @@ def generate_launch_description():
         camera_wrist_streamer,
         camera_ext_streamer,
         base_server,
-        # tidybot_jsp
+        tidybot_jsp
     ])

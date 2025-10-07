@@ -40,7 +40,7 @@ class ArmServer(Node):
         )
         self.arm_delta_cmd_sub = self.create_subscription(
             Float64MultiArray,
-            '/tidybot/hardware/arm/delta_commands', # Exclusively for use in VLA
+            '/tidybot/arm/delta_commands', # Exclusively for use in VLA
             self.delta_ee_cmd_callback,
             10
         )
@@ -67,7 +67,7 @@ class ArmServer(Node):
         # Arm joint states (joint_1 to joint_7) + Gripper state
         self.joint_state_pub = self.create_publisher(
             JointState,
-            '/joint_states',
+            '/tidybot/hardware/arm/joint_states',
             10
         )
 
@@ -137,9 +137,7 @@ class ArmServer(Node):
         msg.header.stamp = self.clock.now().to_msg()
         msg.name = list(self.joint_bounds.keys()) + ['left_outer_knuckle_joint']
         msg.position = bounded_joint_states + [0.81 * self.arm.arm.gripper_pos]
-        # Extend base joints with fixed values
-        msg.name.extend(['joint_x', 'joint_y', 'joint_th'])
-        msg.position.extend([0.0, 0.0, 0.0])
+        
         self.joint_state_pub.publish(msg)
 
     def wrap_to_bounds(self, angle: float, min_val: float, max_val: float) -> float:
