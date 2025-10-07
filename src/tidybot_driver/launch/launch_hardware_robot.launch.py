@@ -1,15 +1,46 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration, PythonExpression
-from launch.conditions import IfCondition
+from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoinSubstitution
+from launch.conditions import IfCondition, UnlessCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch_ros.substitutions import FindPackageShare
 
 def generate_launch_description():
+
+    tidybot_description_pkg = FindPackageShare("tidybot_description")
 
     mode = DeclareLaunchArgument(
         "mode", 
         default_value="full", 
         description="Control mode: full, arm_only, base_only"
+    )
+
+    rsp_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([tidybot_description_pkg, "launch", "description.launch.py"])
+        ),
+        launch_arguments={
+            "use_sim_time": "false",
+            "ignore_timestamp": "false"
+        }.items(),
+    )
+
+    rviz_node = Node(
+        package="rviz2",
+        executable="rviz2",
+        name="rviz2",
+        output="screen",
+        arguments=["-d", PathJoinSubstitution([tidybot_description_pkg, "config", "tidybot.rviz"])],
+        parameters=[{"use_sim_time": False}],
+    )
+
+    tf_relay = Node(
+        package="tidybot_description",
+        executable="tf_relay",
+        name="tf_relay",
+        output="screen",
+        parameters=[{"use_sim_time": False}],
     )
 
     arm_server = Node(
@@ -48,7 +79,7 @@ def generate_launch_description():
         ]))
     )
     
-    tidybot_jsp = Node(
+    jsp_launch = Node(
         package="tidybot_driver",
         executable="tidybot_joint_state_publisher",
         name="tidybot_joint_state_publisher",
@@ -57,6 +88,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         mode,
+        rsp_launch,
+        rviz_node,
+        tf_relay,
         arm_server,
         camera_wrist_streamer,
         camera_ext_streamer,

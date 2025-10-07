@@ -13,6 +13,11 @@ import json
 import os
 from ament_index_python.packages import get_package_share_directory
 
+GREEN = "\x1b[32m"
+RED = "\x1b[31m"
+RESET = "\x1b[0m"
+BOLD = "\x1b[1m"
+
 # Ensure the template and static directories are set correctly
 pkg_share = get_package_share_directory("tidybot_control")
 config_path = os.path.join(pkg_share, "config")
@@ -109,7 +114,7 @@ def main():
     web_server_publisher = WebServerPublisher(queue)
 
     webserver = WebServer(queue)
-    web_server_publisher.get_logger().info(f"Web server publisher node started at {webserver.address}:5000")
+    web_server_publisher.get_logger().info(f"{GREEN}{BOLD}Web server publisher node started at {webserver.address}:5000{RESET}")
 
     rclpy.spin(web_server_publisher)
     web_server_publisher.destroy_node()

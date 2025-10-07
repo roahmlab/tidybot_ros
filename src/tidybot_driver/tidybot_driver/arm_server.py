@@ -46,7 +46,7 @@ class ArmServer(Node):
         )
         self.gripper_cmd_sub = self.create_subscription(
             Float64,
-            '/tidybot/gripper/commands',
+            '/tidybot/hardware/gripper/commands',
             self.gripper_cmd_callback,
             10
         )
@@ -62,7 +62,7 @@ class ArmServer(Node):
         self.target_joint_state = np.zeros(7, dtype=np.float64)
         self.target_ee_pose = self.arm.get_state()
         self.clock = self.get_clock()
-        self.jsp_timer = self.create_timer(0.05, self.publish_joint_states)  # 20 Hz
+        self.jsp_timer = self.create_timer(0.001, self.publish_joint_states)  # 1k Hz
 
         # Arm joint states (joint_1 to joint_7) + Gripper state
         self.joint_state_pub = self.create_publisher(
@@ -96,7 +96,7 @@ class ArmServer(Node):
         self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')
 
         # Put the command in the queue for the controller to pick up
-        self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())\
+        self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())
 
     def delta_ee_cmd_callback(self, msg):
         # Position deltas
@@ -116,6 +116,7 @@ class ArmServer(Node):
     def gripper_cmd_callback(self, msg):
         # Buffer the target gripper position
         self.target_gripper_pos = msg.data
+        self.get_logger().info(f"Target gripper pos: {self.target_gripper_pos}")
 
     def publish_joint_states(self): 
         # Send back current state as feedback
@@ -178,6 +179,7 @@ class Arm:
 
         # Create new instance of controller
         self.controller = JointCompliantController(self.command_queue)
+        # Ensure integral error starts fresh after reset
 
         # Start low-level control
         self.arm.init_cyclic(self.controller.control_callback)

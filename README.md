@@ -110,7 +110,7 @@ wget https://artifactory.kinovaapps.com:443/artifactory/generic-public/kortex/AP
 touch venv/COLCON_IGNORE
 
 # Source the environment
-   colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
+colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
 ```
 then in another host terminal:
 ```bash

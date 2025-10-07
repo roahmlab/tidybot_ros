@@ -144,23 +144,6 @@ def generate_launch_description():
             parameters=[{"use_sim_time": True}],
         )
     )
-    # launch rviz if enabled
-    ld.add_action(
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            output="screen",
-            arguments=["-d", LaunchConfiguration("rviz_config")],
-            parameters=[
-                {"use_sim_time": True},
-            ],
-            remappings=[
-                ("/tf", "/tf_relay"),
-                ("/tf_static", "/tf_static_relay"),
-            ],
-            condition=IfCondition(LaunchConfiguration("use_rviz"))
-        )
-    )
 
     ld.add_action(
         Node(

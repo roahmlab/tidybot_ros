@@ -261,9 +261,9 @@ class TorqueControlledArm:
         while not self.kill_the_thread:
             t_now = time.time()
             step_time = t_now - t_cyclic
-            if step_time >= 0.001:  # 1 kHz
+            if step_time >= 0.001:  # 1k Hz
                 t_cyclic = t_now
-                if step_time > 0.004:  # 4 ms
+                if step_time > 0.004:  # 4ms
                     print(f'Warning: Step time {1000 * step_time:.3f} ms in {self.__class__.__name__} run_cyclic')
 
                 # Get torque command

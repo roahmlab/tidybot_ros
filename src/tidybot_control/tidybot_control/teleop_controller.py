@@ -55,8 +55,6 @@ class TeleopController(Node):
 
         self.clock = self.get_clock()
 
-        self.state_timer = self.create_timer(0.05, self.get_robot_state)
-
         # time jump back callback to handle tf buffer reset
         threshold = JumpThreshold(
             min_forward=None, min_backward=Duration(seconds=-1), on_clock_change=True
@@ -188,6 +186,7 @@ class TeleopController(Node):
                     gripper_command.data = np.clip(
                         self.gripper_ref + msg.gripper_delta, 0, 1.0
                     )
+                    # Open loop gripper control
                     self.gripper_obs = gripper_command.data
                     self.gripper_pub.publish(gripper_command)
                     return
@@ -203,7 +202,11 @@ class TeleopController(Node):
             self.arm_ref_quat = None
             self.gripper_ref = None
 
-    def get_robot_state(self):
+        else:
+            # Control series about to be enabled, update robot state
+            self.update_robot_state()
+
+    def update_robot_state(self):
         try:
             # Get base state from tf
             transform = self.tf_buffer.lookup_transform(
@@ -224,7 +227,7 @@ class TeleopController(Node):
             self.get_logger().warn(f"Transform not found: {e}")
 
         try:
-            # Get gripper state from tf
+            # Get arm state from tf
             transform = self.tf_buffer.lookup_transform(
                 target_frame="world",
                 source_frame="bracelet_link",
