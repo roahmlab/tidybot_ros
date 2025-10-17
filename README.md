@@ -103,6 +103,9 @@ python3 -m venv venv && source venv/bin/activate
 # Install all required python packages
 pip install -r requirements.txt
 
+# Install pre-built OpenCV wheel
+wget -O opencv_python-4.9.0.80-cp312-cp312-linux_x86_64.whl "https://www.dropbox.com/scl/fi/mzfz0i7qljmwzm5bm22td/opencv_python-4.9.0.80-cp312-cp312-linux_x86_64.whl?rlkey=rbero1ycahdk1d6jeixiu5p5l&st=k5dzfv6a&dl=0" && pip install --force-reinstall --no-deps opencv_python-4.9.0.80-cp312-cp312-linux_x86_64.whl && rm ./opencv_python-4.9.0.80-cp312-cp312-linux_x86_64.whl
+
 # Install Kortex-API
 wget https://artifactory.kinovaapps.com:443/artifactory/generic-public/kortex/API/2.6.0/kortex_api-2.6.0.post3-py3-none-any.whl && pip install ./kortex_api-2.6.0.post3-py3-none-any.whl && pip install protobuf==3.20.0 && rm ./kortex_api-2.6.0.post3-py3-none-any.whl
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# by @sethgi
-
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
@@ -12,7 +10,6 @@ ROS2_KORTEX_DIR=/home/$(whoami)/Documents/ros2_kortex_ws
 XRUN="/run/user/$(id -u)"
 
 capabilities_str=\""capabilities=compute,utility,graphics,display\""
-
 
 DOCKER_OPTIONS=""
 DOCKER_OPTIONS+="-it "

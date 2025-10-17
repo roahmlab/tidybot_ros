@@ -1,9 +1,9 @@
-ARG BASE_IMAGE=ubuntu:22.04
+ARG BASE_IMAGE=ubuntu:24.04
 FROM ${BASE_IMAGE}
 
 ARG USER_NAME=default
 ARG USER_ID=1000
-ARG ROS_DISTRO=humble
+ARG ROS_DISTRO=jazzy
 
 # Prevent anything requiring user input
 ENV DEBIAN_FRONTEND=noninteractive
@@ -15,7 +15,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Basic packages
 RUN apt-get -y update \
     && apt-get -y install \
-      cmake python3-pip python3.12-venv sudo vim wget \
+      cmake python3-pip python3-venv sudo vim wget \
       curl software-properties-common \
       doxygen git tmux dialog dialog \
     && rm -rf /var/lib/apt/lists/*
