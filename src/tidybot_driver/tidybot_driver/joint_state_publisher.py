@@ -34,7 +34,7 @@ class TidybotJointStatePublisher(Node):
         merged.position = arm_joint_state.position + base_joint_state.position
         merged.velocity = arm_joint_state.velocity + base_joint_state.velocity
         merged.effort = arm_joint_state.effort + base_joint_state.effort
-        self.get_logger().info(f"Publishing merged joint states: {merged.position}")
+        # self.get_logger().info(f"Publishing merged joint states: {merged.position}")
         self.joint_state_pub.publish(merged)
         
     def callback_arm(self, arm_joint_state):

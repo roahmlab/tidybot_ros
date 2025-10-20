@@ -4,6 +4,7 @@ from std_msgs.msg import Float64, Float64MultiArray
 from geometry_msgs.msg import Pose, PoseStamped, TwistStamped
 # ServoCommandType import removed - no longer needed with C++ API
 from sensor_msgs.msg import JointState, Joy
+from std_srvs.srv import Empty
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import quaternion_multiply, quaternion_inverse
 import tf2_ros
@@ -39,7 +40,7 @@ from enum import Enum
   - 5: Right bumper (enable)
   - 6: Overview button
   - 7: Menu button
-  - 8: Manufacturer button (next state)
+  - 8: Manufacturer button (reset)
 - Additional buttons can be mapped as needed.
 """
 
@@ -73,13 +74,19 @@ class JoystickController(Node):
             base_topic = "/tidybot/hardware/base/target_vel"
         self.base_pub = self.create_publisher(Float64MultiArray, base_topic, 10)
 
+        self.reset_arm_cli = self.create_client(Empty, "/tidybot/hardware/arm/reset")
+        self.reset_base_cli = self.create_client(Empty, "/tidybot/hardware/base/reset")
+
         self.control_enabled = False
         self.control_mode = None
+        self.turbo_mode = False
         self.arm_control_frame = ArmControlFrame.EE
 
         self.gripper_state = 0.0  # initial gripper state (opened)
         self.last_control_enabled = False
-        
+        self.manufacturer_pressed = False
+        self.last_reset_time = None
+
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
         
         self.arm_pub = self.create_publisher(
@@ -116,6 +123,7 @@ class JoystickController(Node):
         if self.cmd_queue.full():
             self.cmd_queue.get()
         hardware_enabled = msg.buttons[4] != 0 or msg.buttons[5] != 0
+        self.turbo_mode = msg.buttons[4] != 0 and msg.buttons[5] != 0
         if hardware_enabled and not self.control_enabled:
             self.control_enabled = True
             self.get_logger().info(f"{GREEN}Joystick control enabled{RESET}")
@@ -134,6 +142,12 @@ class JoystickController(Node):
         elif msg.buttons[3] == 1 and msg.buttons[2] == 0 and self.arm_control_frame != ArmControlFrame.EE:
             self.arm_control_frame = ArmControlFrame.EE
             self.get_logger().info(f"{GREEN}Switch to ARM END-EFFECTOR frame{RESET}")
+
+        manufacturer_pressed = msg.buttons[8] != 0
+        if manufacturer_pressed and not self.manufacturer_pressed:
+            self.handle_reset_request()
+        self.manufacturer_pressed = manufacturer_pressed
+
         self.cmd_queue.put(msg)
 
     def time_jump_callback(self, time: Time):
@@ -183,12 +197,27 @@ class JoystickController(Node):
         cmd = self.cmd_queue.get() if not self.cmd_queue.empty() else None
 
         if self.control_mode == ControlMode.BASE:
-            base_cmd_raw = np.array([
-                cmd.axes[1] * 0.2 if cmd else 0.0,
-                cmd.axes[0] * 0.2 if cmd else 0.0,
-                cmd.axes[3] * 0.2 if cmd else 0.0,
-            ], dtype=np.float64)
-            base_cmd.data = base_cmd_raw.tolist()
+            if cmd:
+                if self.turbo_mode:
+                    # Turbo mode: increase speed by 50%
+                    base_cmd = np.array([
+                        cmd.axes[1],
+                        cmd.axes[0],
+                        cmd.axes[3],
+                    ], dtype=np.float64)
+                else:
+                    base_cmd = np.array([
+                        0.5 * cmd.axes[1],
+                        0.5 * cmd.axes[0],
+                        0.5 * cmd.axes[3],
+                    ], dtype=np.float64)
+            else:
+                base_cmd = np.array([
+                    0.0,
+                    0.0,
+                    0.0,
+                ], dtype=np.float64)
+            base_cmd.data = base_cmd.tolist()
             self.base_pub.publish(base_cmd)
 
         elif self.control_mode == ControlMode.ARM:
@@ -227,6 +256,38 @@ class JoystickController(Node):
             msg = Float64()
             msg.data = float(self.gripper_state)
         self.gripper_pub.publish(msg)
+
+    def handle_reset_request(self):
+        now = self.get_clock().now()
+        if self.last_reset_time is not None:
+            elapsed_ns = (now - self.last_reset_time).nanoseconds
+            if elapsed_ns < 5_000_000_000:
+                remaining = (5_000_000_000 - elapsed_ns) / 1e9
+                self.get_logger().warn(
+                    f"{YELLOW}Reset ignored; wait {remaining:.1f}s before resetting again{RESET}"
+                )
+                return
+
+        self.get_logger().info(f"{GREEN}Requesting arm and base reset...{RESET}")
+        self._call_reset_service(self.reset_arm_cli, "arm")
+        self._call_reset_service(self.reset_base_cli, "base")
+        self.last_reset_time = now
+
+    def _call_reset_service(self, client, label):
+        if not client.wait_for_service(timeout_sec=0.0):
+            self.get_logger().warn(f"{YELLOW}{label.capitalize()} reset service unavailable{RESET}")
+            return
+
+        future = client.call_async(Empty.Request())
+
+        def _done(fut, component=label):
+            try:
+                fut.result()
+                self.get_logger().info(f"{GREEN}{component.capitalize()} reset succeeded{RESET}")
+            except Exception as exc:  # pylint: disable=broad-except
+                self.get_logger().error(f"{RED}{component.capitalize()} reset failed: {exc}{RESET}")
+
+        future.add_done_callback(_done)
 
 def main(args=None):
     rclpy.init(args=args)
