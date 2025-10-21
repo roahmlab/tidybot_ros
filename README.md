@@ -81,24 +81,33 @@ Shared utilities and message definitions.
 
 2. **Build the workspace:**
    ```bash
-   ./build.sh
+   ./docker/build.sh
    ```
 
 ### Running the System
 
 #### Option 1: Docker (Recommended)
-```bash
-# Build the Docker image
-./build.sh
 
+Connect the Canivore-usb module, the Kinova Gen3 arm and Orbbec camera to the dev machine.
+
+Before launching the docker container:
+```bash
+# Setup the base camera access
+sudo bash ./scripts/install_udev_rules.sh
+sudo udevadm control --reload-rules && sudo udevadm trigger
+```
+Then run the container and setup the environment inside the container:
+```bash
 # Run the container
-./run.sh
+./docker/run.sh restart
+
+# --------------------------Inside the container-------------------------- #
 
 # Install the canivore-usb inside the container
 sudo apt update && sudo apt install canivore-usb -y
 
 # Create a python virtual environment
-python3 -m venv venv && source venv/bin/activate
+python3 -m venv --system-site-packages venv && source venv/bin/activate
 
 # Install all required python packages
 pip install -r requirements.txt
@@ -115,10 +124,10 @@ touch venv/COLCON_IGNORE
 # Source the environment
 colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
 ```
-then in another host terminal:
+Then in another **host** terminal:
 ```bash
 # Setup the CAN connection
-./setup_can.sh
+sudo bash ./scripts/setup_docker_can.sh
 ```
 
 #### Option 2: Native Installation
@@ -130,7 +139,7 @@ TODO
 ### 1. Simulated robot
 Perfect for development and testing without hardware.
 ```bash
-ros2 launch tidybot_description sim_tidybot.launch.py
+ros2 launch tidybot_description launch_sim_robot.launch.py
 ```
 - Launch the Gazebo simulation environment and publish corresponding topics for robot control and monitoring
 - Launch RViz2 for robot visualization and camera view
@@ -139,7 +148,7 @@ ros2 launch tidybot_description sim_tidybot.launch.py
 Direct control of the physical robot.
 ```bash
 # Start hardware drivers
-ros2 launch tidybot_driver drive.launch.py mode:=full
+ros2 launch tidybot_driver launch_hardware_robot.launch.py mode:=full
 ```
 
 ### Choose a control mode

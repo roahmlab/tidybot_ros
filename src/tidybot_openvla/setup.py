@@ -22,7 +22,6 @@ setup(
     maintainer_email='yuandi@umich.edu',
     description='OpenVLA deployment',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'openvla = openvla.tidybot_openvla:main',

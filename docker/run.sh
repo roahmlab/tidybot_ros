@@ -3,8 +3,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
-DATA_DIR=/home/$(whoami)/Documents/tidybot_platform
-ORBBEC_DIR=/home/$(whoami)/Downloads/OrbbecViewer_v1.10.22_202504110154_linux_x64_release
+DATA_DIR=$SCRIPT_DIR/../
 XRUN="/run/user/$(id -u)"
 USER_NAME=${USER_NAME:-$(whoami)}
 
@@ -19,7 +18,6 @@ DOCKER_OPTIONS+="-it "
 DOCKER_OPTIONS+="-e DISPLAY=$DISPLAY "
 DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix "
 DOCKER_OPTIONS+="-v $DATA_DIR:/home/$(whoami)/Documents/tidybot_platform "
-DOCKER_OPTIONS+="-v $ORBBEC_DIR:$ORBBEC_DIR:ro "
 DOCKER_OPTIONS+="-v /etc/group:/etc/group:ro "
 DOCKER_OPTIONS+="-v /mnt/:/mnt/hostmnt "
 # installing the canivore-usb package may modify the host modules

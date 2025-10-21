@@ -36,6 +36,8 @@ RUN apt-get -y update \
         libavcodec-dev libeigen3-dev libxxf86vm-dev \
         libembree-dev iputils-ping usbutils can-utils \
         libgl1-mesa-dri libegl1 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools \
+        gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-ugly gstreamer1.0-libav libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # ROS and Orbbec SDK runtime dependencies

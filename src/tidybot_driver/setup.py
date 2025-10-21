@@ -18,6 +18,7 @@ setup(
         ('share/' + package_name + '/models/assets/gen3', glob('models/assets/gen3/*')),
         ('share/' + package_name + '/models/kinova_gen3/', glob('models/kinova_gen3/*')),
         ('share/' + package_name + '/models/stanford_tidybot/', glob('stanford_tidybot/*')),
+        ('share/' + package_name + '/config/', glob('config/*')),
     ],
     install_requires=['setuptools',
                       'tidybot_utils',
@@ -30,7 +31,6 @@ setup(
     maintainer_email='janchen@umich.edu',
     description='Package for interfacing with Tidybot hardware',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'base_server = tidybot_driver.base_server:main',
