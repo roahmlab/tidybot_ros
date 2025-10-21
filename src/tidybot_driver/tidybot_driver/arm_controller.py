@@ -12,17 +12,20 @@ from ruckig import InputParameter, OutputParameter, Result, Ruckig
 from tidybot_driver.constants import POLICY_CONTROL_PERIOD
 from tidybot_driver.kinova import TorqueControlledArm
 
-ALPHA = 0.01
-K_r = np.diag([0.3, 0.3, 0.3, 0.3, 0.18, 0.18, 0.18])
-K_l = np.diag([75.0, 75.0, 75.0, 75.0, 40.0, 40.0, 40.0])
-K_lp = np.diag([5.0, 5.0, 5.0, 5.0, 4.0, 4.0, 4.0])
-K_p = np.diag([100.0, 100.0, 100.0, 100.0, 50.0, 50.0, 50.0])
-K_d = np.diag([3.0, 3.0, 3.0, 3.0, 2.0, 2.0, 2.0])
+ALPHA = 0.01  # 1 kHz torque filter smoothing factor
+
+# Joint-space compliance parameters (see controller_formulation.pdf for details)
+K_r = np.diag([0.3, 0.3, 0.3, 0.3, 0.18, 0.18, 0.18])  # Virtual motor inertia
+K_l = np.diag([250.0, 250.0, 175.0, 150.0, 150.0, 150.0, 150.0])  # Viscous friction compensation
+K_lp = np.diag([20.0, 20.0, 17.5, 15.0, 15.0, 15.0, 15.0])  # Position feedback in friction model
+K_p = np.diag([400.0, 400.0, 300.0, 300.0, 300.0, 300.0, 300.0])  # Joint stiffness
+K_d = np.diag([15.0, 15.0, 10.0, 10.0, 8.0, 8.0, 8.0])  # Damping
 K_r_inv = np.linalg.inv(K_r)
 K_r_K_l = K_r @ K_l
 DT = 0.001
 
 class LowPassFilter:
+    """Simple first-order low-pass filter used to smooth torque feedback."""
     def __init__(self, alpha, initial_value):
         self.alpha = alpha
         self.y = initial_value
@@ -32,6 +35,7 @@ class LowPassFilter:
         return self.y
 
 class JointCompliantController:
+    """Implements the Kinova Gen3 compliant torque controller at 1 kHz."""
     def __init__(self, command_queue):
         self.q_s = None
         self.q_d = None
@@ -52,6 +56,7 @@ class JointCompliantController:
         # self.data = []
 
     def control_callback(self, arm):
+        """Execute one 1 kHz control step using the latest arm state."""
         # Initialize variables on first call
         if self.q_s is None:
             self.q_s = arm.q.copy()
@@ -114,8 +119,11 @@ class JointCompliantController:
         # })
 
         # Compute joint torque for task
-        g = arm.gravity()
-        tau_task = -K_p @ (self.q_n - self.q_d) - K_d @ (self.dq_n - self.dq_d) + g
+        g = arm.gravity()  # Gravity compensation from Pinocchio
+        position_error = self.q_n - self.q_d
+        velocity_error = self.dq_n - self.dq_d
+
+        tau_task = -K_p @ position_error - K_d @ velocity_error + g
 
         # Nominal motor plant
         ddq_n = K_r_inv @ (tau_task - tau_s_f)
@@ -132,7 +140,7 @@ class JointCompliantController:
 
 def command_loop_retract(command_queue, stop_event):
     # qpos = np.array([0.0, 0.26179939, 3.14159265, -2.26892803, 0.0, 0.95993109, 1.57079633])  # Home
-    qpos = np.array([0.0, -0.34906585, 3.14159265, -2.54818071, 0.0, -0.87266463, 1.57079633])
+    qpos = np.array([0.0, -0.34906585, 3.14159265, -2.36, 0.0, -1.13, 1.574186])
     gripper_pos = 0
     while not stop_event.is_set():
         command_queue.put((qpos, gripper_pos))

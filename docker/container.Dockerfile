@@ -4,7 +4,6 @@ FROM ${BASE_IMAGE}
 ARG USER_NAME=default
 ARG USER_ID=1000
 ARG ROS_DISTRO=jazzy
-ARG ROS_DISTRO=jazzy
 
 # Prevent anything requiring user input
 ENV DEBIAN_FRONTEND=noninteractive
@@ -14,19 +13,38 @@ ENV TZ=America
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # Basic packages
+# Basic utilities and development tools
 RUN apt-get -y update \
     && apt-get -y install \
-      cmake python3-pip python3.12-venv sudo vim wget \
+      apt-transport-https \
+      ca-certificates \
+      gnupg \
+      lsb-release \
+      udev \
+      unzip \
+      zip \
+      cmake python3-pip python3-venv sudo vim wget \
       curl software-properties-common \
       doxygen git tmux dialog dialog \
-    && rm -rf /var/lib/apt/lists/*
+      && rm -rf /var/lib/apt/lists/*
 
+# Graphics and robotics dependencies
 RUN apt-get -y update \
     && apt-get -y install \
         libglew-dev libassimp-dev libboost-all-dev \
         libgtk-3-dev libglfw3-dev libavdevice-dev \
         libavcodec-dev libeigen3-dev libxxf86vm-dev \
         libembree-dev iputils-ping usbutils can-utils \
+        libgl1-mesa-dri libegl1 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools \
+        gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+        gstreamer1.0-plugins-ugly gstreamer1.0-libav libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# ROS and Orbbec SDK runtime dependencies
+RUN apt-get -y update \
+    && apt-get -y install \
+        libgflags-dev nlohmann-json3-dev libdw-dev \
+        libssl-dev libusb-1.0-0-dev libudev-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -47,26 +65,23 @@ RUN useradd -m -l -u ${USER_ID} -s /bin/bash ${USER_NAME} \
 
 RUN echo "${USER_NAME} ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-RUN bash Miniforge3.sh -b -p "${HOME}/conda"
-
 # Setup ROS 2 Jazzy + ROS 2 Control
-RUN apt-get update && sudo apt-get upgrade -y && sudo apt-get install software-properties-common -y && \
+RUN apt-get update && apt-get install -y software-properties-common && \
     apt-add-repository universe 
 
-RUN apt-get update && sudo apt-get install curl -y && \
+RUN apt-get update && apt-get install -y curl && \
     curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o \
     /usr/share/keyrings/ros-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(. /etc/os-release && echo $UBUNTU_CODENAME) main" \
     | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
 # Additional ros packages
-RUN apt-get update && apt-get upgrade -y && \
-    apt-get install -y \
+RUN apt-get update && apt-get install -y \
         ros-dev-tools \
         ros-${ROS_DISTRO}-desktop \
         python3-colcon-common-extensions \
         python3-rosdep \
+        python3-vcstool \
         ros-${ROS_DISTRO}-tf-transformations \
         ros-${ROS_DISTRO}-ros2-control \
         ros-${ROS_DISTRO}-ros2-controllers \
@@ -74,23 +89,29 @@ RUN apt-get update && apt-get upgrade -y && \
         ros-${ROS_DISTRO}-joint-trajectory-controller \
         ros-${ROS_DISTRO}-rqt-controller-manager \
         ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
-        ros-${ROS_DISTRO}-pinocchio && \
-    sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*
+        ros-${ROS_DISTRO}-pinocchio \
+        ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-image-transport-plugins \
+        ros-${ROS_DISTRO}-compressed-image-transport \
+        ros-${ROS_DISTRO}-image-publisher \
+        ros-${ROS_DISTRO}-camera-info-manager \
+        ros-${ROS_DISTRO}-diagnostic-updater \
+        ros-${ROS_DISTRO}-diagnostic-msgs \
+        ros-${ROS_DISTRO}-statistics-msgs \
+        ros-${ROS_DISTRO}-backward-ros && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo
-RUN apt-get update && sudo apt-get upgrade && \
-    apt-get install ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control -y
+RUN apt-get update && apt-get install -y ros-${ROS_DISTRO}-ros-gz ros-${ROS_DISTRO}-gz-ros2-control
 
 # Setup Gazebo sensors
 RUN apt-get update && \
-    apt-get install -y lsb-release wget gnupg && \
     echo "deb [arch=$(dpkg --print-architecture)] \
       http://packages.osrfoundation.org/gazebo/ubuntu-stable \
       $(lsb_release -cs) main" \
       > /etc/apt/sources.list.d/gazebo-stable.list && \
     wget http://packages.osrfoundation.org/gazebo.key -O - | apt-key add - && \
-    apt-get update && \
-    apt-cache search libgz-sensors
+    apt-get update
 
 # Setup MoveIt2 
 RUN apt-get install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-moveit-servo -y
@@ -105,20 +126,31 @@ RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-
 # but it is not available at build time. Do this manually after running the container.
 
 # Build the workspace
-USER ${USER_NAME}
 WORKDIR /home/${USER_NAME}/tidybot_platform
 
 COPY ./src ./src
 COPY ./requirements.txt ./requirements.txt
 
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && sudo rosdep init && \
+# Fetch external dependencies via vcstool (as root during build)
+RUN cd /home/${USER_NAME}/tidybot_platform/src/external && \
+    vcs import . < orbbec.repos || true
+
+# Install Orbbec udev rules (reload may fail in build env; ignore non-zero exit)
+RUN bash /home/${USER_NAME}/tidybot_platform/src/external/OrbbecSDK_ROS2/orbbec_camera/scripts/install_udev_rules.sh || true
+
+# Initialize rosdep as root, then switch to user for build
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && (rosdep init || true)
+
+# Ensure ownership for the workspace
+RUN chown -R ${USER_NAME}:${USER_NAME} /home/${USER_NAME}
+
+USER ${USER_NAME}
+
+RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
-    colcon build
+    colcon build --symlink-install
 
-RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> ~/.bashrc
+RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USER_NAME}/.bashrc
 
-RUN sudo chown -R ${USER_NAME} /home/${USER_NAME}
-
-COPY ./entrypoint.sh /entrypoint.sh
-RUN sudo chmod +x /entrypoint.sh
+COPY --chmod=0755 ./docker/entrypoint.sh /entrypoint.sh
 ENTRYPOINT [ "/entrypoint.sh" ]

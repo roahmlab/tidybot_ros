@@ -16,13 +16,19 @@ from moveit_configs_utils import MoveItConfigsBuilder
 from moveit_configs_utils.launches import generate_move_group_launch
 
 def generate_launch_description():
-    tidybot_moveit_pkg = FindPackageShare("tidybot_moveit_config")
     tidybot_description_pkg = FindPackageShare("tidybot_description")
 
     use_sim = DeclareLaunchArgument(
         "use_sim",
         default_value='true',
         description="Use simulation mode if true"
+    )
+
+    # TODO: Add more advanced recording control
+    record = DeclareLaunchArgument(
+        "record",
+        default_value='false',
+        description="Record the episode if true"
     )
 
     robot_description_path = get_package_share_directory("tidybot_description")
@@ -32,17 +38,6 @@ def generate_launch_description():
     outpath.write_text(urdf_xml, encoding="utf-8")
     moveit_config = MoveItConfigsBuilder("tidybot", package_name="tidybot_moveit_config").to_moveit_configs()
     moveit_config.robot_description["use_sim_time"] = True
-
-    rviz_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([tidybot_description_pkg, "launch", "display.launch.py"])
-        ),
-        launch_arguments={
-            "ignore_timestamp": "false",
-            "jsp_gui": "false"
-        }.items(),
-        condition=UnlessCondition(LaunchConfiguration("use_sim"))
-    )
 
     kinematics_yaml_path = os.path.join(
         get_package_share_directory('tidybot_moveit_config'),
@@ -60,28 +55,17 @@ def generate_launch_description():
         output="screen",
     )
 
-    teleop_sim_controller = Node(
+    teleop_controller = Node(
         package="tidybot_control",
         executable="teleop_controller",
         name="teleop_controller",
         output="screen",
-        parameters=[{"use_sim_time": True},
-                    {"use_sim": LaunchConfiguration("use_sim")}],
+        parameters=[{"use_sim_time": LaunchConfiguration("use_sim")},
+                    {"use_sim": LaunchConfiguration("use_sim")},],
         remappings=[
             ("/tf", "/tf_relay"),
             ("/tf_static", "/tf_static_relay"),
         ],
-        condition=IfCondition(LaunchConfiguration("use_sim"))
-    )
-
-    teleop_real_controller = Node(
-        package="tidybot_control",
-        executable="teleop_controller",
-        name="teleop_controller",
-        output="screen",
-        parameters=[{"use_sim_time": False},
-                    {"use_sim": LaunchConfiguration("use_sim")}],
-        condition=UnlessCondition(LaunchConfiguration("use_sim"))
     )
 
     state_controller = Node(
@@ -89,7 +73,8 @@ def generate_launch_description():
         executable="state_controller",
         name="state_controller",
         output="screen",
-        parameters=[{"use_sim": LaunchConfiguration("use_sim")}]
+        parameters=[{"use_sim": LaunchConfiguration("use_sim")},
+                    {"record": LaunchConfiguration("record")}],
     )
     
     teleop_to_moveit = Node(
@@ -104,10 +89,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim,
-        rviz_launch,
+        record,
         teleop_server,
-        teleop_sim_controller,
-        teleop_real_controller,
+        teleop_controller,
         state_controller,
         teleop_to_moveit,
         move_group_launch,

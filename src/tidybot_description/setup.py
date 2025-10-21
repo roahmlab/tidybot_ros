@@ -49,7 +49,6 @@ setup(
     maintainer_email='janchen@umich.edu',
     description='description package for the tidybot',
     license='Apache-2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'tf_relay = tidybot_description.tf_relay:main',

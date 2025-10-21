@@ -18,6 +18,7 @@ setup(
         ('share/' + package_name + '/models/assets/gen3', glob('models/assets/gen3/*')),
         ('share/' + package_name + '/models/kinova_gen3/', glob('models/kinova_gen3/*')),
         ('share/' + package_name + '/models/stanford_tidybot/', glob('stanford_tidybot/*')),
+        ('share/' + package_name + '/config/', glob('config/*')),
     ],
     install_requires=['setuptools',
                       'tidybot_utils',
@@ -30,7 +31,6 @@ setup(
     maintainer_email='janchen@umich.edu',
     description='Package for interfacing with Tidybot hardware',
     license='TODO: License declaration',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'base_server = tidybot_driver.base_server:main',
@@ -38,7 +38,7 @@ setup(
             'arm_server = tidybot_driver.arm_server:main',
             'camera_wrist = tidybot_driver.camera_wrist:main',
             'camera_ext = tidybot_driver.camera_external:main',
-            'tidybot_joint_state_publisher = tidybot_driver.joint_state_publisher:main',
+            'joint_state_publisher = tidybot_driver.joint_state_publisher:main',
             'play_csv_delta = tidybot_driver.play_csv_delta:main',
             'play_csv_pose = tidybot_driver.play_csv_pose:main'
         ],

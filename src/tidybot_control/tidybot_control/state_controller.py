@@ -14,7 +14,7 @@ robot_description_path = get_package_share_directory("tidybot_description")
 RED = "\x1b[31m"
 GREEN = "\x1b[32m"
 RESET = "\x1b[0m"
-
+BOLD = "\x1b[1m"
 
 class State(Enum):
     IDLE = "idle"
@@ -28,20 +28,22 @@ class StateController(Node):
         super().__init__("state_controller")
         self.declare_parameter("use_sim", True)
         self.declare_parameter("use_remote", False)
+        self.declare_parameter("record", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
         self.use_remote = self.get_parameter("use_remote").get_parameter_value().bool_value
+        self.record = self.get_parameter("record").get_parameter_value().bool_value
 
         self.state_sub = self.create_subscription(
             String, "/teleop_state", self.state_callback, 10
         )
-        self.start_recording_cli = self.create_client(Empty, "/start_recording")
-        self.stop_recording_cli = self.create_client(Empty, "/stop_recording")
-        self.state = State.IDLE
 
-        while not self.start_recording_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info("Waiting for start recording service...")
-        while not self.stop_recording_cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info("Waiting for stop recording service...")
+        if self.record:
+            self.start_recording_cli = self.create_client(Empty, "/start_recording")
+            self.stop_recording_cli = self.create_client(Empty, "/stop_recording")
+            while not self.start_recording_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info("Waiting for start recording service...")
+            while not self.stop_recording_cli.wait_for_service(timeout_sec=1.0):
+                self.get_logger().info("Waiting for stop recording service...")
 
         self.reset_arm_cli = self.create_client(Empty, "/tidybot/hardware/arm/reset")
         self.reset_base_cli = self.create_client(Empty, "/tidybot/hardware/base/reset")
@@ -49,12 +51,14 @@ class StateController(Node):
         if (self.use_remote):
             self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")
 
+        self.state = State.IDLE
+
     def state_callback(self, msg):
         self.get_logger().info(f"Received state command: {msg.data}")
         match msg.data:
             case "reset_env":
                 if self.state == State.IDLE or self.state == State.EPISODE_FINISHED:
-                    self.get_logger().info(f"{GREEN}Resetting environment...{RESET}")
+                    self.get_logger().info(f"{GREEN}{BOLD}Resetting environment...{RESET}")
                     self.state = State.ENVIRONMENT_RESET
                     # Reset the remote policy server if using remote control
                     if self.use_remote:
@@ -68,13 +72,15 @@ class StateController(Node):
             case "episode_started":
                 if self.state == State.IDLE or self.state == State.ENVIRONMENT_RESET:
                     self.state = State.EPISODE_STARTED
-                    self.get_logger().info(f"{GREEN}Episode started.{RESET}")
-                    self.start_recording_cli.call_async(Empty.Request())
+                    self.get_logger().info(f"{GREEN}{BOLD}Episode started.{RESET}")
+                    if self.record:
+                        self.start_recording_cli.call_async(Empty.Request())
             case "episode_ended":
                 if self.state == State.IDLE or self.state == State.EPISODE_STARTED:
                     self.state = State.EPISODE_FINISHED
-                    self.get_logger().info(f"{GREEN}Episode ended.{RESET}")
-                    self.stop_recording_cli.call_async(Empty.Request())
+                    self.get_logger().info(f"{GREEN}{BOLD}Episode ended.{RESET}")
+                    if self.record:
+                        self.stop_recording_cli.call_async(Empty.Request())
 
 
 def main(args=None):

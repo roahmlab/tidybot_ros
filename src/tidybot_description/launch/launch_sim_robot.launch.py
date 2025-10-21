@@ -134,6 +134,17 @@ def generate_launch_description():
             condition=IfCondition(LaunchConfiguration("use_rviz"))
         )
     )
+
+    ld.add_action(
+        Node(
+            package="tidybot_description",
+            executable="tf_relay",
+            name="tf_relay",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        )
+    )
+
     ld.add_action(
         Node(
             package="ros_gz_sim",
