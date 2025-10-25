@@ -11,7 +11,7 @@ def generate_launch_description():
 
     tidybot_description_pkg = FindPackageShare("tidybot_description")
     tidybot_driver_pkg = FindPackageShare("tidybot_driver")
-    orbbec_launch_pkg = FindPackageShare("orbbec_camera")
+    # orbbec_launch_pkg = FindPackageShare("orbbec_camera")
 
     mode = DeclareLaunchArgument(
         "mode", 
@@ -70,29 +70,29 @@ def generate_launch_description():
         ]))
     )
 
-    camera_base_streamer = GroupAction(
-        actions=[
-            SetRemap(src='/camera/color/image_raw', dst='/tidybot/camera_base/color/raw'),
-            SetRemap(src='/camera/color/image_raw/compressed', dst='/tidybot/camera_base/color/compressed'),
-            IncludeLaunchDescription(
-                PythonLaunchDescriptionSource(
-                    PathJoinSubstitution([orbbec_launch_pkg, "launch", "femto_bolt.launch.py"])
-                ),
-                launch_arguments={
-                    "enable_ldp": "false",
-                    "enable_depth": "false",
-                    "enable_depth_scale": "false",
-                    "enable_ir": "false",
-                    "enable_color": "true",
-                    "enable_sync_output_accel_gyro": "false",
-                    "publish_tf": "false",
-                }.items(),
-            ),
-        ],
-        condition=IfCondition(PythonExpression([
-            "'", LaunchConfiguration("mode"), "' == 'base_only' or '", LaunchConfiguration("mode"), "' == 'full'"
-        ]))
-    )
+    # camera_base_streamer = GroupAction(
+    #     actions=[
+    #         SetRemap(src='/camera/color/image_raw', dst='/tidybot/camera_base/color/raw'),
+    #         SetRemap(src='/camera/color/image_raw/compressed', dst='/tidybot/camera_base/color/compressed'),
+    #         IncludeLaunchDescription(
+    #             PythonLaunchDescriptionSource(
+    #                 PathJoinSubstitution([orbbec_launch_pkg, "launch", "femto_bolt.launch.py"])
+    #             ),
+    #             launch_arguments={
+    #                 "enable_ldp": "false",
+    #                 "enable_depth": "false",
+    #                 "enable_depth_scale": "false",
+    #                 "enable_ir": "false",
+    #                 "enable_color": "true",
+    #                 "enable_sync_output_accel_gyro": "false",
+    #                 "publish_tf": "false",
+    #             }.items(),
+    #         ),
+    #     ],
+    #     condition=IfCondition(PythonExpression([
+    #         "'", LaunchConfiguration("mode"), "' == 'base_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+    #     ]))
+    # )
     
     camera_ext_streamer = Node(
         package="tidybot_driver",
@@ -128,7 +128,7 @@ def generate_launch_description():
         tf_relay,
         arm_server,
         camera_wrist_streamer,
-        camera_base_streamer,
+        # camera_base_streamer,
         camera_ext_streamer,
         base_server,
         jsp_node,

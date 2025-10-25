@@ -26,7 +26,7 @@ tidybot_driver/
 │   ├── constants.py                # Used by controller nodes
 │   ├── ik_solver.py                # IK solver used for compliant joint controller
 │   ├── kinova.py                   # Low-level control for kinova arm
-│   ├── tidybot.py                  # Joint state publisher for arm and base
+│   ├── joint_state_publisher.py    # Synchronizes joint state publishing for arm and base
 ```
 
 ## 🚀 Launch Files
@@ -54,12 +54,10 @@ ros2 run tidybot_driver arm_server
 ```
 
 **Subscribed Topics:**
-- `/tidybot/hardware/arm/command` (sensor_msgs/JointState): Commanded joint angles (joint_1 to joint_7)
-- `/tidybot/hardware/arm/delta_ee_command` (std_msgs/Float64MultiArray): Commanded end effector deltas, formatted as [delta_pos, delta_rot, gripper]
-- `/tidybot/gripper/command` (std_msgs/Float64): Gripper state command
+- `/tidybot/hardware/arm/commands` (sensor_msgs/JointState): Commanded joint angles (joint_1 to joint_7)
+- `/tidybot/hardware/gripper/commands` (std_msgs/Float64): Gripper state command
 
 **Published Topics:**
-- `/tidybot/arm/pose` (geometry_msgs/pose): End effector pose as read from hardware, with respect to arm base
 - `/tidybot/arm/joint_states` (sensor_msgs/JointState): Joint states (joint_1 to joint_7) as observed from hardware
 
 **Services:**
@@ -77,7 +75,8 @@ ros2 run tidybot_driver base_server
 ```
 
 **Subscribed Topics:**
-- `/tidybot/base/command` (std_msgs/Float64MultiArray): Commanded position (pos_x, pos_y, theta)
+- `/tidybot/hardware/base/target_pos` (std_msgs/Float64MultiArray): Commanded position (pos_x, pos_y, theta)
+- `/tidybot/hardware/base/target_vel` (std_msgs/Float64MultiArray): Commanded velocity, used in joystick control
 
 **Published Topics:**
 - `/tidybot/base/joint_states` (sensor_msgs/JointState): Observed position and rotation from odometry
