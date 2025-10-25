@@ -81,12 +81,14 @@ ros2 run tidybot_solver teleop_to_moveit
 ```
 
 **Subscribed Topics:**
-- `/tidybot/arm/command` (geometry_msgs/Pose): Desired pose for the end-effector read from the WebXR app
-- `/tidybot/gripper/command` (std_msgs/Float64): Gripper state command read from the WebXR
+- `/tidybot/arm/target_pose` (geometry_msgs/Pose): Desired pose for the end-effector read from the WebXR app
+- `/tidybot/arm/delta_commands` (std_msgs/Float64MultiArray): Commanded end effector deltas, formatted as [delta_pos, delta_rot, gripper]
+- `/tidybot/gripper/commands` (std_msgs/Float64): Gripper state command read from the WebXR
 
 **Published Topics:**
 - `/gen3_7dof_controller/joint_trajectory` (trajectory_msgs/JointTrajectory): Publish the computed joint trajectory for the arm to the arm ros2 controller
 - `/robotiq_2f_85_controller/commands` (std_msgs/Float64MultiArray): Publish the gripper state to the gripper ros2 controller
+- `/tidybot/hardware/arm/commands` (sensor_msgs/JointState): Solved joint angles to publish to hardware
 
 **Features:**
 - **Real-time Planning**: Continuous trajectory updates

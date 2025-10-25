@@ -285,11 +285,11 @@ class TeleopToMoveit : public rclcpp::Node {
         gripper_state = msg.data[6];
 
         // Publish joint states for real hardware
-        // sensor_msgs::msg::JointState joint_state_msg;
-        // joint_state_msg.header.stamp = this->now(); 
-        // joint_state_msg.name = joint_names;
-        // joint_state_msg.position = joint_values;
-        // arm_state_pub->publish(joint_state_msg);
+        sensor_msgs::msg::JointState joint_state_msg;
+        joint_state_msg.header.stamp = this->now(); 
+        joint_state_msg.name = joint_names;
+        joint_state_msg.position = joint_values;
+        arm_state_pub->publish(joint_state_msg);
 
     }
 

@@ -43,12 +43,6 @@ class ArmServer(Node):
             self.arm_cmd_callback,
             10
         )
-        self.arm_delta_cmd_sub = self.create_subscription(
-            Float64MultiArray,
-            '/tidybot/arm/delta_commands', # Exclusively for use in VLA
-            self.delta_ee_cmd_callback,
-            10
-        )
         self.gripper_cmd_sub = self.create_subscription(
             Float64,
             '/tidybot/hardware/gripper/commands',
@@ -104,21 +98,6 @@ class ArmServer(Node):
 
         # Put the command in the queue for the controller to pick up
         self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())
-
-    def delta_ee_cmd_callback(self, msg):
-        # Position deltas
-        self.target_ee_pose['arm_pos'] += np.array(msg.data[0:3])
-
-        # Orientation: apply delta RPY to current target quaternion
-        delta_rpy = msg.data[3:6]
-        current_rot = R.from_quat(self.target_ee_pose['arm_quat'])
-        delta_rot = R.from_euler('xyz', delta_rpy)
-        new_rot = current_rot * delta_rot  # local frame
-        self.target_ee_pose['arm_quat'] = new_rot.as_quat()
-        self.get_logger().info(f"Target pose: {self.target_ee_pose['arm_pos']}")
-
-        qpos = self.ik_solver.solve(self.target_ee_pose['arm_pos'], self.target_ee_pose['arm_quat'], self.arm.q)
-        self.arm.execute_action(np.concatenate([qpos, [msg[6]]]).tolist())
         
     def gripper_cmd_callback(self, msg):
         # Buffer the target gripper position

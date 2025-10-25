@@ -34,8 +34,8 @@ Records multi-modal sensor data and robot states.
 
 **Subscribed Topics:**
 - `/joint_states` (sensor_msgs/JointState): Robot joint information
-- `/base_camera/image` (sensor_msgs/Image): Base camera image
-- `/arm_camera/image` (sensor_msgs/Image): Arm camera image
+- `/tidybot/camera_base/color/raw` (sensor_msgs/Image): Base camera image
+- `/tidybot/camera_wrist/color/raw` (sensor_msgs/Image): Arm camera image
 
 **Published Services**
 - `/obs/start_recording` (std_srvs/Empty): Start episode recording
