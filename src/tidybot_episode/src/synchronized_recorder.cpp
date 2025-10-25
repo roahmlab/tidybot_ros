@@ -167,12 +167,12 @@ private:
 
         // Camera images
         base_image_sub_ = image_transport::create_subscription(
-            this, "/base_camera/image",
+            this, "/tidybot/camera_base/color/raw",
             [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
                 last_base_image_ = msg;
             }, "raw");
         arm_image_sub_ = image_transport::create_subscription(
-            this, "/arm_camera/image",
+            this, "/tidybot/camera_wrist/color/raw",
             [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
                 last_arm_image_ = msg;
             }, "raw");

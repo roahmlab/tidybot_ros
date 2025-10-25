@@ -171,16 +171,32 @@ def generate_launch_description():
                 "/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock",
                 joint_state_gz_topic + "@sensor_msgs/msg/JointState[gz.msgs.Model",
                 link_pose_gz_topic + "@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V",
-                "/arm_camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
-                "/arm_camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image",
-                "/base_camera/image@sensor_msgs/msg/Image@gz.msgs.Image",
-                "/base_camera/depth_image@sensor_msgs/msg/Image@gz.msgs.Image",
-                "/world/empty/control@ros_gz_interfaces/srv/ControlWorld",
+                "/arm_camera/image@sensor_msgs/msg/Image[gz.msgs.Image",
+                "/arm_camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image",
+                "/base_camera/image@sensor_msgs/msg/Image[gz.msgs.Image",
+                "/base_camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image",
                 "/world/empty/create@ros_gz_interfaces/srv/SpawnEntity",
             ],
             output="screen",
         )
     )
+    remap_pairs = [
+        ("/arm_camera/image", "/tidybot/camera_wrist/color/raw"),
+        ("/arm_camera/depth_image", "/tidybot/camera_wrist/depth/raw"),
+        ("/base_camera/image", "/tidybot/camera_base/color/raw"),
+        ("/base_camera/depth_image", "/tidybot/camera_base/depth/raw"),
+    ]
+    for src, dst in remap_pairs:
+        ld.add_action(
+            Node(
+                package="topic_tools",
+                executable="relay",
+                name=f"relay_{src.strip('/').replace('/', '_')}",
+                arguments=[src, dst],
+                parameters=[{"use_sim_time": True}],
+                output="screen",
+            )
+        )
     ld.add_action(
         Node(
             package="controller_manager",

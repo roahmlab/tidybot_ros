@@ -12,7 +12,7 @@ class Camera(Node):
         super().__init__('tidybot_ext_camera')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.BEST_EFFORT,
+            reliability=ReliabilityPolicy.RELIABLE,
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )

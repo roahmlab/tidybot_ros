@@ -47,11 +47,11 @@ class RemoteController(Node):
         )
         self.last_joint_state = None
         self.base_image_listener = self.create_subscription(
-            Image, "/base_camera/image", self.base_image_callback, 10
+            Image, "/tidybot/camera_base/color/raw", self.base_image_callback, 10
         )
         self.last_base_image = None
         self.arm_image_listener = self.create_subscription(
-            Image, "/arm_camera/image", self.arm_image_callback, 10
+            Image, "/tidybot/camera_wrist/color/raw", self.arm_image_callback, 10
         )
         self.last_arm_image = None
         self.bridge = CvBridge()

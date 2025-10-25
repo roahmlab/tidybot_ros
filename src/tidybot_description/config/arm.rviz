@@ -225,7 +225,7 @@ Visualization Manager:
         Durability Policy: Volatile
         History Policy: Keep Last
         Reliability Policy: Reliable
-        Value: /arm_camera/image
+        Value: /tidybot/camera_wrist/color/raw
       Value: true
     - Class: rviz_default_plugins/TF
       Enabled: false
