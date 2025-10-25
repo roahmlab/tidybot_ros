@@ -32,8 +32,9 @@
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
-#include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
 #include <geometry_msgs/msg/pose_stamped.hpp>
+#include <geometry_msgs/msg/pose.hpp>
 #include <geometry_msgs/msg/transform_stamped.hpp>
 #include <rosidl_runtime_cpp/traits.hpp>
 #include <chrono>
@@ -76,13 +77,13 @@ private:
 
     // Action command subscriptions (cache latest commands)
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr base_cmd_sub_;
-    rclcpp::Subscription<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_cmd_sub_;
-    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_cmd_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_cmd_sub_;
     
     // Cached latest commands
     std_msgs::msg::Float64MultiArray::ConstSharedPtr last_base_cmd_;
-    trajectory_msgs::msg::JointTrajectory::ConstSharedPtr last_arm_cmd_;
-    std_msgs::msg::Float64MultiArray::ConstSharedPtr last_gripper_cmd_;
+    geometry_msgs::msg::Pose::ConstSharedPtr last_arm_cmd_;
+    std_msgs::msg::Float64::ConstSharedPtr last_gripper_cmd_;
 
     // Recording services
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_recording_service_;
@@ -165,9 +166,11 @@ public:
         auto period = std::chrono::milliseconds(static_cast<int>(1000.0 / fps_));
         record_timer_ = create_wall_timer(period, std::bind(&SynchronizedRecorder::synchronized_record_callback, this));
 
-        RCLCPP_INFO(this->get_logger(), "%s%sEpisode Recorder Node Initialized%s", GREEN, BOLD, RESET);
-        RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
-        RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
+    RCLCPP_INFO(this->get_logger(), "%s%sEpisode Recorder Node Initialized%s", GREEN, BOLD, RESET);
+    RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
+    RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
+    RCLCPP_INFO(this->get_logger(), "%s%sUse simulation topics parameter retained for compatibility: %s%s",
+            GREEN, BOLD, use_sim_ ? "true" : "false", RESET);
     }
 
 private:
@@ -195,44 +198,34 @@ private:
 
     void setup_action_subscriptions()
     {
+        // Subscribe to action topics requested for dataset capture.
         if (use_sim_)
         {
-            // Simulation topics
             base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-                "/tidybot_base_pos_controller/commands", 10,
-                [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                    last_base_cmd_ = msg;
-                });
-            arm_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-                "/gen3_7dof_controller/joint_trajectory", 10,
-                [this](const trajectory_msgs::msg::JointTrajectory::SharedPtr msg) {
-                    last_arm_cmd_ = msg;
-                });
-            gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-                "/robotiq_2f_85_controller/commands", 10,
-                [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                    last_gripper_cmd_ = msg;
-                });
+            "/tidybot_base_pos_controller/commands", 10,
+            [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+                last_base_cmd_ = msg;
+            });
         }
         else
         {
-            // Real robot topics
             base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-                "/tidybot/base/commands", 10,
-                [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                    last_base_cmd_ = msg;
-                });
-            arm_cmd_sub_ = this->create_subscription<trajectory_msgs::msg::JointTrajectory>(
-                "/tidybot/arm/pose", 10,
-                [this](const trajectory_msgs::msg::JointTrajectory::SharedPtr msg) {
-                    last_arm_cmd_ = msg;
-                });
-            gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-                "/tidybot/gripper/state", 10,
-                [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                    last_gripper_cmd_ = msg;
-                });
+            "/tidybot/hardware/base/target_pos", 10,
+            [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+                last_base_cmd_ = msg;
+            });
         }
+        arm_cmd_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
+            "/tidybot/arm/target_pose", 10,
+            [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
+                last_arm_cmd_ = msg;
+            });
+
+        gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+            "/tidybot/gripper/commands", 10,
+            [this](const std_msgs::msg::Float64::SharedPtr msg) {
+                last_gripper_cmd_ = msg;
+            });
     }
 
     void start_recording_callback(
@@ -482,23 +475,22 @@ private:
         if (last_base_cmd_)
         {
             auto cmd_copy = std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_);
-            write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot_base_pos_controller/commands");
+            if (!use_sim_) write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot/hardware/base/target_pos");
+            else write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot_base_pos_controller/commands");
         }
 
         // Record arm command
         if (last_arm_cmd_)
         {
-            auto cmd_copy = std::make_shared<trajectory_msgs::msg::JointTrajectory>(*last_arm_cmd_);
-            std::string topic = use_sim_ ? "/gen3_7dof_controller/joint_trajectory" : "/tidybot/arm/command";
-            write_action_message<trajectory_msgs::msg::JointTrajectory>(cmd_copy, topic);
+            auto cmd_copy = std::make_shared<geometry_msgs::msg::Pose>(*last_arm_cmd_);
+            write_action_message<geometry_msgs::msg::Pose>(cmd_copy, "/tidybot/arm/target_pose");
         }
 
         // Record gripper command
         if (last_gripper_cmd_)
         {
-            auto cmd_copy = std::make_shared<std_msgs::msg::Float64MultiArray>(*last_gripper_cmd_);
-            std::string topic = use_sim_ ? "/robotiq_2f_85_controller/commands" : "/tidybot/gripper/command";
-            write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, topic);
+            auto cmd_copy = std::make_shared<std_msgs::msg::Float64>(*last_gripper_cmd_);
+            write_action_message<std_msgs::msg::Float64>(cmd_copy, "/tidybot/gripper/commands");
         }
     }
 

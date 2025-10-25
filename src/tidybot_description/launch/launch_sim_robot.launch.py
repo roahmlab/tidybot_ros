@@ -108,15 +108,6 @@ def generate_launch_description():
     ld.add_action(
         OpaqueFunction(function=launch_robot_description)
     )
-    ld.add_action(
-        Node(
-            package="tidybot_description",
-            executable="tf_relay",
-            name="tf_relay",
-            output="screen",
-            parameters=[{"use_sim_time": True}],
-        )
-    )
     # launch rviz if enabled
     ld.add_action(
         Node(
@@ -176,27 +167,16 @@ def generate_launch_description():
                 "/base_camera/image@sensor_msgs/msg/Image[gz.msgs.Image",
                 "/base_camera/depth_image@sensor_msgs/msg/Image[gz.msgs.Image",
                 "/world/empty/create@ros_gz_interfaces/srv/SpawnEntity",
+                "/world/empty/control@ros_gz_interfaces/srv/ControlWorld",
             ],
             output="screen",
+            remappings=[
+                ("/arm_camera/image", "/tidybot/camera_wrist/color/raw"),
+                ("/arm_camera/depth_image", "/tidybot/camera_wrist/depth/raw"),
+                ("/base_camera/image", "/tidybot/camera_base/color/raw"),
+                ("/base_camera/depth_image", "/tidybot/camera_base/depth/raw"),]
         )
     )
-    remap_pairs = [
-        ("/arm_camera/image", "/tidybot/camera_wrist/color/raw"),
-        ("/arm_camera/depth_image", "/tidybot/camera_wrist/depth/raw"),
-        ("/base_camera/image", "/tidybot/camera_base/color/raw"),
-        ("/base_camera/depth_image", "/tidybot/camera_base/depth/raw"),
-    ]
-    for src, dst in remap_pairs:
-        ld.add_action(
-            Node(
-                package="topic_tools",
-                executable="relay",
-                name=f"relay_{src.strip('/').replace('/', '_')}",
-                arguments=[src, dst],
-                parameters=[{"use_sim_time": True}],
-                output="screen",
-            )
-        )
     ld.add_action(
         Node(
             package="controller_manager",

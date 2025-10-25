@@ -17,7 +17,7 @@ robot_description_path = get_package_share_directory("tidybot_description")
 
 class StateController(Node):
     def __init__(self):
-        super().__init__("state_controller")
+        super().__init__("reset_env")
         self.declare_parameter("base_mode", "position")
         self.base_mode = self.get_parameter("base_mode").get_parameter_value().string_value
         self.get_logger().info(f"Base mode: {self.base_mode}")
