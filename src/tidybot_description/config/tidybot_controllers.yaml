@@ -31,7 +31,7 @@ tidybot_base_vel_controller:
       - position
       - velocity
     state_publish_rate: 100
-    action_monitor_rate: 20.0
+    action_monitor_rate: 100.0
     allow_partial_joints_goal: false
 
 tidybot_base_pos_controller:
@@ -46,7 +46,7 @@ tidybot_base_pos_controller:
       - position
       - velocity
     state_publish_rate: 100
-    action_monitor_rate: 20.0
+    action_monitor_rate: 100.0
     allow_partial_joints_goal: false
 
 gen3_7dof_controller:
@@ -65,7 +65,7 @@ gen3_7dof_controller:
       - position
       - velocity
     state_publish_rate: 100
-    action_monitor_rate: 20.0
+    action_monitor_rate: 100.0
     allow_partial_joints_goal: false
     allow_nonzero_velocity_at_trajectory_end: true
 
@@ -79,5 +79,5 @@ robotiq_2f_85_controller:
       - position
       - velocity
     state_publish_rate: 100
-    action_monitor_rate: 20.0
+    action_monitor_rate: 100.0
     allow_partial_joints_goal: false

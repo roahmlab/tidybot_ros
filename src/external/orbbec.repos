@@ -1,0 +1,5 @@
+repositories:
+  OrbbecSDK_ROS2:
+    type: git
+    url: https://github.com/orbbec/OrbbecSDK_ROS2.git
+    version: v2-main

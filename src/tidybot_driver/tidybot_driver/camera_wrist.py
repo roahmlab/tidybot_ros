@@ -7,6 +7,12 @@ from sensor_msgs.msg import Image, CompressedImage
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
 import numpy as np
 
+GREEN = "\x1b[32m"
+YELLOW = "\x1b[33m"
+RED = "\x1b[31m"
+RESET = "\x1b[0m"
+BOLD = "\x1b[1m"
+
 class Camera(Node):
     def __init__(self):
         super().__init__('tidybot_wrist_camera')
@@ -22,13 +28,15 @@ class Camera(Node):
         self.br = CvBridge()
 
         # RTSP stream URL
+        self.get_logger().info("Opening RTSP stream from wrist camera")
         self.cap = cv2.VideoCapture(
             'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp latency=0 ! rtph264depay ! avdec_h264 ! videoconvert ! appsink drop=true sync=false',
             cv2.CAP_GSTREAMER
         )
         if not self.cap.isOpened():
-            self.get_logger().error(f"Failed to open RTSP stream")
+            self.get_logger().error(f"{RED}{BOLD}Failed to open RTSP stream{RESET}")
             return
+        self.get_logger().info(f"{GREEN}{BOLD}Successfully opened RTSP stream{RESET}")
         
         w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -39,12 +47,13 @@ class Camera(Node):
     def timer_callback(self):
         ret, frame = self.cap.read()
         if not ret:
-            self.get_logger().warn('Failed to read frame from RTSP stream')
+            self.get_logger().warn(f"{YELLOW}Failed to read frame from RTSP stream{RESET}")
             self.cap.release()
             time.sleep(1)
             self.cap = cv2.VideoCapture(
                 'rtspsrc location=rtsp://192.168.1.10/color protocols=tcp latency=0 ! rtph264depay ! avdec_h264 ! videoconvert ! appsink drop=true sync=false',
-                cv2.CAP_GSTREAMER)
+                cv2.CAP_GSTREAMER
+            )
             return
 
         frame = self.crop_and_resize_opencv(frame, crop_scale=1, output_size=(224, 224))

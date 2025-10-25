@@ -54,8 +54,8 @@ ros2 run tidybot_driver arm_server
 ```
 
 **Subscribed Topics:**
-- `/tidybot/arm/command` (sensor_msgs/JointState): Commanded joint angles (joint_1 to joint_7)
-- `/tidybot/arm/delta_ee_command` (std_msgs/Float64MultiArray): Commanded end effector deltas, formatted as [delta_pos, delta_rot, gripper]
+- `/tidybot/hardware/arm/command` (sensor_msgs/JointState): Commanded joint angles (joint_1 to joint_7)
+- `/tidybot/hardware/arm/delta_ee_command` (std_msgs/Float64MultiArray): Commanded end effector deltas, formatted as [delta_pos, delta_rot, gripper]
 - `/tidybot/gripper/command` (std_msgs/Float64): Gripper state command
 
 **Published Topics:**

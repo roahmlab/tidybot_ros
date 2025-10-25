@@ -83,7 +83,7 @@ Server Side:
 ## 🎛️ Nodes
 
 ### **OpenVLA Inference (`tidybot_openvla_node`)**
-Loads checkpoints for the original OpenVLA model, plus fine-tuned parameters using peft and unnormalization statistics based on the finetuning dataset. Then, listens to incoming images from `tidybot/camera_ext/color/compressed` or `tidybot/camera_wrist/color/compressed` on its own thread, which continuously updates the current image. On a separate thread, performs inference on the most recent image and publishes the end effector action continuously to `tidybot/hardware/arm/delta_commands` at 15Hz. Every 5Hz, inference is performed again on the most recent image, which updates the published action.
+Loads checkpoints for the original OpenVLA model, plus fine-tuned parameters using peft and unnormalization statistics based on the finetuning dataset. Then, listens to incoming images from `tidybot/camera_ext/color/compressed` or `tidybot/camera_wrist/color/compressed` on its own thread, which continuously updates the current image. On a separate thread, performs inference on the most recent image and publishes the end effector action continuously to `tidybot/arm/delta_commands` at 15Hz. Every 5Hz, inference is performed again on the most recent image, which updates the published action.
 
 ```bash
 ros2 run tidybot_openvla openvla_node
@@ -93,7 +93,7 @@ ros2 run tidybot_openvla openvla_node
 - `/tidybot/hardware/arm/camera_ext` (sensor_msgs/CompressedImage): Observed 224x224 resolution compressed jpeg
 
 **Published Topics:**
-- `/tidybot/hardware/arm/delta_commands` (std_msgs/Float64MultiArray): Inferred end effector action in the form of delta position, delta rotation and gripper state
+- `/tidybot/arm/delta_commands` (std_msgs/Float64MultiArray): Inferred end effector action in the form of delta position, delta rotation and gripper state
 
 **Features:**
 - **Action Decoding to Continuous Trajectory**: By publishing the end effector delta continuously, which updates an accumulated target position in the `tidybot_arm_server` node, this allows the robot to execute actions as continuous trajectories with each inference.

@@ -19,7 +19,7 @@ setup(
     install_requires=['setuptools',
                       'flask',
                       'flask_socketio',
-                      'tidybot_utils'
+                      'tidybot_utils',
                       'numpy',
                       'opencv-python',],
     zip_safe=True,
@@ -27,7 +27,6 @@ setup(
     maintainer_email='janchen@umich.edu',
     description='Tidybot remote control package for ROS2',
     license='Apache License 2.0',
-    tests_require=['pytest'],
     entry_points={
         'console_scripts': [
             'teleop_server = tidybot_control.teleop_server:main',
