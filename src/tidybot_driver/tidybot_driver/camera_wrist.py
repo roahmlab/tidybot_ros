@@ -22,6 +22,12 @@ class Camera(Node):
             history=HistoryPolicy.KEEP_LAST,
             depth=10
         )
+        self.declare_parameter('fps', 30)
+        self.declare_parameter('image_width', 640)
+        self.declare_parameter('image_height', 480)
+        self.fps = self.get_parameter('fps').get_parameter_value().integer_value
+        self.image_width = self.get_parameter('image_width').get_parameter_value().integer_value
+        self.image_height = self.get_parameter('image_height').get_parameter_value().integer_value
 
         self.publisher_raw_ = self.create_publisher(Image, '/tidybot/camera_wrist/color/raw', qos)
         self.publisher_ = self.create_publisher(CompressedImage, '/tidybot/camera_wrist/color/compressed', qos)
@@ -41,7 +47,7 @@ class Camera(Node):
         w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.get_logger().info(f"Wrist camera resolution: {w}x{h}")
-        timer_period = 1.0 / 5.0
+        timer_period = 1.0 / self.fps
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
     def timer_callback(self):
@@ -56,7 +62,7 @@ class Camera(Node):
             )
             return
 
-        frame = self.crop_and_resize_opencv(frame, crop_scale=1, output_size=(224, 224))
+        frame = self.crop_and_resize_opencv(frame, crop_scale=1)
 
         success, encoded_image = cv2.imencode('.jpg', frame)
         if not success:
@@ -74,11 +80,10 @@ class Camera(Node):
         self.publisher_raw_.publish(msg_raw)
         self.publisher_.publish(msg)
 
-    @staticmethod
-    def crop_and_resize_opencv(image: np.ndarray, crop_scale: float, output_size=(224, 224)) -> np.ndarray:
+    def crop_and_resize_opencv(self, image: np.ndarray, crop_scale: float) -> np.ndarray:
         """
         Center-crops a single image to have area `crop_scale` * (original image area),
-        then resizes to `output_size`.
+        then resizes to image_width x image_height.
 
         Args:
             image: np.ndarray of shape (H, W, C) with dtype=np.uint8 or np.float32, range [0,255] or [0,1]
@@ -105,7 +110,7 @@ class Camera(Node):
         x2 = x1 + crop_width
 
         cropped = image[y1:y2, x1:x2]
-        resized = cv2.resize(cropped, output_size, interpolation=cv2.INTER_AREA)
+        resized = cv2.resize(cropped, (self.image_width, self.image_height), interpolation=cv2.INTER_AREA)
 
         return resized
 

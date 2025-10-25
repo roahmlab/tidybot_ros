@@ -67,7 +67,8 @@ def generate_launch_description():
         name="camera_wrist",
         condition=IfCondition(PythonExpression([
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
-        ]))
+        ])),
+        parameters=[{"fps": 30}],
     )
 
     camera_base_streamer = GroupAction(
@@ -86,6 +87,9 @@ def generate_launch_description():
                     "enable_color": "true",
                     "enable_sync_output_accel_gyro": "false",
                     "publish_tf": "false",
+                    "color_fps": "30",
+                    # "color_width": "640",
+                    # "color_height": "360",
                 }.items(),
             ),
         ],

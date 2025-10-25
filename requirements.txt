@@ -18,6 +18,7 @@ flask==3.0.2
 flask_socketio==5.3.6
 pyzmq==25.1.2
 redis==5.0.6
+simple-websocket==1.0.0
 
 # Mobile base
 phoenix6

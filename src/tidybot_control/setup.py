@@ -19,6 +19,7 @@ setup(
     install_requires=['setuptools',
                       'flask',
                       'flask_socketio',
+                      'simple-websocket',
                       'tidybot_utils',
                       'numpy',
                       'opencv-python',],

@@ -27,6 +27,7 @@
 #include <rosbag2_cpp/converter_options.hpp>
 #include <rosbag2_storage/storage_options.hpp>
 #include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/set_bool.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <sensor_msgs/msg/image.hpp>
@@ -41,6 +42,7 @@
 #include <memory>
 #include <ctime>
 #include <cstdlib>
+#include <filesystem>
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -48,6 +50,12 @@
 #include <cv_bridge/cv_bridge.hpp>
 #include <image_transport/image_transport.hpp>
 #include <opencv2/opencv.hpp>
+
+constexpr const char* GREEN = "\x1b[32m";
+constexpr const char* YELLOW = "\x1b[33m";
+constexpr const char* RED = "\x1b[31m";
+constexpr const char* RESET = "\x1b[0m";
+constexpr const char* BOLD = "\x1b[1m";
 
 class SynchronizedRecorder : public rclcpp::Node
 {
@@ -79,6 +87,7 @@ private:
     // Recording services
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_recording_service_;
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr stop_recording_service_;
+    rclcpp::Service<std_srvs::srv::SetBool>::SharedPtr finalize_recording_service_;
 
     // Rosbag writers
     rosbag2_cpp::Writer actions_writer_;
@@ -107,6 +116,9 @@ private:
     
     // Sample counter for alignment
     uint64_t sample_count_ = 0;
+
+    // Track current episode directory for finalize step
+    std::string current_episode_dir_;
 
 public:
     SynchronizedRecorder()
@@ -145,14 +157,17 @@ public:
         stop_recording_service_ = this->create_service<std_srvs::srv::Empty>(
             "/stop_recording",
             std::bind(&SynchronizedRecorder::stop_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
+        finalize_recording_service_ = this->create_service<std_srvs::srv::SetBool>(
+            "/finalize_recording",
+            std::bind(&SynchronizedRecorder::finalize_recording_callback, this, std::placeholders::_1, std::placeholders::_2));
 
         // Create synchronized recording timer
         auto period = std::chrono::milliseconds(static_cast<int>(1000.0 / fps_));
         record_timer_ = create_wall_timer(period, std::bind(&SynchronizedRecorder::synchronized_record_callback, this));
 
-        RCLCPP_INFO(this->get_logger(), "Episode Recorder Node Initialized");
-        RCLCPP_INFO(this->get_logger(), "Storage URI: %s", storage_uri_.c_str());
-        RCLCPP_INFO(this->get_logger(), "Recording frequency: %.1f Hz", fps_);
+        RCLCPP_INFO(this->get_logger(), "%s%sEpisode Recorder Node Initialized%s", GREEN, BOLD, RESET);
+        RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
+        RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
     }
 
 private:
@@ -229,26 +244,28 @@ private:
         
         if (recording_enabled_)
         {
-            RCLCPP_WARN(this->get_logger(), "Already recording episode");
+            RCLCPP_WARN(this->get_logger(), "%sAlready recording episode%s", YELLOW, RESET);
             return;
         }
 
         recording_enabled_ = true;
         sample_count_ = 0;
         
-        RCLCPP_INFO(this->get_logger(), "Starting synchronized episode recording");
+        RCLCPP_INFO(this->get_logger(), "%sStarting synchronized episode recording%s", GREEN, RESET);
         
         // Create episode directory
         std::string timestamp = get_timestamped_filename("episode");
         std::string episode_dir = storage_uri_ + "/" + timestamp;
+        current_episode_dir_ = episode_dir;
         
         // Create the episode directory
         std::string mkdir_cmd = "mkdir -p " + episode_dir;
         int result = system(mkdir_cmd.c_str());
         if (result != 0)
         {
-            RCLCPP_ERROR(this->get_logger(), "Failed to create episode directory: %s", episode_dir.c_str());
+            RCLCPP_ERROR(this->get_logger(), "%sFailed to create episode directory: %s%s", RED, episode_dir.c_str(), RESET);
             recording_enabled_ = false;
+            current_episode_dir_.clear();
             return;
         }
         
@@ -264,7 +281,7 @@ private:
         base_video_filename_ = episode_dir + "/base_camera.mp4";
         arm_video_filename_ = episode_dir + "/arm_camera.mp4";
         
-        RCLCPP_INFO(this->get_logger(), "Recording episode to: %s", episode_dir.c_str());
+        RCLCPP_INFO(this->get_logger(), "%sRecording episode to: %s%s", GREEN, episode_dir.c_str(), RESET);
     }
 
     void stop_recording_callback(
@@ -280,7 +297,7 @@ private:
             return;
         }
 
-        RCLCPP_INFO(this->get_logger(), "Stopping synchronized episode recording");
+        RCLCPP_INFO(this->get_logger(), "%sStopping synchronized episode recording%s", GREEN, RESET);
         
         // Close writers
         actions_writer_.close();
@@ -290,12 +307,12 @@ private:
         if (base_video_writer_.isOpened())
         {
             base_video_writer_.release();
-            RCLCPP_INFO(this->get_logger(), "Base video saved to %s", base_video_filename_.c_str());
+            RCLCPP_INFO(this->get_logger(), "Base video closed: %s", base_video_filename_.c_str());
         }
         if (arm_video_writer_.isOpened())
         {
             arm_video_writer_.release();
-            RCLCPP_INFO(this->get_logger(), "Arm video saved to %s", arm_video_filename_.c_str());
+            RCLCPP_INFO(this->get_logger(), "Arm video closed: %s", arm_video_filename_.c_str());
         }
 
         recording_enabled_ = false;
@@ -304,16 +321,53 @@ private:
         
         RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
         
-        // Extract episode directory from actions path for cleaner logging
-        std::string episode_dir = actions_storage_options_.uri;
-        size_t last_slash = episode_dir.find_last_of('/');
-        if (last_slash != std::string::npos) {
-            episode_dir = episode_dir.substr(0, last_slash);
+        // Inform that episode is awaiting finalize decision
+        if (!current_episode_dir_.empty()) {
+            RCLCPP_INFO(this->get_logger(), "%sEpisode recorded at: %s (awaiting finalize)%s", GREEN, current_episode_dir_.c_str(), RESET);
+            RCLCPP_INFO(this->get_logger(), "%s  - Actions: %s%s", GREEN, actions_storage_options_.uri.c_str(), RESET);
+            RCLCPP_INFO(this->get_logger(), "%s  - Observations: %s%s", GREEN, obs_storage_options_.uri.c_str(), RESET);
         }
-        
-        RCLCPP_INFO(this->get_logger(), "Episode data saved to: %s", episode_dir.c_str());
-        RCLCPP_INFO(this->get_logger(), "  - Actions: %s", actions_storage_options_.uri.c_str());
-        RCLCPP_INFO(this->get_logger(), "  - Observations: %s", obs_storage_options_.uri.c_str());
+    }
+
+    void finalize_recording_callback(
+        const std::shared_ptr<std_srvs::srv::SetBool::Request> request,
+        std::shared_ptr<std_srvs::srv::SetBool::Response> response)
+    {
+        if (recording_enabled_) {
+            response->success = false;
+            response->message = "Cannot finalize while recording is active";
+            RCLCPP_WARN(this->get_logger(), "%sCannot finalize while recording is active%s", YELLOW, RESET);
+            return;
+        }
+        if (current_episode_dir_.empty()) {
+            response->success = false;
+            response->message = "No episode to finalize";
+            RCLCPP_WARN(this->get_logger(), "%sNo episode to finalize%s", YELLOW, RESET);
+            return;
+        }
+
+        bool save = request->data;
+        if (save) {
+            response->success = true;
+            response->message = "Episode saved";
+            RCLCPP_INFO(this->get_logger(), "%sEpisode saved at: %s%s", GREEN, current_episode_dir_.c_str(), RESET);
+            current_episode_dir_.clear();
+            return;
+        }
+
+        // Discard: remove directory and all contents
+        std::error_code ec;
+        std::filesystem::remove_all(current_episode_dir_, ec);
+        if (ec) {
+            response->success = false;
+            response->message = std::string("Failed to delete episode: ") + ec.message();
+            RCLCPP_ERROR(this->get_logger(), "%s%s%s", RED, response->message.c_str(), RESET);
+        } else {
+            response->success = true;
+            response->message = "Episode discarded";
+            RCLCPP_INFO(this->get_logger(), "%sEpisode discarded: %s%s", GREEN, current_episode_dir_.c_str(), RESET);
+        }
+        current_episode_dir_.clear();
     }
 
     void synchronized_record_callback()
@@ -321,11 +375,14 @@ private:
         // Handle time jumps
         if (last_record_time_.nanoseconds() > this->get_clock()->now().nanoseconds())
         {
-            RCLCPP_WARN(this->get_logger(), "Time jump detected, resetting tf_buffer...");
-            tf_buffer_.reset();
+            RCLCPP_WARN(this->get_logger(), "Time jump detected, resetting TF buffer and listener...");
+            // Fully destroy and recreate TF structures
             tf_listener_.reset();
+            tf_buffer_.reset();
             tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-            tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_, this);
+            tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+            // Update last record time to current to avoid repeated resets
+            last_record_time_ = this->get_clock()->now();
             return;
         }
         
@@ -465,7 +522,7 @@ private:
                     }
                     else
                     {
-                        RCLCPP_ERROR(this->get_logger(), "Failed to open base video writer");
+                        RCLCPP_ERROR(this->get_logger(), "%sFailed to open base video writer%s", RED, RESET);
                     }
                 }
                 
@@ -476,7 +533,7 @@ private:
             }
             catch (cv_bridge::Exception &e)
             {
-                RCLCPP_ERROR(this->get_logger(), "Base camera cv_bridge exception: %s", e.what());
+                RCLCPP_ERROR(this->get_logger(), "%sBase camera cv_bridge exception: %s%s", RED, e.what(), RESET);
             }
         }
 
@@ -498,7 +555,7 @@ private:
                     }
                     else
                     {
-                        RCLCPP_ERROR(this->get_logger(), "Failed to open arm video writer");
+                        RCLCPP_ERROR(this->get_logger(), "%sFailed to open arm video writer%s", RED, RESET);
                     }
                 }
                 
@@ -509,7 +566,7 @@ private:
             }
             catch (cv_bridge::Exception &e)
             {
-                RCLCPP_ERROR(this->get_logger(), "Arm camera cv_bridge exception: %s", e.what());
+                RCLCPP_ERROR(this->get_logger(), "%sArm camera cv_bridge exception: %s%s", RED, e.what(), RESET);
             }
         }
     }

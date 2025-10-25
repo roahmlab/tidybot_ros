@@ -106,26 +106,26 @@ class TeleopToMoveit : public rclcpp::Node {
         robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
         const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
         
-        RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
-            "IK input pose: pos=(%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f), norm=%.6f",
-            msg.position.x, msg.position.y, msg.position.z,
-            msg.orientation.x, msg.orientation.y,
-            msg.orientation.z, msg.orientation.w,
-            std::sqrt(msg.orientation.x*msg.orientation.x +
-                      msg.orientation.y*msg.orientation.y +
-                      msg.orientation.z*msg.orientation.z +
-                      msg.orientation.w*msg.orientation.w));
+        // RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
+        //     "IK input pose: pos=(%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f), norm=%.6f",
+        //     msg.position.x, msg.position.y, msg.position.z,
+        //     msg.orientation.x, msg.orientation.y,
+        //     msg.orientation.z, msg.orientation.w,
+        //     std::sqrt(msg.orientation.x*msg.orientation.x +
+        //               msg.orientation.y*msg.orientation.y +
+        //               msg.orientation.z*msg.orientation.z +
+        //               msg.orientation.w*msg.orientation.w));
 
         // Now check bounds for each joint
         for (size_t i = 0; i < joint_names.size(); ++i) {
             const auto& jm = robot_state->getJointModel(joint_names[i]);
             const auto& bounds = jm->getVariableBounds(joint_names[i]);
 
-            RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
-                        "Joint %s bounds: [%f, %f], current %f",
-                        joint_names[i].c_str(),
-                        bounds.min_position_, bounds.max_position_,
-                        joint_values[i]);
+            // RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
+            //             "Joint %s bounds: [%f, %f], current %f",
+            //             joint_names[i].c_str(),
+            //             bounds.min_position_, bounds.max_position_,
+            //             joint_values[i]);
         }
 
         // Create trajectory message
@@ -148,7 +148,7 @@ class TeleopToMoveit : public rclcpp::Node {
 
         // Publish trajectory for sim
         arm_traj_pub->publish(traj);
-        RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Trajectory sent");
+        // RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Trajectory sent");
 
         // Publish joint states for real hardware
         sensor_msgs::msg::JointState joint_state_msg;

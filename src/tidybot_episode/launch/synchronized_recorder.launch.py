@@ -23,7 +23,6 @@ def generate_launch_description():
             default_value='10.0',
             description='Recording frequency in Hz'
         ),
-        
         Node(
             package='tidybot_episode',
             executable='synchronized_recorder',
@@ -31,8 +30,13 @@ def generate_launch_description():
             parameters=[{
                 'storage_uri': LaunchConfiguration('storage_uri'),
                 'use_sim': LaunchConfiguration('use_sim'),
+                'use_sim_time': LaunchConfiguration('use_sim'),
                 'fps': LaunchConfiguration('fps')
             }],
-            output='screen'
+            output='screen',
+            remappings=[
+                ("/tf", "/tf_relay"),
+                ("/tf_static", "/tf_static_relay"),
+            ],
         )
     ])

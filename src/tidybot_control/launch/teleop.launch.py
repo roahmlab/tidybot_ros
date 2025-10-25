@@ -24,11 +24,10 @@ def generate_launch_description():
         description="Use simulation mode if true"
     )
 
-    # TODO: Add more advanced recording control
     record = DeclareLaunchArgument(
         "record",
         default_value='false',
-        description="Record the episode if true"
+        description="Enable episode recording services and node if true"
     )
 
     robot_description_path = get_package_share_directory("tidybot_description")
@@ -53,6 +52,7 @@ def generate_launch_description():
         executable="teleop_server",
         name="teleop_server",
         output="screen",
+        parameters=[{"record": LaunchConfiguration("record")}],
     )
 
     teleop_controller = Node(
@@ -77,6 +77,23 @@ def generate_launch_description():
                     {"record": LaunchConfiguration("record")}],
     )
     
+    # Optionally include the synchronized recorder when record=true
+    recorder_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(
+                get_package_share_directory('tidybot_episode'),
+                'launch',
+                'synchronized_recorder.launch.py',
+            )
+        ),
+        launch_arguments={
+            'use_sim': LaunchConfiguration('use_sim'),
+            'storage_uri': 'episode_bag',
+            'fps': '10.0',
+        }.items(),
+        condition=IfCondition(LaunchConfiguration('record')),
+    )
+    
     teleop_to_moveit = Node(
         package="tidybot_solver",
         executable="teleop_to_moveit",
@@ -93,6 +110,7 @@ def generate_launch_description():
         teleop_server,
         teleop_controller,
         state_controller,
+        recorder_launch,
         teleop_to_moveit,
         move_group_launch,
     ])

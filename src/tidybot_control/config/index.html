@@ -38,6 +38,34 @@
         margin: 0;
         touch-action: none;
       }
+
+      /* Modal styles */
+      .modal-backdrop {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+      }
+      .modal {
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+        padding: 16px 20px;
+        max-width: 420px;
+        width: 90%;
+      }
+      .modal h3 { margin: 0 0 8px 0; }
+      .modal p { margin: 0 0 16px 0; color: #333; }
+      .modal .actions { display: flex; gap: 12px; justify-content: flex-end; }
+      .btn { padding: 8px 14px; border-radius: 6px; cursor: pointer; border: 1px solid #ccc; background: #fff; }
+      .btn-primary { background: #3b82f6; color: white; border-color: #3b82f6; }
+      .btn-danger { background: #ef4444; color: white; border-color: #ef4444; }
     </style>
   </head>
   <body>
@@ -72,6 +100,8 @@
 
       // Socket to communicate with server
       const socket = io();
+      // Server injects whether recording is enabled
+      const RECORD_ENABLED = {{ 'true' if record_enabled else 'false' }};
 
       // Calculate RTT from server response
       socket.on('echo', (timestamp) => {
@@ -141,6 +171,10 @@
         // Let the server know user has ended the episode
         const data = { timestamp: Date.now(), state_update: 'episode_ended' };
         socket.send(data);
+        // If recording is enabled, prompt to save/discard
+        if (RECORD_ENABLED === true || RECORD_ENABLED === 'true') {
+          showSaveModal();
+        }
       }
 
       function onEndSession(session) {
@@ -228,6 +262,35 @@
         }
         socket.send(data);
       }
+
+      // Save/discard modal
+      const modalBackdrop = document.createElement('div');
+      modalBackdrop.className = 'modal-backdrop';
+      modalBackdrop.innerHTML = `
+        <div class="modal">
+          <h3>Save episode?</h3>
+          <p>Do you want to save the just recorded episode or discard it?</p>
+          <div class="actions">
+            <button id="btnDiscard" class="btn btn-danger">Discard</button>
+            <button id="btnSave" class="btn btn-primary">Save</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modalBackdrop);
+
+      function showSaveModal() {
+        modalBackdrop.style.display = 'flex';
+      }
+      function hideSaveModal() {
+        modalBackdrop.style.display = 'none';
+      }
+      document.getElementById('btnSave').addEventListener('click', () => {
+        socket.emit('save_episode');
+        hideSaveModal();
+      });
+      document.getElementById('btnDiscard').addEventListener('click', () => {
+        socket.emit('discard_episode');
+        hideSaveModal();
+      });
 
       initXR();
     </script>
