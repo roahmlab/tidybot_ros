@@ -1,5 +1,9 @@
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import (
+    IncludeLaunchDescription,
+    DeclareLaunchArgument,
+    OpaqueFunction,
+)
 from launch_ros.actions import Node
 from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
@@ -9,62 +13,86 @@ from moveit_configs_utils.launches import generate_move_group_launch
 import os
 from ament_index_python.packages import get_package_share_directory
 
+
+def launch_controller(context, *args, **kwargs):
+    controller_type = LaunchConfiguration("controller_type").perform(context)
+    config_path = os.path.join(
+        get_package_share_directory("tidybot_control"),
+        "config",
+        f"{controller_type}_config.yaml",
+    )
+    if not os.path.isfile(config_path):
+        raise RuntimeError(f"Controller config not found: {config_path}")
+    node = Node(
+        package="tidybot_control",
+        executable="joystick_controller",
+        name="joystick_controller",
+        parameters=[
+            config_path,
+            {"use_sim": LaunchConfiguration("use_sim")},
+            {"use_sim_time": LaunchConfiguration("use_sim")},
+        ],
+    )
+    return [node]
+
+
 def generate_launch_description():
 
-    package_dir = get_package_share_directory('tidybot_control')
-    description_pkg_dir = get_package_share_directory('tidybot_description')
-    solver_pkg_dir = get_package_share_directory('tidybot_solver')
-    joy_params = os.path.join(package_dir, 'config', 'joystick.yaml')
+    package_dir = get_package_share_directory("tidybot_control")
+    solver_pkg_dir = get_package_share_directory("tidybot_solver")
+    joy_node_config = os.path.join(package_dir, "config", "joy_node_config.yaml")
+    controller_arg = DeclareLaunchArgument(
+        "controller_type",
+        default_value="Xbox_SeriesX_Wire",
+        description="Select joystick controller mapping (Xbox_SeriesX_Wire or Xbox_SeriesX_Wireless)",
+        choices=["Xbox_SeriesX_Wire", "Xbox_SeriesX_Wireless"],
+    )
 
     use_sim_arg = DeclareLaunchArgument(
-        'use_sim', default_value='true',
-        description='Use simulation (Gazebo) if true, hardware if false'
+        "use_sim",
+        default_value="true",
+        description="Use simulation (Gazebo) if true, hardware if false",
     )
 
     joy_node = Node(
-        package='joy',
-        executable='joy_node',
-        name='joy_node',
-        parameters=[joy_params],
+        package="joy",
+        executable="joy_node",
+        name="joy_node",
+        parameters=[joy_node_config],
     )
 
-    joystick_controller_node = Node(
-        package='tidybot_control',
-        executable='joystick_controller',
-        name='joystick_controller',
-        parameters=[{'use_sim': LaunchConfiguration('use_sim')},
-                    {'use_sim_time': LaunchConfiguration('use_sim')}],
-    )
+    controller_node = OpaqueFunction(function=launch_controller)
 
     # Use our custom joystick_to_moveit node with C++ Servo API
     moveit_servo_sim = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
                 solver_pkg_dir,
-                'launch',
-                'moveit_twist.launch.py',
+                "launch",
+                "launch_moveit_vel_ik.launch.py",
             )
         ),
-        launch_arguments={'command_output_type': 'joint_trajectory'}.items(),
-        condition=IfCondition(LaunchConfiguration('use_sim'))
+        condition=IfCondition(LaunchConfiguration("use_sim")),
     )
 
     moveit_servo_hardware = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(
                 solver_pkg_dir,
-                'launch',
-                'moveit_twist.launch.py',
+                "launch",
+                "launch_moveit_vel_ik.launch.py",
             )
         ),
-        launch_arguments={'command_output_type': 'joint_state'}.items(),
-        condition=UnlessCondition(LaunchConfiguration('use_sim'))
+        condition=UnlessCondition(LaunchConfiguration("use_sim")),
     )
 
-    return LaunchDescription([
-        use_sim_arg,
-        joy_node,
-        joystick_controller_node,
-        moveit_servo_sim,
-        moveit_servo_hardware,
-    ])
+    return LaunchDescription(
+        [
+            use_sim_arg,
+            controller_arg,
+            joy_node,
+            controller_node,
+            moveit_servo_sim,
+            moveit_servo_hardware,
+        ]
+    )

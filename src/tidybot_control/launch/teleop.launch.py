@@ -96,8 +96,8 @@ def generate_launch_description():
     
     teleop_to_moveit = Node(
         package="tidybot_solver",
-        executable="teleop_to_moveit",
-        name="teleop_to_moveit",
+        executable="moveit_ee_pose_ik",
+        name="moveit_ee_pose_ik",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
     )

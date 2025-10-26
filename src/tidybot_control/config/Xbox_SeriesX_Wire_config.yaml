@@ -1,0 +1,34 @@
+joystick_controller:
+  ros__parameters:
+    axis_mapping:
+      base_linear_x: 1
+      base_linear_y: 0
+      base_angular_z: 3
+      arm_linear_x: 0  # Only in arm mode
+      arm_linear_y: 1  # Only in arm mode
+      arm_linear_z: 7
+      arm_angular_x: 4
+      arm_angular_y: 3  # Only in arm mode
+      arm_roll_positive: 2
+      arm_roll_negative: 5
+      gripper_horizontal: 6
+    axis_scale:
+      base_linear_x: 0.5
+      base_linear_y: 0.5
+      base_angular_z: 0.5
+      arm_linear_x: 1.0
+      arm_linear_y: -1.0
+      arm_linear_z: -1.0
+      arm_angular_x: -1.0
+      arm_angular_y: -1.0
+      arm_roll_positive: 1.0
+      arm_roll_negative: 1.0
+      gripper_horizontal: 1.0
+    button_mapping:
+      arm_mode: 0
+      base_mode: 1
+      frame_base: 2
+      frame_ee: 3
+      enable_normal: 5
+      enable_turbo: 4
+      reset_env: 8

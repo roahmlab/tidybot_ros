@@ -38,11 +38,11 @@ class BaseServer(Node):
         # Create a subscription to the command topic
         if self.drive_mode == "position":
             self.cmd_sub = self.create_subscription(
-                Float64MultiArray, "/tidybot/hardware/base/target_pos", self.cmd_callback, 1
+                Float64MultiArray, "/tidybot/base/target_pose", self.cmd_callback, 1
             )
         else:  # velocity mode
             self.cmd_sub = self.create_subscription(
-                Float64MultiArray, "/tidybot/hardware/base/target_vel", self.cmd_callback, 1
+                Float64MultiArray, "/tidybot/base/target_vel", self.cmd_callback, 1
             )
 
         self.state_pub = self.create_publisher(

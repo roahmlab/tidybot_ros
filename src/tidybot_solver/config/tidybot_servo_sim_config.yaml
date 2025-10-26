@@ -27,7 +27,7 @@ leaving_singularity_threshold_multiplier: 2.0
 
 joint_limit_margins: [0.12]
 
-cartesian_command_in_topic: /tidybot/arm/twist
+cartesian_command_in_topic: /tidybot/arm/target_vel
 joint_command_in_topic: /tidybot/arm/joint_jog
 status_topic: /tidybot/arm/status
 command_out_topic: /gen3_7dof_controller/joint_trajectory

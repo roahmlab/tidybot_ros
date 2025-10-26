@@ -55,6 +55,7 @@ class TeleopToMoveit : public rclcpp::Node {
             "/joint_states", 1,
         std::bind(&TeleopToMoveit::joint_state_callback, this, std::placeholders::_1));
 
+        // Need to periodically publish gripper state to force ros2_control to update in the simulation mode
         gripper_timer = this->create_wall_timer(
             std::chrono::milliseconds(20),
             [this]() {

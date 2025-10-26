@@ -27,15 +27,13 @@ class TeleopController(Node):
         self.get_logger().info(
             "Teleop controller initialized with use_sim: {}".format(self.use_sim)
         )
+        self.base_pub = self.create_publisher(
+            Float64MultiArray, "/tidybot/base/target_pose", 10
+        )
         if self.use_sim:
-            # Publish to the ros2 control topic for base control
-            self.base_pub = self.create_publisher(
+            # Publish to the ros2 control topic for base control in simulation
+            self.base_pub_sim = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
-            )
-        else:
-            # Publish to the hardware topic for base control
-            self.base_pub = self.create_publisher(
-                Float64MultiArray, "/tidybot/hardware/base/target_pos", 10
             )
 
         # Listen to teleop commands
@@ -134,6 +132,8 @@ class TeleopController(Node):
                             yaw + self.base_ref_quat[2],
                         ]
                         self.base_pub.publish(command)
+                        if self.use_sim:
+                            self.base_pub_sim.publish(command)
                         return
 
                 case "arm":

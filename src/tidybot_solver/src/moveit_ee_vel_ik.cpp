@@ -9,6 +9,7 @@
 #include <moveit/utils/logger.hpp>
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <moveit_msgs/srv/servo_command_type.hpp>
 #include <moveit/planning_scene_monitor/planning_scene_monitor.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
@@ -25,42 +26,46 @@ const std::string RED = "\x1b[31m";
 const std::string RESET = "\x1b[0m";
 const std::string BOLD = "\x1b[1m";
 
-class JoystickToMoveit : public rclcpp::Node {
+class MoveitEEVelIK : public rclcpp::Node {
 public:
-    JoystickToMoveit() : Node("joystick_to_moveit") {
+    MoveitEEVelIK() : Node("joystick_to_moveit") {
         moveit::setNodeLoggerName("joystick_to_moveit");
-        
-        command_output_type_param_ = this->declare_parameter<std::string>(
-            "command_output_type", "joint_trajectory");
         update_period_sec_ = this->declare_parameter<double>("update_period", 0.0);
         base_frame_ = this->declare_parameter<std::string>("base_frame", "base");
         end_effector_link_ = this->declare_parameter<std::string>("end_effector_link", "bracelet_link");
 
-        output_type_ = parseOutputType(command_output_type_param_);
-
         // Subscribe to twist commands from joystick controller
-        twist_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
-            "/tidybot/arm/twist", 10,
-            std::bind(&JoystickToMoveit::twistCallback, this, std::placeholders::_1));
+        arm_cmd_sub_ = this->create_subscription<geometry_msgs::msg::TwistStamped>(
+            "/tidybot/arm/target_vel", 10,
+            std::bind(&MoveitEEVelIK::ArmCmdCallback, this, std::placeholders::_1));
+        
+        gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64>(
+            "/tidybot/gripper/commands", 1,
+            std::bind(&MoveitEEVelIK::update_gripper, this, std::placeholders::_1));
+
+        // Publisher to ros2_control gripper controller
+        gripper_sim_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+        "/robotiq_2f_85_controller/commands", 10);
+
+        gripper_hardware_pub = this->create_publisher<std_msgs::msg::Float64>(
+        "/tidybot/hardware/gripper/commands", 10);
 
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
         auto marker_qos = rclcpp::QoS(rclcpp::KeepLast(10)).transient_local().reliable();
         marker_pub_ = this->create_publisher<visualization_msgs::msg::Marker>("/visual_ee_pose", marker_qos);
-        
-        // Publisher for joint trajectory commands
-        if (output_type_ == OutputType::JointTrajectory)
-        {
-            joint_trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
-                "/gen3_7dof_controller/joint_trajectory", 10);
-            RCLCPP_INFO(this->get_logger(),"%sPublishing joint trajectories to /gen3_7dof_controller/joint_trajectory%s", GREEN.c_str(), RESET.c_str());
-        }
-        else
-        {
-            joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
-                "/tidybot/hardware/arm/commands", 10);
-            RCLCPP_INFO(this->get_logger(), "%sPublishing joint states to /tidybot/hardware/arm/commands%s", GREEN.c_str(), RESET.c_str());
-        }
+
+        // Need to periodically publish gripper state to force ros2_control to update in the simulation mode
+        gripper_timer = this->create_wall_timer(
+        std::chrono::milliseconds(20),
+        [this]() {
+            std_msgs::msg::Float64MultiArray gripper_msg_sim;
+            std_msgs::msg::Float64 gripper_msg_hardware;
+            gripper_msg_sim.data = {gripper_state * 0.81};
+            gripper_msg_hardware.data = gripper_state;
+            gripper_sim_pub->publish(gripper_msg_sim);
+            gripper_hardware_pub->publish(gripper_msg_hardware);
+        });
     }
     
     void initialize() {
@@ -69,6 +74,17 @@ public:
         
         servo_param_listener_ = std::make_shared<const servo::ParamListener>(shared_from_this(), param_namespace);
         servo_params_ = servo_param_listener_->get_params();
+
+        output_type_ = parseOutputType(servo_params_.command_out_type);
+        if (output_type_ == OutputType::JointTrajectory) {
+            RCLCPP_INFO(this->get_logger(), "%sCommand output type set to JointTrajectory%s", GREEN.c_str(), RESET.c_str());
+            joint_trajectory_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
+                servo_params_.command_out_topic, rclcpp::QoS(10));
+        } else {
+            RCLCPP_INFO(this->get_logger(), "%sCommand output type set to JointState%s", GREEN.c_str(), RESET.c_str());
+            joint_state_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
+                servo_params_.command_out_topic, rclcpp::QoS(10));
+        }
 
         // Create the planning scene monitor
         planning_scene_monitor_ = moveit_servo::createPlanningSceneMonitor(shared_from_this(), servo_params_);
@@ -106,7 +122,7 @@ public:
         timer_period_sec_ = (update_period_sec_ > 0.0) ? update_period_sec_ : servo_params_.publish_period;
         servo_timer_ = this->create_timer(
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::duration<double>(timer_period_sec_)),
-            std::bind(&JoystickToMoveit::servoLoop, this));
+            std::bind(&MoveitEEVelIK::servoLoop, this));
         RCLCPP_INFO(this->get_logger(), "%sMoveit servo loop started with period %.3f sec%s", GREEN.c_str(), timer_period_sec_, RESET.c_str());
         RCLCPP_INFO(this->get_logger(), "%sServo initialized successfully. You can start planning!%s", GREEN.c_str(), RESET.c_str());
     }
@@ -132,28 +148,28 @@ private:
         return OutputType::JointTrajectory;
     }
 
-    void twistCallback(const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
+    void ArmCmdCallback(const geometry_msgs::msg::TwistStamped::SharedPtr msg) {
         // Store the latest twist command
-        latest_twist_command_ = *msg;
-        has_twist_command_ = true;
+        lastest_arm_command_ = *msg;
+        has_arm_command_ = true;
     }
     
     void servoLoop() {
-        if (!servo_ || !has_twist_command_) {
+        if (!servo_ || !has_arm_command_) {
             return;
         }
         
         // Create TwistCommand for Servo
-        TwistCommand twist_command{latest_twist_command_.header.frame_id, 
-                                 {latest_twist_command_.twist.linear.x,
-                                  latest_twist_command_.twist.linear.y,
-                                  latest_twist_command_.twist.linear.z,
-                                  latest_twist_command_.twist.angular.x,
-                                  latest_twist_command_.twist.angular.y,
-                                  latest_twist_command_.twist.angular.z}};
+        TwistCommand twist_command{lastest_arm_command_.header.frame_id, 
+                                 {lastest_arm_command_.twist.linear.x,
+                                  lastest_arm_command_.twist.linear.y,
+                                  lastest_arm_command_.twist.linear.z,
+                                  lastest_arm_command_.twist.angular.x,
+                                  lastest_arm_command_.twist.angular.y,
+                                  lastest_arm_command_.twist.angular.z}};
 
         // RCLCPP_INFO(this->get_logger(), "Received twist command in frame %s: [lin: %.3f, %.3f, %.3f; ang: %.3f, %.3f, %.3f]",
-        //              latest_twist_command_.header.frame_id.c_str(),
+        //              lastest_arm_command_.header.frame_id.c_str(),
         //              twist_command.velocities[0], twist_command.velocities[1], twist_command.velocities[2],
         //              twist_command.velocities[3], twist_command.velocities[4], twist_command.velocities[5]);
         
@@ -223,7 +239,7 @@ private:
         }
         publishVisualization(next_joint_state);
         last_commanded_state_ = next_joint_state;
-        has_twist_command_ = false;  // Reset flag until next command
+        has_arm_command_ = false;  // Reset flag until next command
     }
 
     void publishVisualization(const KinematicState &state)
@@ -306,19 +322,27 @@ private:
 
         marker_pub_->publish(marker);
     }
+
+    void update_gripper(const std_msgs::msg::Float64 gripper_delta) {
+        // Update gripper state
+        gripper_state = std::clamp(gripper_delta.data, 0.0, 1.0);
+    }
     
     std::shared_ptr<const servo::ParamListener> servo_param_listener_;
     servo::Params servo_params_;
     planning_scene_monitor::PlanningSceneMonitorPtr planning_scene_monitor_;
     std::unique_ptr<Servo> servo_;
     
-    rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr twist_sub_;
+    rclcpp::Subscription<geometry_msgs::msg::TwistStamped>::SharedPtr arm_cmd_sub_;
+    rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_cmd_sub_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_sim_pub;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_hardware_pub;
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr joint_trajectory_pub_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_state_pub_;
     rclcpp::TimerBase::SharedPtr servo_timer_;
     
-    geometry_msgs::msg::TwistStamped latest_twist_command_;
-    bool has_twist_command_ = false;
+    geometry_msgs::msg::TwistStamped lastest_arm_command_;
+    bool has_arm_command_ = false;
     KinematicState last_commanded_state_;
 
     std::string command_output_type_param_;
@@ -332,12 +356,14 @@ private:
     std::string planning_frame_;
     std::string end_effector_link_;
     std::string base_frame_;
+    double gripper_state = 0.0;
+    rclcpp::TimerBase::SharedPtr gripper_timer;
     double timer_period_sec_ = 0.0;
 };
 
 int main(int argc, char** argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<JoystickToMoveit>();
+    auto node = std::make_shared<MoveitEEVelIK>();
     node->initialize();
     rclcpp::spin(node);
     rclcpp::shutdown();

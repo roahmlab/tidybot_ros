@@ -8,3 +8,6 @@ src/build
 /src/install
 venv
 episode_bag
+
+# Ignore external packages
+/src/external/OrbbecSDK_ROS2

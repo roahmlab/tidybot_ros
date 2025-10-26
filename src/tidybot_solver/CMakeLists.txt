@@ -16,8 +16,8 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 
 add_executable(demo_plan src/demo_plan.cpp)
-add_executable(teleop_to_moveit src/teleop_to_moveit.cpp)
-add_executable(twist_to_moveit src/twist_to_moveit.cpp)
+add_executable(moveit_ee_pose_ik src/moveit_ee_pose_ik.cpp)
+add_executable(moveit_ee_vel_ik src/moveit_ee_vel_ik.cpp)
 add_executable(keyboard_input src/keyboard_input.cpp)
 
 ament_target_dependencies(demo_plan
@@ -25,13 +25,13 @@ ament_target_dependencies(demo_plan
   "moveit_ros_planning_interface"
   "moveit_visual_tools")
 
-ament_target_dependencies(teleop_to_moveit
+ament_target_dependencies(moveit_ee_pose_ik
   "rclcpp"
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
   "tidybot_utils")
 
-  ament_target_dependencies(twist_to_moveit
+ament_target_dependencies(moveit_ee_vel_ik
   "rclcpp"
   "moveit_ros_planning_interface"
   "moveit_visual_tools"
@@ -50,7 +50,7 @@ ament_target_dependencies(keyboard_input
   "control_msgs"
   "moveit_msgs")
 
-install(TARGETS demo_plan teleop_to_moveit twist_to_moveit keyboard_input
+install(TARGETS demo_plan moveit_ee_pose_ik moveit_ee_vel_ik keyboard_input
 DESTINATION lib/${PROJECT_NAME}
 )
 
