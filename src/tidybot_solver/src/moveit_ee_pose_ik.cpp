@@ -46,8 +46,10 @@ class TeleopToMoveit : public rclcpp::Node {
         gripper_pos_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/robotiq_2f_85_controller/commands", 10);
         // Publish to real hardware
-        arm_state_pub = this->create_publisher<sensor_msgs::msg::JointState>(
+        arm_command_pub = this->create_publisher<sensor_msgs::msg::JointState>(
             "/tidybot/hardware/arm/commands", 10);
+        gripper_command_pub = this->create_publisher<std_msgs::msg::Float64>(
+            "/tidybot/hardware/gripper/commands", 10);
 
         // Debugging
         pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
@@ -156,8 +158,7 @@ class TeleopToMoveit : public rclcpp::Node {
         joint_state_msg.header.stamp = this->now(); 
         joint_state_msg.name = joint_names;
         joint_state_msg.position = joint_values;
-        arm_state_pub->publish(joint_state_msg);
-
+        arm_command_pub->publish(joint_state_msg);
     }
 
     void publish_delta_ee(const std_msgs::msg::Float64MultiArray &msg) {
@@ -290,13 +291,19 @@ class TeleopToMoveit : public rclcpp::Node {
         joint_state_msg.header.stamp = this->now(); 
         joint_state_msg.name = joint_names;
         joint_state_msg.position = joint_values;
-        arm_state_pub->publish(joint_state_msg);
+        arm_command_pub->publish(joint_state_msg);
 
+        std_msgs::msg::Float64 gripper_msg;
+        gripper_msg.data = gripper_state;
+        gripper_command_pub->publish(gripper_msg);
     }
 
     void publish_gripper(const std_msgs::msg::Float64 gripper_delta) {
         // Update gripper state
         gripper_state = std::clamp(gripper_delta.data, 0.0, 1.0);
+        std_msgs::msg::Float64 gripper_msg;
+        gripper_msg.data = gripper_state;
+        gripper_command_pub->publish(gripper_msg);
     }
 
     void publish_pose_visual(const geometry_msgs::msg::Pose &pose)
@@ -337,7 +344,8 @@ class TeleopToMoveit : public rclcpp::Node {
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr delta_ee_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_subscriber_;
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub;
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_state_pub;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_command_pub;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_command_pub;
     
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pos_pub;
     const moveit::core::JointModelGroup* arm_joint_model_group;
