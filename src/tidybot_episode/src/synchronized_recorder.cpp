@@ -129,10 +129,8 @@ public:
     {
         // Declare parameters
         declare_parameter<std::string>("storage_uri", "episode_bag");
-        declare_parameter<bool>("use_sim", true);
         declare_parameter<double>("fps", 10.0);
         get_parameter("storage_uri", storage_uri_);
-        get_parameter("use_sim", use_sim_);
         get_parameter("fps", fps_);
 
         // Initialize TF
@@ -182,7 +180,6 @@ private:
             [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
                 last_joint_state_ = msg;
             });
-
         // Camera images
         base_image_sub_ = image_transport::create_subscription(
             this, "/tidybot/camera_base/color/raw",
@@ -198,29 +195,17 @@ private:
 
     void setup_action_subscriptions()
     {
-        // Subscribe to action topics requested for dataset capture.
-        if (use_sim_)
-        {
-            base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            "/tidybot_base_pos_controller/commands", 10,
-            [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                last_base_cmd_ = msg;
-            });
-        }
-        else
-        {
-            base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-            "/tidybot/hardware/base/target_pos", 10,
-            [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-                last_base_cmd_ = msg;
-            });
-        }
+        // Subscribe to unified action topics requested for dataset capture.
+        base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
+        "/tidybot/base/target_pose", 10,
+        [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+            last_base_cmd_ = msg;
+        });
         arm_cmd_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/tidybot/arm/target_pose", 10,
             [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
                 last_arm_cmd_ = msg;
             });
-
         gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64>(
             "/tidybot/gripper/commands", 10,
             [this](const std_msgs::msg::Float64::SharedPtr msg) {
@@ -475,8 +460,7 @@ private:
         if (last_base_cmd_)
         {
             auto cmd_copy = std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_);
-            if (!use_sim_) write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot/hardware/base/target_pos");
-            else write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot_base_pos_controller/commands");
+            write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot/base/target_pose");
         }
 
         // Record arm command

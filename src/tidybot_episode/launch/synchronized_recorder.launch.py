@@ -14,14 +14,14 @@ def generate_launch_description():
             description='Base directory for storing episode data'
         ),
         DeclareLaunchArgument(
-            'use_sim',
-            default_value='true',
-            description='Whether to use simulation topics (true) or real robot topics (false)'
-        ),
-        DeclareLaunchArgument(
             'fps',
             default_value='10.0',
             description='Recording frequency in Hz'
+        ),
+        DeclareLaunchArgument(
+            'use_sim',
+            default_value='true',
+            description='Use simulation (Gazebo) if true, hardware if false',
         ),
         Node(
             package='tidybot_episode',
@@ -29,7 +29,6 @@ def generate_launch_description():
             name='synchronized_recorder',
             parameters=[{
                 'storage_uri': LaunchConfiguration('storage_uri'),
-                'use_sim': LaunchConfiguration('use_sim'),
                 'use_sim_time': LaunchConfiguration('use_sim'),
                 'fps': LaunchConfiguration('fps')
             }],

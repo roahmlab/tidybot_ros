@@ -1,4 +1,6 @@
+#include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <iostream>
 #include <memory>
@@ -12,6 +14,9 @@
 #include "rosbag2_cpp/readers/sequential_reader.hpp"
 #include "rosbag2_storage/storage_options.hpp"
 #include "std_msgs/msg/float64.hpp"
+#include "std_msgs/msg/float64_multi_array.hpp"
+#include "geometry_msgs/msg/pose.hpp"
+#include "geometry_msgs/msg/pose_stamped.hpp"
 
 #include "tf2/LinearMath/Quaternion.h"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
@@ -74,25 +79,54 @@ private:
             if (h5file)
             {
                 RCLCPP_INFO(this->get_logger(), "Converting bag: %s to HDF5", bag_dir.string().c_str());
-                // Open rosbag2 file (the .db3 inside the directory)
-                std::string db3_path;
-                for (auto &file : fs::directory_iterator(bag_dir))
+                fs::path obs_dir = bag_dir / "observations";
+                fs::path actions_dir = bag_dir / "actions";
+
+                if (!fs::exists(obs_dir) || !fs::is_directory(obs_dir))
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Observations directory missing in %s", bag_name.c_str());
+                    continue;
+                }
+                if (!fs::exists(actions_dir) || !fs::is_directory(actions_dir))
+                {
+                    RCLCPP_ERROR(this->get_logger(), "Actions directory missing in %s", bag_name.c_str());
+                    continue;
+                }
+
+                std::string obs_db3_path;
+                for (auto &file : fs::directory_iterator(obs_dir))
                 {
                     if (file.path().extension() == ".db3")
                     {
-                        db3_path = file.path().string();
+                        obs_db3_path = file.path().string();
                         break;
                     }
                 }
-                if (db3_path.empty())
+                if (obs_db3_path.empty())
                 {
-                    RCLCPP_ERROR(this->get_logger(), "No .db3 file in %s", bag_name.c_str());
+                    RCLCPP_ERROR(this->get_logger(), "No observation .db3 file in %s", bag_name.c_str());
                     continue;
                 }
+
+                std::string actions_db3_path;
+                for (auto &file : fs::directory_iterator(actions_dir))
+                {
+                    if (file.path().extension() == ".db3")
+                    {
+                        actions_db3_path = file.path().string();
+                        break;
+                    }
+                }
+                if (actions_db3_path.empty())
+                {
+                    RCLCPP_ERROR(this->get_logger(), "No actions .db3 file in %s", bag_name.c_str());
+                    continue;
+                }
+
                 RCLCPP_INFO(this->get_logger(), "Converting bag %s.", bag_name.c_str());
                 // Setup rosbag2 reader
                 rosbag2_storage::StorageOptions storage_options;
-                storage_options.uri = db3_path;
+                storage_options.uri = obs_db3_path;
                 storage_options.storage_id = "sqlite3";
                 rosbag2_cpp::ConverterOptions converter_options;
                 converter_options.input_serialization_format = "cdr";
@@ -142,11 +176,93 @@ private:
                     throw std::runtime_error("Message count mismatch in bag " + bag_name);
                 }
 
+                // Read actions bag
+                rosbag2_storage::StorageOptions action_storage_options;
+                action_storage_options.uri = actions_db3_path;
+                action_storage_options.storage_id = "sqlite3";
+                rosbag2_cpp::readers::SequentialReader action_reader;
+                action_reader.open(action_storage_options, converter_options);
+
+                std::vector<double> base_cmd_x;
+                std::vector<double> base_cmd_y;
+                std::vector<double> base_cmd_yaw;
+                std::vector<geometry_msgs::msg::Pose> arm_cmds;
+                std::vector<std_msgs::msg::Float64> gripper_cmds;
+
+                rclcpp::Serialization<std_msgs::msg::Float64MultiArray> base_cmd_serializer;
+                rclcpp::Serialization<geometry_msgs::msg::Pose> arm_cmd_serializer;
+
+                while (action_reader.has_next())
+                {
+                    auto serialized_msg = action_reader.read_next();
+                    rclcpp::SerializedMessage extracted(*serialized_msg->serialized_data);
+                    const std::string &topic = serialized_msg->topic_name;
+
+                    if (topic == "/tidybot/base/target_pose")
+                    {
+                        std_msgs::msg::Float64MultiArray base_cmd;
+                        base_cmd_serializer.deserialize_message(&extracted, &base_cmd);
+                        if (base_cmd.data.size() < 3)
+                        {
+                            RCLCPP_WARN(this->get_logger(),
+                                        "Base command in %s has insufficient length (%zu)",
+                                        bag_name.c_str(), base_cmd.data.size());
+                            continue;
+                        }
+                        base_cmd_x.push_back(base_cmd.data[0]);
+                        base_cmd_y.push_back(base_cmd.data[1]);
+                        base_cmd_yaw.push_back(base_cmd.data[2]);
+                    }
+                    else if (topic == "/tidybot/arm/target_pose")
+                    {
+                        geometry_msgs::msg::Pose arm_cmd;
+                        arm_cmd_serializer.deserialize_message(&extracted, &arm_cmd);
+                        arm_cmds.push_back(arm_cmd);
+                    }
+                    else if (topic == "/tidybot/gripper/commands")
+                    {
+                        std_msgs::msg::Float64 grip_cmd;
+                        float_serializer.deserialize_message(&extracted, &grip_cmd);
+                        gripper_cmds.push_back(grip_cmd);
+                    }
+                }
+
+                size_t base_samples = base_cmd_x.size();
+                size_t arm_cmd_samples = arm_cmds.size();
+                size_t grip_cmd_samples = gripper_cmds.size();
+                size_t action_samples = std::min({base_samples, arm_cmd_samples, grip_cmd_samples});
+
+                if (action_samples == 0)
+                {
+                    RCLCPP_WARN(this->get_logger(), "No action samples found in %s; skipping", bag_name.c_str());
+                    continue;
+                }
+
+                if (base_samples != action_samples || arm_cmd_samples != action_samples || grip_cmd_samples != action_samples)
+                {
+                    RCLCPP_WARN(this->get_logger(),
+                                "Action topic counts mismatch in %s (base=%zu, arm=%zu, gripper=%zu); truncating to %zu",
+                                bag_name.c_str(), base_samples, arm_cmd_samples, grip_cmd_samples, action_samples);
+                }
+
+                if (action_samples != N)
+                {
+                    RCLCPP_WARN(this->get_logger(),
+                                "Observation and action counts differ in %s (obs=%zu, act=%zu); truncating to %zu",
+                                bag_name.c_str(), N, action_samples, std::min(N, action_samples));
+                }
+
+                size_t sample_count = std::min(N, action_samples);
+                if (sample_count == 0)
+                {
+                    RCLCPP_WARN(this->get_logger(), "No synchronized samples available in %s; skipping", bag_name.c_str());
+                    continue;
+                }
+
                 // Open videos using OpenCV
-                std::string prefix = "observations_";
-                std::string base_video = (bag_dir / fs::path("base_video_" + bag_name.substr(prefix.length()) + ".mp4")).string();
+                std::string base_video = (bag_dir / fs::path("base_camera.mp4")).string();
                 RCLCPP_INFO(this->get_logger(), "Opening video: %s", base_video.c_str());
-                std::string arm_video = (bag_dir / fs::path("arm_video_" + bag_name.substr(prefix.length()) + ".mp4")).string();
+                std::string arm_video = (bag_dir / fs::path("arm_camera.mp4")).string();
                 RCLCPP_INFO(this->get_logger(), "Opening video: %s", arm_video.c_str());
                 cv::VideoCapture base_cap(base_video), arm_cap(arm_video);
                 if (!base_cap.isOpened() || !arm_cap.isOpened())
@@ -173,10 +289,7 @@ private:
                                          resized.data, resized.data + (84 * 84 * 3));
                     frame_count++;
                 }
-                if (static_cast<size_t>(frame_count) != N)
-                {
-                    throw std::runtime_error("Frame count mismatch in base_video of " + bag_name);
-                }
+                size_t base_frames = static_cast<size_t>(frame_count);
                 // Read arm(wrist) video frames
                 frame_count = 0;
                 while (arm_cap.read(frame))
@@ -187,21 +300,38 @@ private:
                                           resized.data, resized.data + (84 * 84 * 3));
                     frame_count++;
                 }
-                if (static_cast<size_t>(frame_count) != N)
+                size_t wrist_frames = static_cast<size_t>(frame_count);
+
+                if (base_frames != N)
                 {
-                    throw std::runtime_error("Frame count mismatch in arm_video of " + bag_name);
+                    RCLCPP_WARN(this->get_logger(),
+                                "Base video frame count (%zu) differs from observation count (%zu) in %s",
+                                base_frames, N, bag_name.c_str());
+                }
+                if (wrist_frames != N)
+                {
+                    RCLCPP_WARN(this->get_logger(),
+                                "Wrist video frame count (%zu) differs from observation count (%zu) in %s",
+                                wrist_frames, N, bag_name.c_str());
+                }
+
+                sample_count = std::min(sample_count, base_frames);
+                sample_count = std::min(sample_count, wrist_frames);
+                if (sample_count == 0)
+                {
+                    RCLCPP_WARN(this->get_logger(), "No synchronized samples after video alignment in %s; skipping", bag_name.c_str());
+                    continue;
                 }
 
                 // Compute data arrays for HDF5
-                std::vector<double> actions_data;
-                actions_data.resize(N * 10);
+                std::vector<double> actions_data(sample_count * 10, 0.0);
                 std::vector<double> arm_pos_data, arm_quat_data, base_pose_data, gripper_data;
                 arm_pos_data.reserve(N * 3);
                 arm_quat_data.reserve(N * 4);
                 base_pose_data.reserve(N * 3);
                 gripper_data.reserve(N);
 
-                // Populate obs datasets and also build actions dataset entries
+                // Populate observation datasets
                 for (size_t i = 0; i < N; ++i)
                 {
                     // Get messages
@@ -235,65 +365,67 @@ private:
                     double grip_val = grip.data;
                     gripper_data.push_back(grip_val);
 
-                    // Prepare state vector S[i] for actions (10 elements)
-                    double arm_axis_x = 0.0, arm_axis_y = 0.0, arm_axis_z = 0.0;
-                    // Convert arm quaternion to axis-angle (rotation vector)
-                    double theta = 2 * acos(qw);
-                    if (theta > 1e-6)
-                    {
-                        double norm = sqrt(1 - qw * qw);
-                        arm_axis_x = theta * (qx / norm);
-                        arm_axis_y = theta * (qy / norm);
-                        arm_axis_z = theta * (qz / norm);
-                    }
-                    else
-                    {
-                        // Zero rotation (set axis-angle to 0 vector)
-                        arm_axis_x = arm_axis_y = arm_axis_z = 0.0;
-                    }
-                    // Base yaw already computed as 'yaw'
-                    // Fill S[i] = [base_x, base_y, base_yaw, arm_pos(x,y,z), arm_axis(x,y,z), gripper]
-                    double Sx[10] = {bx, by, yaw, ax, ay, az, arm_axis_x, arm_axis_y, arm_axis_z, grip_val};
-
-                    // Place into actions_data (to be shifted later)
-                    for (int j = 0; j < 10; ++j)
-                    {
-                        // We will actually assign to actions_data after computing shift
-                        actions_data[i * 10 + j] = Sx[j];
-                    }
                 }
 
-                // Apply shift: actions[0] = interpolated (average) of S0 and S1, actions[i] = S[i-1] for i>=1
-                if (N > 0)
+                // Prepare action dataset using recorded command topics
+                for (size_t i = 0; i < sample_count; ++i)
                 {
-                    // If N>=3, interpolate first entry
-                    if (N > 2)
+                    double bx = base_cmd_x[i];
+                    double by = base_cmd_y[i];
+                    double byaw = base_cmd_yaw[i];
+
+                    const auto &arm_cmd = arm_cmds[i];
+                    double ax = arm_cmd.position.x;
+                    double ay = arm_cmd.position.y;
+                    double az = arm_cmd.position.z;
+
+                    double qx = arm_cmd.orientation.x;
+                    double qy = arm_cmd.orientation.y;
+                    double qz = arm_cmd.orientation.z;
+                    double qw = arm_cmd.orientation.w;
+
+                    double qw_clamped = std::clamp(qw, -1.0, 1.0);
+                    double theta = 2.0 * std::acos(qw_clamped);
+                    double sin_half = std::sqrt(std::max(0.0, 1.0 - qw_clamped * qw_clamped));
+                    double rx = 0.0, ry = 0.0, rz = 0.0;
+                    if (sin_half > 1e-6)
                     {
-                        // Shift actions_data by the size of one entry (10 elements)
-                        shift_right_drop(actions_data, 10);
-                        for (int j = 0; j < 10; ++j)
-                        {
-                            // For orientation components in axis-angle (indices 2 and 6-8), a direct average is an approximation.
-                            actions_data[j] = 0.5 * (actions_data[10 + j] + actions_data[20 + j]);
-                        }
+                        rx = theta * (qx / sin_half);
+                        ry = theta * (qy / sin_half);
+                        rz = theta * (qz / sin_half);
                     }
-                    else if (N == 2)
-                    {
-                        // For N==2, copy the second to the first
-                        shift_right_drop(actions_data, 10);
-                        for (int j = 0; j < 10; ++j)
-                        {
-                            actions_data[j] = actions_data[10 + j]; // Copy second entry to first
-                        }
-                    }
-                    else // N == 1
-                    {
-                        // If N==1, just copy the first entry as is
-                        for (int j = 0; j < 10; ++j)
-                        {
-                            actions_data[j] = actions_data[j];
-                        }
-                    }
+
+                    double grip_val = gripper_cmds[i].data;
+
+                    double *slot = &actions_data[i * 10];
+                    slot[0] = bx;
+                    slot[1] = by;
+                    slot[2] = byaw;
+                    slot[3] = ax;
+                    slot[4] = ay;
+                    slot[5] = az;
+                    slot[6] = rx;
+                    slot[7] = ry;
+                    slot[8] = rz;
+                    slot[9] = grip_val;
+                }
+
+                // Truncate observation buffers if needed to match sample_count
+                if (sample_count < N)
+                {
+                    arm_pos_data.resize(sample_count * 3);
+                    arm_quat_data.resize(sample_count * 4);
+                    base_pose_data.resize(sample_count * 3);
+                    gripper_data.resize(sample_count);
+                }
+
+                if (sample_count < base_frames)
+                {
+                    base_img_data.resize(sample_count * 84 * 84 * 3);
+                }
+                if (sample_count < wrist_frames)
+                {
+                    wrist_img_data.resize(sample_count * 84 * 84 * 3);
                 }
 
                 // Write to HDF5: create group and datasets
@@ -322,13 +454,13 @@ private:
 
                 // Write datasets
                 // actions: N x 10
-                writeDataset2D(bagGroup, "actions", N, 10, H5::PredType::NATIVE_DOUBLE, actions_data.data());
-                writeDataset2D(obsGroup, "arm_pos", N, 3, H5::PredType::NATIVE_DOUBLE, arm_pos_data.data());
-                writeDataset2D(obsGroup, "arm_quat", N, 4, H5::PredType::NATIVE_DOUBLE, arm_quat_data.data());
-                writeDataset2D(obsGroup, "base_pose", N, 3, H5::PredType::NATIVE_DOUBLE, base_pose_data.data());
-                writeDataset2D(obsGroup, "gripper_pos", N, 1, H5::PredType::NATIVE_DOUBLE, gripper_data.data());
-                writeDataset4D(obsGroup, "base_image", N, 84, 84, 3, H5::PredType::NATIVE_UCHAR, base_img_data.data());
-                writeDataset4D(obsGroup, "wrist_image", N, 84, 84, 3, H5::PredType::NATIVE_UCHAR, wrist_img_data.data());
+                writeDataset2D(bagGroup, "actions", sample_count, 10, H5::PredType::NATIVE_DOUBLE, actions_data.data());
+                writeDataset2D(obsGroup, "arm_pos", sample_count, 3, H5::PredType::NATIVE_DOUBLE, arm_pos_data.data());
+                writeDataset2D(obsGroup, "arm_quat", sample_count, 4, H5::PredType::NATIVE_DOUBLE, arm_quat_data.data());
+                writeDataset2D(obsGroup, "base_pose", sample_count, 3, H5::PredType::NATIVE_DOUBLE, base_pose_data.data());
+                writeDataset2D(obsGroup, "gripper_pos", sample_count, 1, H5::PredType::NATIVE_DOUBLE, gripper_data.data());
+                writeDataset4D(obsGroup, "base_image", sample_count, 84, 84, 3, H5::PredType::NATIVE_UCHAR, base_img_data.data());
+                writeDataset4D(obsGroup, "wrist_image", sample_count, 84, 84, 3, H5::PredType::NATIVE_UCHAR, wrist_img_data.data());
             }
         }
 
@@ -337,27 +469,6 @@ private:
             RCLCPP_INFO(this->get_logger(), "HDF5 file created successfully at %s", h5file->getFileName().c_str());
             delete h5file; // close HDF5 file
         }
-    }
-
-    void shift_right_drop(
-        std::vector<double> &v,
-        size_t k,
-        double fill_value = 0.0)
-    {
-        size_t n = v.size();
-        if (n == 0)
-        {
-            return;
-        }
-        // clamp k to [0,n]
-        k = std::min(k, n);
-
-        std::copy_backward(
-            v.begin(),
-            v.begin() + (n - k),
-            v.end());
-
-        std::fill(v.begin(), v.begin() + k, fill_value);
     }
 
     std::string root_dir_;
