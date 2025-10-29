@@ -47,6 +47,7 @@
 
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 
 #include <cv_bridge/cv_bridge.hpp>
 #include <image_transport/image_transport.hpp>
@@ -75,6 +76,14 @@ private:
     sensor_msgs::msg::Image::ConstSharedPtr last_base_image_;
     sensor_msgs::msg::Image::ConstSharedPtr last_arm_image_;
 
+    // Latest observation buffers (updated outside writer loop)
+    geometry_msgs::msg::PoseStamped latest_base_pose_;
+    geometry_msgs::msg::PoseStamped latest_arm_pose_;
+    std_msgs::msg::Float64 latest_gripper_state_;
+    bool have_base_pose_ = false;
+    bool have_arm_pose_ = false;
+    bool have_gripper_state_ = false;
+
     // Action command subscriptions (cache latest commands)
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr base_cmd_sub_;
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_cmd_sub_;
@@ -84,6 +93,10 @@ private:
     std_msgs::msg::Float64MultiArray::ConstSharedPtr last_base_cmd_;
     geometry_msgs::msg::Pose::ConstSharedPtr last_arm_cmd_;
     std_msgs::msg::Float64::ConstSharedPtr last_gripper_cmd_;
+
+    // Pending write triggers (incremented by any action callback)
+    size_t pending_writes_ = 0;
+    bool initialized_from_obs_ = false;
 
     // Recording services
     rclcpp::Service<std_srvs::srv::Empty>::SharedPtr start_recording_service_;
@@ -179,6 +192,17 @@ private:
             "/joint_states", 10,
             [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
                 last_joint_state_ = msg;
+                // Update gripper state buffer immediately if possible
+                auto it = std::find(msg->name.begin(), msg->name.end(), "left_outer_knuckle_joint");
+                if (it != msg->name.end())
+                {
+                    size_t index = std::distance(msg->name.begin(), it);
+                    if (index < msg->position.size())
+                    {
+                        latest_gripper_state_.data = msg->position[index];
+                        have_gripper_state_ = true;
+                    }
+                }
             });
         // Camera images
         base_image_sub_ = image_transport::create_subscription(
@@ -197,19 +221,22 @@ private:
     {
         // Subscribe to unified action topics requested for dataset capture.
         base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
-        "/tidybot/base/target_pose", 10,
-        [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
-            last_base_cmd_ = msg;
-        });
+            "/tidybot/base/target_pose", 10,
+            [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
+                last_base_cmd_ = msg;
+                if (recording_enabled_) { pending_writes_++; }
+            });
         arm_cmd_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/tidybot/arm/target_pose", 10,
             [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
                 last_arm_cmd_ = msg;
+                if (recording_enabled_) { pending_writes_++; }
             });
         gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64>(
             "/tidybot/gripper/commands", 10,
             [this](const std_msgs::msg::Float64::SharedPtr msg) {
                 last_gripper_cmd_ = msg;
+                if (recording_enabled_) { pending_writes_++; }
             });
     }
 
@@ -259,6 +286,11 @@ private:
         base_video_filename_ = episode_dir + "/base_camera.mp4";
         arm_video_filename_ = episode_dir + "/arm_camera.mp4";
         
+        // Prime observation buffers immediately
+        update_observation_buffers();
+        seed_initial_actions_from_observation();
+        initialized_from_obs_ = true;
+
         RCLCPP_INFO(this->get_logger(), "%sRecording episode to: %s%s", GREEN, episode_dir.c_str(), RESET);
     }
 
@@ -371,68 +403,64 @@ private:
             return;
         }
 
-        // Record current observations (state at time T)
-        record_observations();
-        
-        // Record current action commands (actions for time T -> T+1)
-        record_actions();
-        
-        sample_count_++;
-        
-        if (sample_count_ % 100 == 0)
+        // Always update observation buffers; do not write unless triggered
+        update_observation_buffers();
+
+        // Only write when there is a pending trigger from an action message
+        if (pending_writes_ > 0)
         {
-            RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
+            if (perform_write_once())
+            {
+                pending_writes_--;
+                sample_count_++;
+                if (sample_count_ % 100 == 0)
+                {
+                    RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
+                }
+            }
+            // If perform_write_once() failed due to missing data, keep pending_writes_ unchanged
         }
     }
-
-    void record_observations()
+    // Update observation buffers (no writes)
+    void update_observation_buffers()
     {
         auto current_time = this->get_clock()->now();
-        
-        // Record base pose
+        // Base pose
         try
         {
             auto transform_stamped = tf_buffer_->lookupTransform("world", "base", rclcpp::Time(0));
-            geometry_msgs::msg::PoseStamped base_pose;
-            base_pose.header = transform_stamped.header;
-            base_pose.header.stamp = current_time;
-            base_pose.pose.position.x = transform_stamped.transform.translation.x;
-            base_pose.pose.position.y = transform_stamped.transform.translation.y;
-            base_pose.pose.position.z = transform_stamped.transform.translation.z;
-            base_pose.pose.orientation = transform_stamped.transform.rotation;
-            
-            write_observation_message<geometry_msgs::msg::PoseStamped>(
-                std::make_shared<geometry_msgs::msg::PoseStamped>(base_pose), "/base_pose");
+            latest_base_pose_.header = transform_stamped.header;
+            latest_base_pose_.header.stamp = current_time;
+            latest_base_pose_.pose.position.x = transform_stamped.transform.translation.x;
+            latest_base_pose_.pose.position.y = transform_stamped.transform.translation.y;
+            latest_base_pose_.pose.position.z = transform_stamped.transform.translation.z;
+            latest_base_pose_.pose.orientation = transform_stamped.transform.rotation;
+            have_base_pose_ = true;
         }
         catch (const tf2::TransformException &ex)
         {
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                                   "Could not get base pose: %s", ex.what());
         }
-
-        // Record arm pose
+        // Arm pose
         try
         {
             auto transform_stamped = tf_buffer_->lookupTransform("arm_base_link", "bracelet_link", rclcpp::Time(0));
-            geometry_msgs::msg::PoseStamped arm_pose;
-            arm_pose.header = transform_stamped.header;
-            arm_pose.header.stamp = current_time;
-            arm_pose.pose.position.x = transform_stamped.transform.translation.x;
-            arm_pose.pose.position.y = transform_stamped.transform.translation.y;
-            arm_pose.pose.position.z = transform_stamped.transform.translation.z;
-            arm_pose.pose.orientation = transform_stamped.transform.rotation;
-            
-            write_observation_message<geometry_msgs::msg::PoseStamped>(
-                std::make_shared<geometry_msgs::msg::PoseStamped>(arm_pose), "/arm_pose");
+            latest_arm_pose_.header = transform_stamped.header;
+            latest_arm_pose_.header.stamp = current_time;
+            latest_arm_pose_.pose.position.x = transform_stamped.transform.translation.x;
+            latest_arm_pose_.pose.position.y = transform_stamped.transform.translation.y;
+            latest_arm_pose_.pose.position.z = transform_stamped.transform.translation.z;
+            latest_arm_pose_.pose.orientation = transform_stamped.transform.rotation;
+            have_arm_pose_ = true;
         }
         catch (const tf2::TransformException &ex)
         {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000,
                                   "Could not get arm pose: %s", ex.what());
         }
-
-        // Record gripper state
-        if (last_joint_state_)
+        // Gripper state already updated in joint state callback; if not available, try to compute now
+        if (!have_gripper_state_ && last_joint_state_)
         {
             auto it = std::find(last_joint_state_->name.begin(), last_joint_state_->name.end(), "left_outer_knuckle_joint");
             if (it != last_joint_state_->name.end())
@@ -440,111 +468,130 @@ private:
                 size_t index = std::distance(last_joint_state_->name.begin(), it);
                 if (index < last_joint_state_->position.size())
                 {
-                    std_msgs::msg::Float64 gripper_state;
-                    gripper_state.data = last_joint_state_->position[index];
-                    write_observation_message<std_msgs::msg::Float64>(
-                        std::make_shared<std_msgs::msg::Float64>(gripper_state), "/gripper_state");
+                    latest_gripper_state_.data = last_joint_state_->position[index];
+                    have_gripper_state_ = true;
                 }
             }
         }
-
-        // Record camera images as video frames
-        record_camera_images();
     }
 
-    void record_actions()
+    void seed_initial_actions_from_observation()
     {
-        auto current_time = this->get_clock()->now();
-        
-        // Record base command
+        // Only seed if we have obs; otherwise leave as null until first obs arrives
+        if (have_base_pose_)
+        {
+            auto seed = std::make_shared<std_msgs::msg::Float64MultiArray>();
+            seed->data.resize(3);
+            // compute yaw
+            double roll, pitch, yaw;
+            tf2::Quaternion q;
+            tf2::fromMsg(latest_base_pose_.pose.orientation, q);
+            tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+            seed->data[0] = latest_base_pose_.pose.position.x;
+            seed->data[1] = latest_base_pose_.pose.position.y;
+            seed->data[2] = yaw;
+            last_base_cmd_ = seed;
+        }
+        if (have_arm_pose_)
+        {
+            auto seed = std::make_shared<geometry_msgs::msg::Pose>(latest_arm_pose_.pose);
+            last_arm_cmd_ = seed;
+        }
+        if (have_gripper_state_)
+        {
+            auto seed = std::make_shared<std_msgs::msg::Float64>(latest_gripper_state_);
+            last_gripper_cmd_ = seed;
+        }
+    }
+
+    bool perform_write_once()
+    {
+        // Ensure we have images to write a frame
+        if (!last_base_image_ || !last_arm_image_)
+        {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "Skipping write: waiting for camera frames");
+            return false;
+        }
+        // Ensure we have observations
+        if (!(have_base_pose_ && have_arm_pose_ && have_gripper_state_))
+        {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
+                                 "Skipping write: observations not ready");
+            return false;
+        }
+
+        // Ensure we have initial action buffers; if not, seed from obs
+        if (!last_base_cmd_ || !last_arm_cmd_ || !last_gripper_cmd_)
+        {
+            seed_initial_actions_from_observation();
+        }
+
+        // Write observations
+        write_observation_message<geometry_msgs::msg::PoseStamped>(
+            std::make_shared<geometry_msgs::msg::PoseStamped>(latest_base_pose_), "/base_pose");
+        write_observation_message<geometry_msgs::msg::PoseStamped>(
+            std::make_shared<geometry_msgs::msg::PoseStamped>(latest_arm_pose_), "/arm_pose");
+        write_observation_message<std_msgs::msg::Float64>(
+            std::make_shared<std_msgs::msg::Float64>(latest_gripper_state_), "/gripper_state");
+
+        // Write actions (use latest cached commands)
         if (last_base_cmd_)
         {
             auto cmd_copy = std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_);
             write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot/base/target_pose");
         }
-
-        // Record arm command
         if (last_arm_cmd_)
         {
             auto cmd_copy = std::make_shared<geometry_msgs::msg::Pose>(*last_arm_cmd_);
             write_action_message<geometry_msgs::msg::Pose>(cmd_copy, "/tidybot/arm/target_pose");
         }
-
-        // Record gripper command
         if (last_gripper_cmd_)
         {
             auto cmd_copy = std::make_shared<std_msgs::msg::Float64>(*last_gripper_cmd_);
             write_action_message<std_msgs::msg::Float64>(cmd_copy, "/tidybot/gripper/commands");
         }
-    }
 
-    void record_camera_images()
-    {
-        // Record base camera
-        if (last_base_image_)
+        // Write camera frames
+        try
         {
-            try
+            auto base_cv = cv_bridge::toCvCopy(last_base_image_, sensor_msgs::image_encodings::BGR8);
+            auto arm_cv = cv_bridge::toCvCopy(last_arm_image_, sensor_msgs::image_encodings::BGR8);
+
+            if (!base_video_initialized_)
             {
-                auto cv_ptr = cv_bridge::toCvCopy(last_base_image_, sensor_msgs::image_encodings::BGR8);
-                
-                if (!base_video_initialized_)
-                {
-                    cv::Size frame_size(cv_ptr->image.cols, cv_ptr->image.rows);
-                    int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-                    base_video_writer_.open(base_video_filename_, fourcc, fps_, frame_size, true);
-                    if (base_video_writer_.isOpened())
-                    {
-                        base_video_initialized_ = true;
-                    }
-                    else
-                    {
-                        RCLCPP_ERROR(this->get_logger(), "%sFailed to open base video writer%s", RED, RESET);
-                    }
-                }
-                
-                if (base_video_initialized_)
-                {
-                    base_video_writer_ << cv_ptr->image;
-                }
+                cv::Size frame_size(base_cv->image.cols, base_cv->image.rows);
+                int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+                base_video_writer_.open(base_video_filename_, fourcc, fps_, frame_size, true);
+                if (base_video_writer_.isOpened())
+                    base_video_initialized_ = true;
+                else
+                    RCLCPP_ERROR(this->get_logger(), "%sFailed to open base video writer%s", RED, RESET);
             }
-            catch (cv_bridge::Exception &e)
+            if (!arm_video_initialized_)
             {
-                RCLCPP_ERROR(this->get_logger(), "%sBase camera cv_bridge exception: %s%s", RED, e.what(), RESET);
+                cv::Size frame_size(arm_cv->image.cols, arm_cv->image.rows);
+                int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+                arm_video_writer_.open(arm_video_filename_, fourcc, fps_, frame_size, true);
+                if (arm_video_writer_.isOpened())
+                    arm_video_initialized_ = true;
+                else
+                    RCLCPP_ERROR(this->get_logger(), "%sFailed to open arm video writer%s", RED, RESET);
+            }
+
+            if (base_video_initialized_ && arm_video_initialized_)
+            {
+                base_video_writer_ << base_cv->image;
+                arm_video_writer_ << arm_cv->image;
             }
         }
-
-        // Record arm camera
-        if (last_arm_image_)
+        catch (cv_bridge::Exception &e)
         {
-            try
-            {
-                auto cv_ptr = cv_bridge::toCvCopy(last_arm_image_, sensor_msgs::image_encodings::BGR8);
-                
-                if (!arm_video_initialized_)
-                {
-                    cv::Size frame_size(cv_ptr->image.cols, cv_ptr->image.rows);
-                    int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-                    arm_video_writer_.open(arm_video_filename_, fourcc, fps_, frame_size, true);
-                    if (arm_video_writer_.isOpened())
-                    {
-                        arm_video_initialized_ = true;
-                    }
-                    else
-                    {
-                        RCLCPP_ERROR(this->get_logger(), "%sFailed to open arm video writer%s", RED, RESET);
-                    }
-                }
-                
-                if (arm_video_initialized_)
-                {
-                    arm_video_writer_ << cv_ptr->image;
-                }
-            }
-            catch (cv_bridge::Exception &e)
-            {
-                RCLCPP_ERROR(this->get_logger(), "%sArm camera cv_bridge exception: %s%s", RED, e.what(), RESET);
-            }
+            RCLCPP_ERROR(this->get_logger(), "%sCamera cv_bridge exception: %s%s", RED, e.what(), RESET);
+            return false;
         }
+
+        return true;
     }
 
     template <typename MsgT>
