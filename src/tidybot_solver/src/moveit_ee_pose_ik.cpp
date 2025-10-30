@@ -18,12 +18,26 @@
 #include <moveit/kinematics_base/kinematics_base.hpp>
 #include <moveit/kinematics_plugin_loader/kinematics_plugin_loader.hpp>
 
+// TF2 for frame transforms between planning_frame and model_frame
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
 using moveit::planning_interface::MoveGroupInterface;
 #include "sensor_msgs/msg/joint_state.hpp"
 
 class TeleopToMoveit : public rclcpp::Node {
     public:
     TeleopToMoveit() : Node("teleop_to_moveit") {
+        // Parameters
+        this->declare_parameter<std::string>("planning_frame", "arm_base_link");
+        this->get_parameter("planning_frame", planning_frame);
+
+        // TF setup
+        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        // Initialize last time for time-jump detection
+        last_time_ = this->get_clock()->now();
         sensitivity = 0.01; // Incoming end effector position must not be within 1cm of previous pose
         options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
         options.lock_redundant_joints = false;
@@ -73,10 +87,38 @@ class TeleopToMoveit : public rclcpp::Node {
         robot_state = std::make_shared<moveit::core::RobotState>(robot_model);
         arm_joint_model_group = robot_model->getJointModelGroup("gen3_7dof");
         // gripper_joint_model_group = robot_model->getJointModelGroup("gen3_lite_2f");
+
+        // Determine the model/world frame used by MoveIt/RobotModel
+        model_frame = robot_model->getModelFrame();
+        // If user hasn't overridden planning_frame, keep what was declared; otherwise ensure it's set
+        this->get_parameter("planning_frame", planning_frame);
     }
 
     void publish_arm(const geometry_msgs::msg::Pose &msg) {
-        this->publish_pose_visual(msg);
+        // Handle time jump: reset TF buffer/listener if clock moved backwards
+        if (handle_time_jump_and_reset_tf()) {
+            return; // skip this callback invocation to allow TF to repopulate
+        }
+        // Incoming pose is interpreted in the configured planning_frame
+        geometry_msgs::msg::PoseStamped pose_in;
+        pose_in.header.stamp = this->now();
+        pose_in.header.frame_id = planning_frame;
+        pose_in.pose = msg;
+
+        geometry_msgs::msg::PoseStamped pose_in_model;
+        try {
+            if (planning_frame == model_frame) {
+                pose_in_model = pose_in;
+                pose_in_model.header.frame_id = model_frame;
+            } else {
+                pose_in_model = tf_buffer_->transform(pose_in, model_frame, tf2::durationFromSec(0.2));
+            }
+        } catch (const tf2::TransformException &ex) {
+            RCLCPP_WARN(this->get_logger(), "TF transform failed from %s to %s: %s", planning_frame.c_str(), model_frame.c_str(), ex.what());
+            return;
+        }
+
+        this->publish_pose_visual(pose_in_model.pose);
         // if (pose_distance(last_pose, msg) < sensitivity) {
         //     return;
         // }
@@ -91,7 +133,7 @@ class TeleopToMoveit : public rclcpp::Node {
 
         // Perform IK
         bool found_ik = robot_state->setFromIK(
-            arm_joint_model_group, msg, 0.1, 
+            arm_joint_model_group, pose_in_model.pose, 0.1, 
             moveit::core::GroupStateValidityCallbackFn(), options
         );
 
@@ -101,7 +143,7 @@ class TeleopToMoveit : public rclcpp::Node {
         }
 
         robot_state->enforceBounds();
-        last_pose = msg; // Update to most recent valid pose
+        last_pose = msg; // Store last pose in planning_frame coordinates
         pose_initialized = true;
 
         // Extract joint values
@@ -162,6 +204,10 @@ class TeleopToMoveit : public rclcpp::Node {
     }
 
     void publish_delta_ee(const std_msgs::msg::Float64MultiArray &msg) {
+        // Handle time jump: reset TF buffer/listener if clock moved backwards
+        if (handle_time_jump_and_reset_tf()) {
+            return; // skip this callback invocation to allow TF to repopulate
+        }
         if (!pose_initialized) {
             // Fill RobotState from the latest joint_state message
             std::map<std::string, double> joint_position_map;
@@ -186,7 +232,23 @@ class TeleopToMoveit : public rclcpp::Node {
             current_pose_msg.orientation.z = q.z();
             current_pose_msg.orientation.w = q.w();
 
-            last_pose = current_pose_msg;
+            // Transform FK pose from model_frame -> planning_frame for internal tracking
+            geometry_msgs::msg::PoseStamped fk_in_model;
+            fk_in_model.header.stamp = this->now();
+            fk_in_model.header.frame_id = model_frame;
+            fk_in_model.pose = current_pose_msg;
+
+            try {
+                if (planning_frame == model_frame) {
+                    last_pose = current_pose_msg;
+                } else {
+                    auto fk_in_planning = tf_buffer_->transform(fk_in_model, planning_frame, tf2::durationFromSec(0.2));
+                    last_pose = fk_in_planning.pose;
+                }
+            } catch (const tf2::TransformException &ex) {
+                RCLCPP_WARN(this->get_logger(), "TF transform failed (init FK) from %s to %s: %s", model_frame.c_str(), planning_frame.c_str(), ex.what());
+                last_pose = current_pose_msg; // fallback
+            }
             pose_initialized = true;
 
             RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Initialized last_pose from FK");
@@ -222,7 +284,25 @@ class TeleopToMoveit : public rclcpp::Node {
         target_pose.orientation.y = new_q.y();
         target_pose.orientation.z = new_q.z();
         
-        this->publish_pose_visual(target_pose);
+        // Visualize target in model frame
+        geometry_msgs::msg::PoseStamped target_in;
+        target_in.header.stamp = this->now();
+        target_in.header.frame_id = planning_frame;
+        target_in.pose = target_pose;
+
+        geometry_msgs::msg::PoseStamped target_in_model;
+        try {
+            if (planning_frame == model_frame) {
+                target_in_model = target_in;
+                target_in_model.header.frame_id = model_frame;
+            } else {
+                target_in_model = tf_buffer_->transform(target_in, model_frame, tf2::durationFromSec(0.2));
+            }
+        } catch (const tf2::TransformException &ex) {
+            RCLCPP_WARN(this->get_logger(), "TF transform failed from %s to %s: %s", planning_frame.c_str(), model_frame.c_str(), ex.what());
+            return;
+        }
+        this->publish_pose_visual(target_in_model.pose);
 
         // Get current robot state
         std::map<std::string, double> joint_position_map;
@@ -234,7 +314,7 @@ class TeleopToMoveit : public rclcpp::Node {
 
         // Perform IK
         bool found_ik = robot_state->setFromIK(
-            arm_joint_model_group, target_pose, 0.1, 
+            arm_joint_model_group, target_in_model.pose, 0.1, 
             moveit::core::GroupStateValidityCallbackFn(), options
         );
 
@@ -244,7 +324,7 @@ class TeleopToMoveit : public rclcpp::Node {
         }
 
         robot_state->enforceBounds();
-        last_pose = target_pose; 
+        last_pose = target_pose; // Keep in planning_frame
 
         // Extract joint values
         std::vector<double> joint_values;
@@ -311,7 +391,7 @@ class TeleopToMoveit : public rclcpp::Node {
         auto msg = geometry_msgs::msg::PoseStamped();
 
         msg.header.stamp = this->get_clock()->now();
-        msg.header.frame_id = "world";
+        msg.header.frame_id = model_frame;
 
         msg.pose.position.x = pose.position.x;
         msg.pose.position.y = pose.position.y;
@@ -336,9 +416,31 @@ class TeleopToMoveit : public rclcpp::Node {
     }
 
     private:
+    // Returns true if a time jump backward was detected and TF was reset
+    bool handle_time_jump_and_reset_tf() {
+        auto now = this->get_clock()->now();
+        if (last_time_.nanoseconds() > now.nanoseconds()) {
+            RCLCPP_WARN(this->get_logger(), "Time jump detected, resetting TF buffer and listener...");
+            tf_listener_.reset();
+            tf_buffer_.reset();
+            tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+            tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+            last_time_ = now;
+            return true;
+        }
+        last_time_ = now;
+        return false;
+    }
+
     moveit::core::RobotModelPtr robot_model;
     moveit::core::RobotStatePtr robot_state;
     rclcpp::Logger logger = rclcpp::get_logger("web_server_moveit");
+
+    // TF & frame configuration
+    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::string planning_frame;
+    std::string model_frame;
 
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr delta_ee_subscriber_;
@@ -357,6 +459,9 @@ class TeleopToMoveit : public rclcpp::Node {
     geometry_msgs::msg::Pose last_pose;
     bool pose_initialized = false;
     sensor_msgs::msg::JointState last_joint_state;
+
+    // Track last callback time to detect backward time jumps and refresh TF
+    rclcpp::Time last_time_;
 
     float sensitivity;
     kinematics::KinematicsQueryOptions options;
