@@ -1,3 +1,4 @@
+from email.policy import default
 import rclpy
 import rclpy.exceptions
 from rclpy.node import Node
@@ -17,6 +18,7 @@ from tf2_ros import TransformBroadcaster
 import numpy as np
 import math
 import gc
+from std_srvs.srv import Empty
 
 
 class TeleopController(Node):
@@ -45,6 +47,15 @@ class TeleopController(Node):
         # Publish gripper command
         self.gripper_pub = self.create_publisher(
             Float64, "/tidybot/gripper/commands", 10
+        )
+
+        # Reset service: clear references and send home commands once
+        self.reset_srv = self.create_service(Empty, "/tidybot/controller/reset", self.reset_callback)
+
+        # Subscribe to joint states to buffer latest joint positions (for gripper state)
+        self.latest_joint_state = None
+        self.joint_states_sub = self.create_subscription(
+            JointState, "/joint_states", self.joint_states_callback, 10
         )
 
         self.tf_buffer = tf2_ros.Buffer()
@@ -83,6 +94,10 @@ class TeleopController(Node):
 
         # Offset from base to arm in base frame
         self.base_arm_offset = [0.12, 3.76986e-15, 0.374775]
+        self.arm_home_pos = [0.260, 0.001, 0.815] # In global frame
+        self.arm_home_quat = [-0.001, -0.001, 0.708, 0.706] # In global frame [x, y, z, w]
+        self.base_home_pose = [0.0, 0.0, 0.0]  # [x, y, theta]
+        self.gripper_home_pos = 0.0
 
     def teleop_callback(self, msg):
         if not msg.state_update:
@@ -152,7 +167,8 @@ class TeleopController(Node):
                         self.arm_ref_quat = self.arm_obs_quat
                         # Store base yaw at reference time for orientation mapping
                         self.arm_ref_base_yaw = self.base_obs[2]
-                        self.gripper_ref = self.gripper_obs
+                        # Initialize gripper reference from buffered joint states
+                        self.gripper_ref = self.get_gripper_state_from_joint_states()
 
                     # Rotations around z-axis to go between global frame (base) and local frame (arm)
                     z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.base_obs[2])
@@ -164,7 +180,7 @@ class TeleopController(Node):
                     # Map XR delta into current base-aligned local frame and apply to local ref
                     arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff) + np.array(
                         self.base_arm_offset
-                    )
+                    ) + np.array([self.base_obs[0], self.base_obs[1], 0.0])
 
                     # Orientation
                     arm_target_quat = (
@@ -187,8 +203,6 @@ class TeleopController(Node):
                     gripper_command.data = np.clip(
                         self.gripper_ref + msg.gripper_delta, 0, 1.0
                     )
-                    # Open loop gripper control
-                    self.gripper_obs = gripper_command.data
                     self.gripper_pub.publish(gripper_command)
                     return
 
@@ -206,6 +220,72 @@ class TeleopController(Node):
         else:
             # Control series about to be enabled, update robot state
             self.update_robot_state()
+
+    def reset_callback(self, request, response):
+        # Clear XR and robot reference states
+        self.base_xr_ref_pos = None
+        self.base_xr_ref_quat = None
+        self.base_ref_pos = None
+        self.base_ref_quat = None
+        self.arm_xr_ref_pos = None
+        self.arm_xr_ref_quat = None
+        self.arm_ref_pos = None
+        self.arm_ref_quat = None
+        self.arm_ref_base_yaw = None
+        self.gripper_ref = 1.0
+
+        # Send one-time home commands
+        self.send_home_commands()
+        return response
+
+    def send_home_commands(self):
+        # Publish base home pose
+        base_cmd = Float64MultiArray()
+        base_cmd.data = [self.base_home_pose[0], self.base_home_pose[1], self.base_home_pose[2]]
+        self.base_pub.publish(base_cmd)
+        if self.use_sim:
+            self.base_pub_sim.publish(base_cmd)
+
+        # Publish arm home pose (assumed in global/base frame as defined)
+        arm_cmd = Pose()
+        arm_cmd.position.x = float(self.arm_home_pos[0])
+        arm_cmd.position.y = float(self.arm_home_pos[1])
+        arm_cmd.position.z = float(self.arm_home_pos[2])
+        arm_cmd.orientation.x = float(self.arm_home_quat[0])
+        arm_cmd.orientation.y = float(self.arm_home_quat[1])
+        arm_cmd.orientation.z = float(self.arm_home_quat[2])
+        arm_cmd.orientation.w = float(self.arm_home_quat[3])
+        self.arm_pub.publish(arm_cmd)
+
+        # Publish gripper home
+        grip_cmd = Float64()
+        grip_cmd.data = float(self.gripper_home_pos)
+        self.gripper_pub.publish(grip_cmd)
+
+    def joint_states_callback(self, msg: JointState):
+        # Buffer the latest JointState message
+        self.latest_joint_state = msg
+
+    def get_gripper_state_from_joint_states(self) -> float:
+        """Return the gripper state from buffered JointState.
+
+        Looks for the 'left_outer_knuckle_joint' in the latest JointState and
+        returns its position. If not available, returns the provided default.
+        """
+        js = self.latest_joint_state
+        if js is None:
+            return float(0.0)
+        try:
+            idx = js.name.index("left_outer_knuckle_joint")
+        except ValueError:
+            return float(0.0)
+        # Ensure positions array has corresponding index
+        if js.position is None or idx >= len(js.position):
+            return float(0.0)
+        try:
+            return float(js.position[idx])
+        except (TypeError, ValueError):
+            return float(0.0)
 
     def update_robot_state(self):
         try:

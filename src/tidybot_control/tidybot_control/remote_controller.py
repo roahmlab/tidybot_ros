@@ -35,6 +35,7 @@ class RemoteController(Node):
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
 
+        # Reset service for remote controller (align with state_controller expectations)
         self.reset_service = self.create_service(
             Empty, "/remote_controller/reset", self.reset_env_callback
         )
@@ -72,6 +73,12 @@ class RemoteController(Node):
 
         # Offset from base to arm base (in base frame)
         self.base_arm_offset = np.array([0.12, 0.0, 0.374775], dtype=float)
+
+        # Home poses (match teleop defaults)
+        self.base_home_pose = [0.0, 0.0, 0.0]  # [x, y, yaw]
+        self.arm_home_pos = [0.260, 0.001, 0.815]
+        self.arm_home_quat = [-0.001, -0.001, 0.708, 0.706]  # [x, y, z, w]
+        self.gripper_home_pos = 0.0
 
         # Publish to same topics as teleop_controller
         self.base_pub = self.create_publisher(
@@ -169,7 +176,34 @@ class RemoteController(Node):
 
         # Disable policy execution until user presses on screen
         self.enabled = False  # Note: Set to True to run without phone
+
+        # Send one-time home commands to bring robot to a safe pose
+        self.send_home_commands()
         return response
+
+    def send_home_commands(self):
+        # Base home
+        base_msg = Float64MultiArray()
+        base_msg.data = [self.base_home_pose[0], self.base_home_pose[1], self.base_home_pose[2]]
+        self.base_pub.publish(base_msg)
+        if self.use_sim:
+            self.base_pub_sim.publish(base_msg)
+
+        # Arm home
+        arm_msg = Pose()
+        arm_msg.position.x = float(self.arm_home_pos[0])
+        arm_msg.position.y = float(self.arm_home_pos[1])
+        arm_msg.position.z = float(self.arm_home_pos[2])
+        arm_msg.orientation.x = float(self.arm_home_quat[0])
+        arm_msg.orientation.y = float(self.arm_home_quat[1])
+        arm_msg.orientation.z = float(self.arm_home_quat[2])
+        arm_msg.orientation.w = float(self.arm_home_quat[3])
+        self.arm_pub.publish(arm_msg)
+
+        # Gripper home
+        grip_msg = Float64()
+        grip_msg.data = float(self.gripper_home_pos)
+        self.gripper_pub.publish(grip_msg)
 
     def joint_states_callback(self, msg):
         self.last_gripper_state = msg.position[msg.name.index("left_outer_knuckle_joint")]

@@ -51,9 +51,10 @@ class StateController(Node):
 
         self.reset_arm_cli = self.create_client(Empty, "/tidybot/hardware/arm/reset")
         self.reset_base_cli = self.create_client(Empty, "/tidybot/hardware/base/reset")
-        
-        if (self.use_remote):
-            self.reset_remote_cli = self.create_client(Empty, "/remote_controller/reset")
+        # Teleop controller reset service (resets refs and sends home commands)
+        self.reset_controller_cli = self.create_client(Empty, "/tidybot/controller/reset")
+        while not self.reset_controller_cli.wait_for_service(timeout_sec=1.0):
+            self.get_logger().info("Waiting for teleop controller reset service...")
 
         self.state = State.IDLE
         self.awaiting_save_decision = False
@@ -74,6 +75,9 @@ class StateController(Node):
                     else:
                         self.reset_base_cli.call_async(Empty.Request())
                         self.reset_arm_cli.call_async(Empty.Request())
+                    # Reset teleop controller internal state and send home commands
+                    self.get_logger().info("Resetting controller...")
+                    self.reset_controller_cli.call_async(Empty.Request())
             case "episode_started":
                 if self.state == State.IDLE or self.state == State.ENVIRONMENT_RESET:
                     self.state = State.EPISODE_STARTED

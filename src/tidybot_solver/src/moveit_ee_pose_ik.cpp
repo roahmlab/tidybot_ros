@@ -59,10 +59,10 @@ class TeleopToMoveit : public rclcpp::Node {
 
         // Need to periodically publish gripper state to force ros2_control to update in the simulation mode
         gripper_timer = this->create_wall_timer(
-            std::chrono::milliseconds(20),
+            std::chrono::milliseconds(50),
             [this]() {
                 std_msgs::msg::Float64MultiArray gripper_msg;
-                gripper_msg.data = {gripper_state * 0.81};
+                gripper_msg.data = {gripper_state * 0.8}; // Scale to match ros2_control gripper limits
                 gripper_pos_pub->publish(gripper_msg);
             });
     }
