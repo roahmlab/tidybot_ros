@@ -72,6 +72,7 @@ class TeleopController(Node):
         self.base_ref_quat = None
         self.arm_ref_pos = None
         self.arm_ref_quat = None
+        self.arm_ref_base_yaw = None
         self.gripper_ref = None
 
         # Observed position
@@ -79,6 +80,9 @@ class TeleopController(Node):
         self.arm_obs_pos = [0.0, 0.0, 1.0]
         self.arm_obs_quat = R.from_quat([0.0, 0.0, 0.0, 1.0])
         self.gripper_obs = 0
+
+        # Offset from base to arm in base frame
+        self.base_arm_offset = [0.12, 3.76986e-15, 0.374775]
 
     def teleop_callback(self, msg):
         if not msg.state_update:
@@ -143,27 +147,24 @@ class TeleopController(Node):
                     if self.arm_xr_ref_pos is None:
                         self.arm_xr_ref_pos = xr_pos
                         self.arm_xr_ref_rot_inv = xr_quat.inv()
+                        # Use local arm frame observation (arm_base_link -> bracelet_link)
                         self.arm_ref_pos = self.arm_obs_pos.copy()
                         self.arm_ref_quat = self.arm_obs_quat
-                        self.arm_ref_base_pose = self.base_obs.copy()
+                        # Store base yaw at reference time for orientation mapping
+                        self.arm_ref_base_yaw = self.base_obs[2]
                         self.gripper_ref = self.gripper_obs
 
                     # Rotations around z-axis to go between global frame (base) and local frame (arm)
                     z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.base_obs[2])
                     z_rot_inv = z_rot.inv()
-                    ref_z_rot = R.from_rotvec(
-                        np.array([0.0, 0.0, 1.0]) * self.arm_ref_base_pose[2]
-                    )
+                    ref_z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.arm_ref_base_yaw)
 
                     # Position
                     pos_diff = xr_pos - self.arm_xr_ref_pos  # WebXR
-                    pos_diff += ref_z_rot.apply(self.arm_ref_pos) - z_rot.apply(
-                        self.arm_ref_pos
-                    )  # Secondary base control: Compensate for base rotation
-                    pos_diff[:2] += (
-                        self.arm_ref_base_pose[:2] - self.base_obs[:2]
-                    )  # Secondary base control: Compensate for base translation
-                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff)
+                    # Map XR delta into current base-aligned local frame and apply to local ref
+                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff) + np.array(
+                        self.base_arm_offset
+                    )
 
                     # Orientation
                     arm_target_quat = (
@@ -227,9 +228,9 @@ class TeleopController(Node):
             self.get_logger().warn(f"Transform not found: {e}")
 
         try:
-            # Get arm state from tf
+            # Get arm state from tf (local frame: arm_base_link -> bracelet_link)
             transform = self.tf_buffer.lookup_transform(
-                target_frame="world",
+                target_frame="arm_base_link",
                 source_frame="bracelet_link",
                 time=rclpy.time.Time(),
                 timeout=rclpy.duration.Duration(seconds=0.5),

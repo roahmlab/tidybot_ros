@@ -16,7 +16,6 @@ from moveit_configs_utils import MoveItConfigsBuilder
 from moveit_configs_utils.launches import generate_move_group_launch
 
 def generate_launch_description():
-    tidybot_description_pkg = FindPackageShare("tidybot_description")
 
     use_sim = DeclareLaunchArgument(
         "use_sim",

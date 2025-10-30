@@ -11,13 +11,14 @@ from geometry_msgs.msg import Pose
 from std_srvs.srv import Empty
 from cv_bridge import CvBridge
 from tf2_ros import Buffer, TransformListener, LookupException, ExtrapolationException
-from geometry_msgs.msg import Vector3, TransformStamped
+
 
 import zmq
 import cv2
 import gc
 from tf_transformations import quaternion_multiply, euler_from_quaternion
 import numpy as np
+from scipy.spatial.transform import Rotation as R
 
 REMOTE_CONTROL_FREQUENCY = 20  # Hz
 
@@ -69,17 +70,20 @@ class RemoteController(Node):
             threshold, post_callback=self.time_jump_callback
         )
 
-        self.base_offset = TransformStamped()
-        self.base_offset.transform.translation.x = 0.12
-        self.base_offset.transform.translation.y = 0.0
-        self.base_offset.transform.translation.z = 0.374775
+        # Offset from base to arm base (in base frame)
+        self.base_arm_offset = np.array([0.12, 0.0, 0.374775], dtype=float)
 
+        # Publish to same topics as teleop_controller
         self.base_pub = self.create_publisher(
-            Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
+            Float64MultiArray, "/tidybot/base/target_pose", 10
         )
-        self.arm_pub = self.create_publisher(Pose, "/tidybot/hardware/arm/command", 10)
+        if self.use_sim:
+            self.base_pub_sim = self.create_publisher(
+                Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
+            )
+        self.arm_pub = self.create_publisher(Pose, "/tidybot/arm/target_pose", 10)
         self.gripper_pub = self.create_publisher(
-            Float64, "/tidybot/gripper/command", 10
+            Float64, "/tidybot/gripper/commands", 10
         )
 
         # Connection to policy server
@@ -127,41 +131,28 @@ class RemoteController(Node):
         rep_arm_quat = rep['action']['arm_quat'].tolist()
         rep_gripper = rep['action']['gripper_pos'].tolist()
 
-        self.get_logger().info(f"Base pose: {rep_base_pose}, Arm pos: {rep_arm_pos}, Arm quat: {rep_arm_quat}, Gripper: {rep_gripper}")
-        # Offset the arm position by the base offset
-        try:
-            offset = self.tf_buffer.lookup_transform(
-                "world", "arm_base_link", Time()
-            )
-        except (LookupException, ExtrapolationException) as e:
-            self.get_logger().error(f"TF lookup failed: {e}")
-            return None, None
-
-        abs_arm_pos = [rep_arm_pos[0] + offset.transform.translation.x,
-                       rep_arm_pos[1] + offset.transform.translation.y,
-                       rep_arm_pos[2] + offset.transform.translation.z]
-        # abs_arm_quat = quaternion_multiply([offset.transform.rotation.w, offset.transform.rotation.x, offset.transform.rotation.y, offset.transform.rotation.z], rep_arm_quat)
-        abs_arm_quat = rep_arm_quat
+        z_rot = R.from_rotvec([0, 0, base_yaw])
+        arm_target_pos = (z_rot.apply(np.array(rep_arm_pos, dtype=float)) + self.base_arm_offset).tolist()
+        arm_target_quat = (z_rot * R.from_quat(rep_arm_quat)).as_quat().tolist()
         arm_command = Pose()
-        arm_command.position.x = abs_arm_pos[0]
-        arm_command.position.y = abs_arm_pos[1]
-        arm_command.position.z = abs_arm_pos[2]
-        arm_command.orientation.x = abs_arm_quat[0]
-        arm_command.orientation.y = abs_arm_quat[1]
-        arm_command.orientation.z = abs_arm_quat[2]
-        arm_command.orientation.w = abs_arm_quat[3]
+        arm_command.position.x = arm_target_pos[0]
+        arm_command.position.y = arm_target_pos[1]
+        arm_command.position.z = arm_target_pos[2]
+        arm_command.orientation.x = arm_target_quat[0]
+        arm_command.orientation.y = arm_target_quat[1]
+        arm_command.orientation.z = arm_target_quat[2]
+        arm_command.orientation.w = arm_target_quat[3]
         self.arm_pub.publish(arm_command)
 
         base_command = Float64MultiArray()
-        base_command.data = [
-            rep_base_pose[0],
-            rep_base_pose[1],
-            rep_base_pose[2]]
+        base_command.data = [rep_base_pose[0], rep_base_pose[1], rep_base_pose[2]]
         self.base_pub.publish(base_command)
+        if self.use_sim:
+            self.base_pub_sim.publish(base_command)
 
         if rep_gripper is not None:
             gripper_command = Float64()
-            gripper_command.data = rep_gripper[0] / 0.81
+            gripper_command.data = float(rep_gripper[0])
             self.gripper_pub.publish(gripper_command)
 
     def reset_env_callback(self, request, response):
@@ -222,7 +213,7 @@ class RemoteController(Node):
         try:
             # get the relative transform from base to end effector
             transform = self.tf_buffer.lookup_transform(
-                "arm_base_link", "end_effector_link", Time()
+                "arm_base_link", "bracelet_link", Time()
             )
             return [transform.transform.translation.x,
                     transform.transform.translation.y,

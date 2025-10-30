@@ -16,8 +16,6 @@ from moveit_configs_utils import MoveItConfigsBuilder
 from moveit_configs_utils.launches import generate_move_group_launch
 
 def generate_launch_description():
-    tidybot_moveit_pkg = FindPackageShare("tidybot_moveit_config")
-    tidybot_description_pkg = FindPackageShare("tidybot_description")
 
     use_sim = DeclareLaunchArgument(
         "use_sim",
@@ -33,16 +31,7 @@ def generate_launch_description():
     moveit_config = MoveItConfigsBuilder("tidybot", package_name="tidybot_moveit_config").to_moveit_configs()
     moveit_config.robot_description["use_sim_time"] = True
 
-    rviz_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution([tidybot_description_pkg, "launch", "display.launch.py"])
-        ),
-        launch_arguments={
-            "ignore_timestamp": "false",
-            "jsp_gui": "false"
-        }.items(),
-        condition=UnlessCondition(LaunchConfiguration("use_sim"))
-    )
+    # Teleop launch does not include RViz, align remote launch accordingly
 
     kinematics_yaml_path = os.path.join(
         get_package_share_directory('tidybot_moveit_config'),
@@ -58,14 +47,15 @@ def generate_launch_description():
         executable="teleop_server",
         name="teleop_server",
         output="screen",
+        parameters=[{"record": False}],
     )
 
     teleop_controller = Node(
         package="tidybot_control",
         executable="remote_controller",
-        name="teleop_controller",
+        name="remote_controller",
         output="screen",
-        parameters=[{"use_sim_time": True},
+        parameters=[{"use_sim_time": LaunchConfiguration("use_sim")},
                     {"use_sim": LaunchConfiguration("use_sim")}],
         remappings=[
             ("/tf", "/tf_relay"),
@@ -79,16 +69,16 @@ def generate_launch_description():
         name="state_controller",
         output="screen",
         parameters=[{"use_sim": LaunchConfiguration("use_sim")},
-                    {"use_remote": True}],
+                    {"use_remote": True},
+                    {"record": False}],
     )
     
-    teleop_to_moveit = Node(
+    moveit_ee_pose_ik = Node(
         package="tidybot_solver",
-        executable="teleop_to_moveit",
-        name="teleop_to_moveit",
+        executable="moveit_ee_pose_ik",
+        name="moveit_ee_pose_ik",
         output="screen",
         parameters=[{"robot_description_kinematics": kinematics_config}],
-        condition=IfCondition(LaunchConfiguration("use_sim"))
     )
 
     # Generate the move group launch description
@@ -96,10 +86,9 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim,
-        rviz_launch,
         teleop_server,
         teleop_controller,
         state_controller,
-        teleop_to_moveit,
+        moveit_ee_pose_ik,
         move_group_launch
     ])
