@@ -68,7 +68,7 @@
     </model>
     <model name="cube">
       <!-- Lift 0.5 m so the bottom sits on z=0 -->
-      <pose>0.6 0 0.02 0 0 0</pose>
+      <pose>1.0 0 0.02 0 0 0</pose>
       <static>false</static>
 
       <link name="link">

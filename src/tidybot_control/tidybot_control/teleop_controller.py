@@ -14,6 +14,7 @@ from geometry_msgs.msg import Quaternion, TransformStamped, Vector3
 from scipy.spatial.transform import Rotation as R
 from tf_transformations import quaternion_multiply, quaternion_inverse
 import tf2_ros
+from tf2_geometry_msgs import do_transform_pose
 from tf2_ros import TransformBroadcaster
 import numpy as np
 import math
@@ -175,14 +176,12 @@ class TeleopController(Node):
                     z_rot_inv = z_rot.inv()
                     ref_z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.arm_ref_base_yaw)
 
-                    # Position
-                    pos_diff = xr_pos - self.arm_xr_ref_pos  # WebXR
-                    # Map XR delta into current base-aligned local frame and apply to local ref
-                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff) + np.array(
-                        self.base_arm_offset
-                    ) + np.array([self.base_obs[0], self.base_obs[1], 0.0])
+                    # Position (publish in arm_base_link local frame)
+                    pos_diff = xr_pos - self.arm_xr_ref_pos  # WebXR delta in XR/world frame
+                    # Map XR delta into current base-aligned local frame; arm_base_link aligns with base axes
+                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff)
 
-                    # Orientation
+                    # Orientation (local frame): map XR delta into current base-aligned local frame
                     arm_target_quat = (
                         z_rot_inv * (xr_quat * self.arm_xr_ref_rot_inv) * ref_z_rot
                     ) * self.arm_ref_quat
@@ -197,6 +196,7 @@ class TeleopController(Node):
                         arm_command.orientation.z,
                         arm_command.orientation.w,
                     ) = arm_target_quat.as_quat()
+
                     self.arm_pub.publish(arm_command)
 
                     gripper_command = Float64()
@@ -239,24 +239,6 @@ class TeleopController(Node):
         return response
 
     def send_home_commands(self):
-        # Publish base home pose
-        base_cmd = Float64MultiArray()
-        base_cmd.data = [self.base_home_pose[0], self.base_home_pose[1], self.base_home_pose[2]]
-        self.base_pub.publish(base_cmd)
-        if self.use_sim:
-            self.base_pub_sim.publish(base_cmd)
-
-        # Publish arm home pose (assumed in global/base frame as defined)
-        arm_cmd = Pose()
-        arm_cmd.position.x = float(self.arm_home_pos[0])
-        arm_cmd.position.y = float(self.arm_home_pos[1])
-        arm_cmd.position.z = float(self.arm_home_pos[2])
-        arm_cmd.orientation.x = float(self.arm_home_quat[0])
-        arm_cmd.orientation.y = float(self.arm_home_quat[1])
-        arm_cmd.orientation.z = float(self.arm_home_quat[2])
-        arm_cmd.orientation.w = float(self.arm_home_quat[3])
-        self.arm_pub.publish(arm_cmd)
-
         # Publish gripper home
         grip_cmd = Float64()
         grip_cmd.data = float(self.gripper_home_pos)

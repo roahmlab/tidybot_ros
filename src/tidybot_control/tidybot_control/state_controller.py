@@ -66,17 +66,13 @@ class StateController(Node):
                 if self.state == State.IDLE or self.state == State.EPISODE_FINISHED:
                     self.get_logger().info(f"{GREEN}{BOLD}Resetting environment...{RESET}")
                     self.state = State.ENVIRONMENT_RESET
-                    # Reset the remote policy server if using remote control
-                    if self.use_remote:
-                        self.reset_remote_cli.call_async(Empty.Request())
                     # Reset the environment
                     if self.use_sim:
                         subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
                     else:
                         self.reset_base_cli.call_async(Empty.Request())
                         self.reset_arm_cli.call_async(Empty.Request())
-                    # Reset teleop controller internal state and send home commands
-                    self.get_logger().info("Resetting controller...")
+                    # Reset Controller
                     self.reset_controller_cli.call_async(Empty.Request())
             case "episode_started":
                 if self.state == State.IDLE or self.state == State.ENVIRONMENT_RESET:

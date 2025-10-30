@@ -37,7 +37,7 @@ class RemoteController(Node):
 
         # Reset service for remote controller (align with state_controller expectations)
         self.reset_service = self.create_service(
-            Empty, "/remote_controller/reset", self.reset_env_callback
+            Empty, "/tidybot/controller/reset", self.reset_env_callback
         )
 
         self.control_timer = self.create_timer(
@@ -124,31 +124,30 @@ class RemoteController(Node):
         #     return
         # Send observation to policy server
         req = {'obs': obs}
-        self.get_logger().info(f"Sending request to policy server: {req}")
+        # self.get_logger().info(f"Sending request to policy server: {req}")
         self.socket.send_pyobj(req)
 
         rep = self.socket.recv_pyobj()
-        self.get_logger().info(f"Received response from policy server: {rep}")
+        # self.get_logger().info(f"Received response from policy server: {rep}")
 
         if rep['action'] is None:
             self.get_logger().warn("Received None actions from policy server, skipping control loop")
             return
+        # Print the received action
+        self.get_logger().info(f"Received action: {rep['action']}")
         rep_base_pose = rep['action']['base_pose'].tolist()
         rep_arm_pos = rep['action']['arm_pos'].tolist()
         rep_arm_quat = rep['action']['arm_quat'].tolist()
         rep_gripper = rep['action']['gripper_pos'].tolist()
 
-        z_rot = R.from_rotvec([0, 0, base_yaw])
-        arm_target_pos = (z_rot.apply(np.array(rep_arm_pos, dtype=float)) + self.base_arm_offset).tolist()
-        arm_target_quat = (z_rot * R.from_quat(rep_arm_quat)).as_quat().tolist()
         arm_command = Pose()
-        arm_command.position.x = arm_target_pos[0]
-        arm_command.position.y = arm_target_pos[1]
-        arm_command.position.z = arm_target_pos[2]
-        arm_command.orientation.x = arm_target_quat[0]
-        arm_command.orientation.y = arm_target_quat[1]
-        arm_command.orientation.z = arm_target_quat[2]
-        arm_command.orientation.w = arm_target_quat[3]
+        arm_command.position.x = rep_arm_pos[0]
+        arm_command.position.y = rep_arm_pos[1]
+        arm_command.position.z = rep_arm_pos[2]
+        arm_command.orientation.x = rep_arm_quat[0]
+        arm_command.orientation.y = rep_arm_quat[1]
+        arm_command.orientation.z = rep_arm_quat[2]
+        arm_command.orientation.w = rep_arm_quat[3]
         self.arm_pub.publish(arm_command)
 
         base_command = Float64MultiArray()
@@ -182,24 +181,6 @@ class RemoteController(Node):
         return response
 
     def send_home_commands(self):
-        # Base home
-        base_msg = Float64MultiArray()
-        base_msg.data = [self.base_home_pose[0], self.base_home_pose[1], self.base_home_pose[2]]
-        self.base_pub.publish(base_msg)
-        if self.use_sim:
-            self.base_pub_sim.publish(base_msg)
-
-        # Arm home
-        arm_msg = Pose()
-        arm_msg.position.x = float(self.arm_home_pos[0])
-        arm_msg.position.y = float(self.arm_home_pos[1])
-        arm_msg.position.z = float(self.arm_home_pos[2])
-        arm_msg.orientation.x = float(self.arm_home_quat[0])
-        arm_msg.orientation.y = float(self.arm_home_quat[1])
-        arm_msg.orientation.z = float(self.arm_home_quat[2])
-        arm_msg.orientation.w = float(self.arm_home_quat[3])
-        self.arm_pub.publish(arm_msg)
-
         # Gripper home
         grip_msg = Float64()
         grip_msg.data = float(self.gripper_home_pos)

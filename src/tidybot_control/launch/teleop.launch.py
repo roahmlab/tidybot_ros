@@ -98,7 +98,11 @@ def generate_launch_description():
         executable="moveit_ee_pose_ik",
         name="moveit_ee_pose_ik",
         output="screen",
-        parameters=[{"robot_description_kinematics": kinematics_config}],
+        parameters=[{"robot_description_kinematics": kinematics_config},
+                    {"planning_frame": "arm_base_link"},
+                    {"use_sim_time": LaunchConfiguration("use_sim")}],
+        remappings=[("/tf", "/tf_relay"),
+                    ("/tf_static", "/tf_static_relay")],
     )
 
     move_group_launch = generate_move_group_launch(moveit_config)
