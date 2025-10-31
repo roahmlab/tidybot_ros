@@ -11,6 +11,7 @@
  * - observations/     : ROS2 bag with robot state (poses, joint states)
  * - base_camera.mp4   : Video from base camera
  * - arm_camera.mp4    : Video from arm camera
+ * - ext_camera.mp4    : Video from external camera
  * 
  * Services:
  * - /start_recording  : Start recording an episode
@@ -73,8 +74,10 @@ private:
     // Camera subscriptions
     image_transport::Subscriber base_image_sub_;
     image_transport::Subscriber arm_image_sub_;
+    image_transport::Subscriber ext_image_sub_;
     sensor_msgs::msg::Image::ConstSharedPtr last_base_image_;
     sensor_msgs::msg::Image::ConstSharedPtr last_arm_image_;
+    sensor_msgs::msg::Image::ConstSharedPtr last_ext_image_;
 
     // Latest observation buffers (updated outside writer loop)
     geometry_msgs::msg::PoseStamped latest_base_pose_;
@@ -113,10 +116,13 @@ private:
     // Video writers
     cv::VideoWriter base_video_writer_;
     cv::VideoWriter arm_video_writer_;
+    cv::VideoWriter ext_video_writer_;
     bool base_video_initialized_ = false;
     bool arm_video_initialized_ = false;
+    bool ext_video_initialized_ = false;
     std::string base_video_filename_;
     std::string arm_video_filename_;
+    std::string ext_video_filename_;
 
     // Synchronized recording timer
     rclcpp::TimerBase::SharedPtr record_timer_;
@@ -215,6 +221,11 @@ private:
             [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
                 last_arm_image_ = msg;
             }, "raw");
+        ext_image_sub_ = image_transport::create_subscription(
+            this, "/tidybot/camera/ext/color/raw",
+            [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
+                last_ext_image_ = msg;
+            }, "raw");
     }
 
     void setup_action_subscriptions()
@@ -285,6 +296,7 @@ private:
         // Setup video files inside episode directory
         base_video_filename_ = episode_dir + "/base_camera.mp4";
         arm_video_filename_ = episode_dir + "/arm_camera.mp4";
+    ext_video_filename_ = episode_dir + "/ext_camera.mp4";
         
         // Prime observation buffers immediately
         update_observation_buffers();
@@ -323,6 +335,11 @@ private:
         {
             arm_video_writer_.release();
             RCLCPP_INFO(this->get_logger(), "Arm video closed: %s", arm_video_filename_.c_str());
+        }
+        if (ext_video_writer_.isOpened())
+        {
+            ext_video_writer_.release();
+            RCLCPP_INFO(this->get_logger(), "Ext video closed: %s", ext_video_filename_.c_str());
         }
 
         recording_enabled_ = false;
@@ -507,10 +524,10 @@ private:
     bool perform_write_once()
     {
         // Ensure we have images to write a frame
-        if (!last_base_image_ || !last_arm_image_)
+        if (!last_base_image_ || !last_arm_image_ || !last_ext_image_)
         {
             RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                 "Skipping write: waiting for camera frames");
+                                 "Skipping write: waiting for camera frames (base/arm/ext)");
             return false;
         }
         // Ensure we have observations
@@ -557,6 +574,7 @@ private:
         {
             auto base_cv = cv_bridge::toCvCopy(last_base_image_, sensor_msgs::image_encodings::BGR8);
             auto arm_cv = cv_bridge::toCvCopy(last_arm_image_, sensor_msgs::image_encodings::BGR8);
+            auto ext_cv = cv_bridge::toCvCopy(last_ext_image_, sensor_msgs::image_encodings::BGR8);
 
             if (!base_video_initialized_)
             {
@@ -578,11 +596,22 @@ private:
                 else
                     RCLCPP_ERROR(this->get_logger(), "%sFailed to open arm video writer%s", RED, RESET);
             }
+            if (!ext_video_initialized_)
+            {
+                cv::Size frame_size(ext_cv->image.cols, ext_cv->image.rows);
+                int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
+                ext_video_writer_.open(ext_video_filename_, fourcc, fps_, frame_size, true);
+                if (ext_video_writer_.isOpened())
+                    ext_video_initialized_ = true;
+                else
+                    RCLCPP_ERROR(this->get_logger(), "%sFailed to open ext video writer%s", RED, RESET);
+            }
 
-            if (base_video_initialized_ && arm_video_initialized_)
+            if (base_video_initialized_ && arm_video_initialized_ && ext_video_initialized_)
             {
                 base_video_writer_ << base_cv->image;
                 arm_video_writer_ << arm_cv->image;
+                ext_video_writer_ << ext_cv->image;
             }
         }
         catch (cv_bridge::Exception &e)
