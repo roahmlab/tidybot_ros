@@ -20,7 +20,7 @@ from tf_transformations import quaternion_multiply, euler_from_quaternion
 import numpy as np
 from scipy.spatial.transform import Rotation as R
 
-REMOTE_CONTROL_FREQUENCY = 20  # Hz
+REMOTE_CONTROL_FREQUENCY = 10  # Hz
 
 class RemoteController(Node):
     def __init__(self):

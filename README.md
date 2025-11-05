@@ -30,7 +30,7 @@ Hardware interface for real robot control.
 - Camera streaming capabilities
 - Joint state publishing and command handling
 
-#### `tidybot_control`
+#### `tidybot_teleop`
 Teleoperation and remote control systems.
 - WebXR-based smartphone teleoperation
 - Remote policy server integration
@@ -156,17 +156,31 @@ ros2 launch tidybot_driver launch_hardware_robot.launch.py mode:=full
 ### 1. Phone Teleop mode
 Publish the WebXR app for phone and tablet to connect and relay the web messages to the robot
 ```bash
-ros2 launch tidybot_control teleop.launch.py use_sim:=true
+ros2 launch tidybot_teleop teleop.launch.py use_sim:=true
 ```
 
 ### 2. Joystick mode
 Connect to the gamepad and relay joystick messages to the robot
 ```bash
-ros2 launch tidybot_control joystick.launch.py use_sim:=true
+ros2 launch tidybot_teleop joystick.launch.py use_sim:=true
 ```
 
 ### 3. Remote mode
-TODO
+Following the GPU Laptop setup guide in [Original Tidybot++ Codebase](https://github.com/jimmyyhwu/tidybot2#gpu-laptop). Then copy the `policy_server.py` into the diffusion policy codebase ans start the policy server on the GPU server following [this](https://github.com/jimmyyhwu/tidybot2#policy-inference). 
+
+After setup the GPU laptop, connect the machine running low level control to the server by
+
+```bash
+ssh -L 5555:localhost:5555 <gpu-laptop-hostname>
+```
+
+and launch the remote teleoperation by
+
+```bash
+ros2 launch tidybot_teleop remote.launch.py 
+```
+
+Set up the ssh connection between 
 
 ## 📊 Data Collection
 
@@ -240,7 +254,8 @@ TODO
 - [The original Tidybot++ project](https://tidybot2.github.io/)
 - [MoveIt2](https://moveit.ros.org/)
 - [Kinova Gen3 ROS2](https://github.com/Kinovarobotics/ros2_kortex)
-
+- [OrbbecSDK ROS2](https://github.com/orbbec/OrbbecSDK_ROS2)
+- [Diffusion Policy](https://github.com/real-stanford/diffusion_policy)
 ---
 
 *TidyBot++ Platform - Enabling advanced mobile manipulation research and applications*

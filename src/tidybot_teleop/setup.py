@@ -1,9 +1,8 @@
 from setuptools import find_packages, setup
 
 from glob import glob
-import os
 
-package_name = 'tidybot_control'
+package_name = 'tidybot_teleop'
 
 setup(
     name=package_name,
@@ -26,16 +25,16 @@ setup(
     zip_safe=True,
     maintainer='janchen',
     maintainer_email='janchen@umich.edu',
-    description='Tidybot remote control package for ROS2',
+    description='Tidybot teleoperation package for ROS2',
     license='Apache License 2.0',
     entry_points={
         'console_scripts': [
-            'teleop_server = tidybot_control.teleop_server:main',
-            'teleop_controller = tidybot_control.teleop_controller:main',
-            'state_controller = tidybot_control.state_controller:main',
-            'reset_env = tidybot_control.reset_env:main',
-            'remote_controller = tidybot_control.remote_controller:main',
-            'joystick_controller = tidybot_control.joystick_controller:main',
+            'phone_teleop_server = tidybot_teleop.phone_teleop_server:main',
+            'phone_teleop = tidybot_teleop.phone_teleop:main',
+            'state_controller = tidybot_teleop.state_controller:main',
+            'reset_env = tidybot_teleop.reset_env:main',
+            'remote_teleop = tidybot_teleop.remote_teleop:main',
+            'joystick_teleop = tidybot_teleop.joystick_teleop:main',
         ],
     },
 )

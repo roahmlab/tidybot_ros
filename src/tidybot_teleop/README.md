@@ -1,4 +1,4 @@
-# tidybot_control
+# tidybot_teleop
 
 ## 📖 Overview
 
@@ -34,10 +34,10 @@ Launch WebXR-based smartphone teleoperation system.
 
 ```bash
 # Launch with simulation
-ros2 launch tidybot_control teleop.launch.py use_sim:=true
+ros2 launch tidybot_teleop teleop.launch.py use_sim:=true
 
 # Launch with real hardware
-ros2 launch tidybot_control teleop.launch.py use_sim:=false
+ros2 launch tidybot_teleop teleop.launch.py use_sim:=false
 ```
 
 **Parameters:**
@@ -61,7 +61,7 @@ Launch remote policy server control with human oversight.
 
 ```bash
 # Launch remote policy mode
-ros2 launch tidybot_control remote.launch.py use_sim:=true
+ros2 launch tidybot_teleop remote.launch.py use_sim:=true
 ```
 
 **Parameters:**
@@ -78,7 +78,7 @@ Launch gamepad-based control system.
 
 ```bash
 # Launch joystick control
-ros2 launch tidybot_control joystick.launch.py
+ros2 launch tidybot_teleop joystick.launch.py
 ```
 
 **Supported Controllers:**

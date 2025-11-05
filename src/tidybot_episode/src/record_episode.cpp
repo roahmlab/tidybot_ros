@@ -70,7 +70,7 @@ public:
                 "/robotiq_2f_85_controller/joint_trajectory", 10,
                 std::bind(&EpisodeRecorder::gripper_cmd_sim_callback, this, std::placeholders::_1));
         }
-        // If not in simulation, subscribe to the tidybot_control topics
+        // If not in simulation, subscribe to the tidybot_teleop topics
         else
         {
             base_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(

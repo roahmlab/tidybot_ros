@@ -222,7 +222,7 @@ private:
                 last_arm_image_ = msg;
             }, "raw");
         ext_image_sub_ = image_transport::create_subscription(
-            this, "/tidybot/camera/ext/color/raw",
+            this, "/tidybot/camera_ext/color/raw",
             [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
                 last_ext_image_ = msg;
             }, "raw");

@@ -63,7 +63,7 @@ ros2 run tidybot_solver keyboard_input
 - Trajectory execution monitoring
 
 ### `joystick_twist.launch.py`
-Launch joystick-controlled servo system with MoveIt2 integration. Included in tidybot_control package
+Launch joystick-controlled servo system with MoveIt2 integration. Included in tidybot_teleop package
 
 **Features:**
 - Real-time servo control via joystick

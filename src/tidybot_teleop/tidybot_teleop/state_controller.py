@@ -68,7 +68,7 @@ class StateController(Node):
                     self.state = State.ENVIRONMENT_RESET
                     # Reset the environment
                     if self.use_sim:
-                        subprocess.run(["ros2", "run", "tidybot_control", "reset_env"])
+                        subprocess.run(["ros2", "run", "tidybot_teleop", "reset_env"])
                     else:
                         self.reset_base_cli.call_async(Empty.Request())
                         self.reset_arm_cli.call_async(Empty.Request())

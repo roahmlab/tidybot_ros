@@ -42,18 +42,18 @@ def generate_launch_description():
     with open(kinematics_yaml_path, 'r') as f:
         kinematics_config = yaml.safe_load(f)
 
-    teleop_server = Node(
-        package="tidybot_control",
-        executable="teleop_server",
-        name="teleop_server",
+    phone_teleop_server = Node(
+        package="tidybot_teleop",
+        executable="phone_teleop_server",
+        name="phone_teleop_server",
         output="screen",
         parameters=[{"record": False}],
     )
 
-    teleop_controller = Node(
-        package="tidybot_control",
-        executable="remote_controller",
-        name="remote_controller",
+    remote_teleop = Node(
+        package="tidybot_teleop",
+        executable="remote_teleop",
+        name="remote_teleop",
         output="screen",
         parameters=[{"use_sim_time": LaunchConfiguration("use_sim")},
                     {"use_sim": LaunchConfiguration("use_sim")}],
@@ -64,7 +64,7 @@ def generate_launch_description():
     )
 
     state_controller = Node(
-        package="tidybot_control",
+        package="tidybot_teleop",
         executable="state_controller",
         name="state_controller",
         output="screen",
@@ -90,8 +90,8 @@ def generate_launch_description():
 
     return LaunchDescription([
         use_sim,
-        teleop_server,
-        teleop_controller,
+        phone_teleop_server,
+        remote_teleop,
         state_controller,
         moveit_ee_pose_ik,
         move_group_launch

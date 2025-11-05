@@ -14,19 +14,19 @@ import os
 from ament_index_python.packages import get_package_share_directory
 
 
-def launch_controller(context, *args, **kwargs):
+def launch_joystick_teleop(context, *args, **kwargs):
     controller_type = LaunchConfiguration("controller_type").perform(context)
     config_path = os.path.join(
-        get_package_share_directory("tidybot_control"),
+        get_package_share_directory("tidybot_teleop"),
         "config",
         f"{controller_type}_config.yaml",
     )
     if not os.path.isfile(config_path):
         raise RuntimeError(f"Controller config not found: {config_path}")
     node = Node(
-        package="tidybot_control",
-        executable="joystick_controller",
-        name="joystick_controller",
+        package="tidybot_teleop",
+        executable="joystick_teleop",
+        name="joystick_teleop",
         parameters=[
             config_path,
             {"use_sim": LaunchConfiguration("use_sim")},
@@ -38,7 +38,7 @@ def launch_controller(context, *args, **kwargs):
 
 def generate_launch_description():
 
-    package_dir = get_package_share_directory("tidybot_control")
+    package_dir = get_package_share_directory("tidybot_teleop")
     solver_pkg_dir = get_package_share_directory("tidybot_solver")
     joy_node_config = os.path.join(package_dir, "config", "joy_node_config.yaml")
     controller_arg = DeclareLaunchArgument(
@@ -61,7 +61,7 @@ def generate_launch_description():
         parameters=[joy_node_config],
     )
 
-    controller_node = OpaqueFunction(function=launch_controller)
+    joystick_teleop = OpaqueFunction(function=launch_joystick_teleop)
 
     # Use our custom joystick_to_moveit node with C++ Servo API
     moveit_servo_sim = IncludeLaunchDescription(
@@ -91,7 +91,7 @@ def generate_launch_description():
             use_sim_arg,
             controller_arg,
             joy_node,
-            controller_node,
+            joystick_teleop,
             moveit_servo_sim,
             moveit_servo_hardware,
         ]
