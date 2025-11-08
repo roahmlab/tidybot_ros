@@ -28,40 +28,6 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
 
-add_executable(actions_recorder src/actions_recorder.cpp)
-ament_target_dependencies(actions_recorder
-  rclcpp
-  rosbag2_cpp
-  rosbag2_storage
-  std_msgs
-  std_srvs
-  sensor_msgs
-  geometry_msgs
-  trajectory_msgs
-  rosidl_runtime_cpp
-  cv_bridge
-  image_transport
-  OpenCV
-  tf2_ros
-)
-
-add_executable(obs_recorder src/obs_recorder.cpp)
-ament_target_dependencies(obs_recorder
-  rclcpp
-  rosbag2_cpp
-  rosbag2_storage
-  std_msgs
-  std_srvs
-  sensor_msgs
-  geometry_msgs
-  trajectory_msgs
-  rosidl_runtime_cpp
-  cv_bridge
-  image_transport
-  OpenCV
-  tf2_ros
-)
-
 add_executable(rosbag_to_hdf5 src/rosbag_to_hdf5.cpp)
 ament_target_dependencies(rosbag_to_hdf5
   rclcpp
@@ -97,12 +63,6 @@ ament_target_dependencies(synchronized_recorder
   tf2
 )
 
-install(TARGETS actions_recorder
-  DESTINATION lib/${PROJECT_NAME}
-)
-install(TARGETS obs_recorder
-  DESTINATION lib/${PROJECT_NAME}
-)
 install(TARGETS rosbag_to_hdf5
   DESTINATION lib/${PROJECT_NAME}
 )

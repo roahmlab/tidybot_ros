@@ -160,7 +160,7 @@ def main():
     # Get record flag from ROS param server if declared on this process via launch
     record_enabled = False
     try:
-        node_for_params = rclpy.create_node('teleop_server_params')
+        node_for_params = rclpy.create_node('phone_teleop_server_params')
         node_for_params.declare_parameter('record', False)
         record_enabled = node_for_params.get_parameter('record').get_parameter_value().bool_value
         node_for_params.destroy_node()

@@ -41,7 +41,7 @@ def generate_launch_description():
             os.path.join(
                 get_package_share_directory("tidybot_description"),
                 "launch",
-                "sim_arm.launch.py",
+                "launch_sim_arm.launch.py",
             )
         )
     )

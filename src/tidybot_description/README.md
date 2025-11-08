@@ -2,29 +2,27 @@
 
 ## 📖 Overview
 
-This package contains the complete robot description and simulation setup for the TidyBot++ mobile manipulator. It defines the robot's physical structure, visual appearance, collision properties, and simulation behavior using URDF/XACRO files.
+`tidybot_description` captures the URDF/XACRO source for the TidyBot++ platform, including meshes, controller interfaces, and Gazebo plugins. The package feeds robot_state_publisher on hardware (via `tidybot_driver`) and acts as the foundation for simulation launch files consumed by `tidybot_teleop`, `tidybot_solver`, and Gazebo workflows.
 
 ## 🤖 Robot Components
 
-The TidyBot++ description includes:
+The TidyBot++ description includes simulation and visualization models for:
 
-### **Mobile Base (TidyBot++)**
-- Omnidirectional mobile platform
-- Holonomic drive system (3-DOF: x, y, θ)
-- Custom base geometry and inertial properties
+### **Base Platform**
+- Powered-caster holonomic base with omnidirectional drive (x, y, yaw)
+- Configurable in position or velocity control modes (`tidybot_controllers.yaml`)
 
-### **Manipulator (Kinova Gen3 7-DOF)**
-- 7 degree-of-freedom articulated arm
-- Spherical wrist design
-- Collision meshes for safe planning
+### **Manipulator Stack**
+- Kinova Gen3 7-DOF arm with compliant joint controller support
+- Transmission macros and ROS2 control interfaces for joint trajectory execution
 
-### **End Effector (Robotiq 2F-85)**
-- Parallel jaw gripper
-- Adaptive finger design
-- Customizable finger tips
+### **End Effectors**
+- Robotiq 2F-85 grasping configuration with visual/collision meshes
+- Placeholder macros for Kinova Lite gripper variants
 
-### **Sensor Suite**
-- Integrated camera systems
+### **Vision & Sensors**
+- Wrist camera frame hierarchy and extrinsics
+- External camera links for Orbbec base camera and auxiliary sensors
 
 ## 📁 Package Structure
 
@@ -32,13 +30,13 @@ The TidyBot++ description includes:
 tidybot_description/
 ├── config/
 │   ├── tidybot_controllers.yaml      # ROS2 control configuration
-│   ├── arm.rviz                      # RViz config for arm-only
+│   ├── arm.rviz                      # RViz config for arm-only test
 │   └── tidybot.rviz                  # RViz config for full robot
 ├── launch/
 │   ├── description.launch.py         # Basic robot state publisher
 │   ├── display.launch.py             # RViz visualization
-│   ├── sim_arm.launch.py             # Arm-only simulation
-│   └── sim_tidybot.launch.py         # Full robot simulation
+│   ├── launch_sim_arm.launch.py      # Arm-only simulation for manipulation test
+│   └── launch_sim_robot.launch.py    # Full robot simulation
 ├── urdf/
 │   ├── tidybot.xacro                 # Main robot description
 │   ├── bot.xacro                     # Robot assembly macro
@@ -46,11 +44,9 @@ tidybot_description/
 │   ├── tidybot.ros2_control.xacro    # Control interface definition
 │   ├── tidybot.gazebo.xacro          # Gazebo plugins and properties
 │   ├── arms/                         # Arm-specific descriptions
-│   │   └── gen3_7dof/
 │   ├── grippers/                     # Gripper descriptions
-│   │   └── robotiq_2f_85/
-│   └── base/                         # Base platform descriptions
-│       └── tidybot++/
+│   ├── base/                         # Base platform descriptions       
+│   └── world/                        # Demo world
 ├── meshes/                           # 3D model files (STL, DAE) for the robot
 └── models/                           # 3D models obtained from openrobotics
 ```
@@ -70,7 +66,7 @@ ros2 launch tidybot_description description.launch.py
 - `ignore_timestamp` (bool): Ignore timestamps in robot_state_publisher (default: false)
 
 ### `display.launch.py`
-Launch RViz visualization with optional joint state publisher GUI.
+Launch RViz visualization with optional joint state publisher GUI to visualize the robot and test joint configurations.
 
 ```bash
 ros2 launch tidybot_description display.launch.py jsp_gui:=true
@@ -82,7 +78,7 @@ ros2 launch tidybot_description display.launch.py jsp_gui:=true
 - `robot_description_content` (string): URDF content (default: tidybot.xacro)
 - `use_sim_time` (bool): Use simulation time (default: false)
 
-### `sim_arm.launch.py`
+### `launch_sim_arm.launch.py`
 Launch arm-only simulation in Gazebo.
 
 ```bash
@@ -94,8 +90,8 @@ ros2 launch tidybot_description sim_arm.launch.py
 - `rviz_config` (string): RViz configuration file (default: arm.rviz)
 - `world` (string): The simulated world (default: empty, choices: office|warehouse|fetch_coke|fetch_cube)
 
-### `sim_tidybot.launch.py`
-Launch full robot simulation in Gazebo.
+### `launch_sim_robot.launch.py`
+Launch full robot simulation in Gazebo for manipulation test.
 
 ```bash
 ros2 launch tidybot_description sim_tidybot.launch.py base_mode:=velocity
@@ -112,46 +108,24 @@ ros2 launch tidybot_description sim_tidybot.launch.py base_mode:=velocity
 The package defines multiple controller configurations in `config/tidybot_controllers.yaml`:
 
 ### **Joint State Broadcaster**
-Publishes current joint states to `/joint_states` topic.
+- Publishes `/joint_states` from simulated sensors
 
 ### **Base Controllers**
-- `tidybot_base_pos_controller`: Position control for teleoperation
-- `tidybot_base_vel_controller`: Velocity control for joystick input
+- `tidybot_base_pos_controller` — pose-based control (teleop/simulation)
+- `tidybot_base_vel_controller` — velocity inputs (joystick servo pipeline)
 
 ### **Arm Controller**
-- `gen3_7dof_controller`: Joint trajectory controller for planned motions
+- `gen3_7dof_controller` — joint trajectory interface for MoveIt
 
 ### **Gripper Controller**
-- `robotiq_2f_85_controller`: Position controller for gripper actuation
+- `robotiq_2f_85_controller` — parallel gripper position controller
 
-## 🔧 Customization
+## 🔧 Customization & Tips
 
-### Adding New Components
-
-1. **New Arm Configuration:**
-   ```bash
-   mkdir urdf/arms/new_arm/
-   # Create new_arm_macro.xacro with load_arm macro
-   ```
-
-2. **New Gripper:**
-   ```bash
-   mkdir urdf/grippers/new_gripper/
-   # Create new_gripper_macro.xacro with load_gripper macro
-   ```
-
-3. **Custom Base:**
-   ```bash
-   mkdir urdf/base/custom_base/
-   # Create base_macro.xacro with load_base macro
-   ```
-
-### Modifying Robot Properties
-
-1. **Joint Limits:** Edit controller configurations in `config/tidybot_controllers.yaml`
-2. **Visual Properties:** Modify XACRO files in respective component directories
-3. **Physics Properties:** Update inertial properties and collision meshes
-4. **Sensor Integration:** Add sensor plugins in `tidybot.gazebo.xacro`
+- **Swap components**: copy an existing macro (e.g., `gen3_7dof_macro.xacro`) as a template for new arms/grippers/bases and update the inclusion in `bot.xacro`.
+- **Adjust joint limits / PID gains**: edit `config/tidybot_controllers.yaml` and regenerate controllers.
+- **Update visuals**: edit the corresponding XACRO/mesh files under `meshes/` and `urdf/`.
+- **Add sensors**: extend `tidybot.gazebo.xacro` with new Gazebo plugins and link attachments.
 
 ## 🐛 Troubleshooting
 

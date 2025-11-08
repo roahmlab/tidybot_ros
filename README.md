@@ -36,6 +36,7 @@ Teleoperation and remote control systems.
 - Remote policy server integration
 - Real-time control command processing
 - Episode recording integration
+- CLI entry points: `phone_teleop_server`, `phone_teleop`, `remote_teleop`, `joystick_teleop`, `state_controller`, `reset_env`
 
 #### `tidybot_solver`
 Motion planning and control integration.
