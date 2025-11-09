@@ -1,0 +1,5 @@
+repositories:
+  rlds_dataset_builder:
+    type: git
+    url: https://github.com/kpertsch/rlds_dataset_builder.git
+    version: main

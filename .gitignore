@@ -9,6 +9,7 @@ src/build
 venv
 episode_bag
 *.hdf5
+*.parquet
 
 # Ignore external packages
 /src/external/OrbbecSDK_ROS2

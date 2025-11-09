@@ -10,18 +10,23 @@ import pyarrow.parquet as pq
 import av
 import cv2
 import pinocchio as pin
+from rosbags.highlevel import AnyReader
+import pandas as pd
 
 import csv
 
-DATA_ROOT = 'kinova_small'
-PARQUET_DIR = os.path.join(DATA_ROOT, 'data/chunk-000')
-META_DIR = os.path.join(DATA_ROOT, 'meta')
-VIDEOS_DIR = os.path.join(DATA_ROOT, 'videos/chunk-000')
-EXTERN_CAMERA_DIR = os.path.join(VIDEOS_DIR, 'observation.images.cam_exterior')
-WRIST_CAMERA_DIR = os.path.join(VIDEOS_DIR, 'observation.images.cam_wrist')
+EPISODES_DIR = 'episode_bag'
+episode_dirs = sorted(glob.glob(os.path.join(EPISODES_DIR, "episode_*")))
+num_episodes = len(episode_dirs)
 
-class KinovaSmall(tfds.core.GeneratorBasedBuilder):
-    """DatasetBuilder for example dataset."""
+PARQUET_DIR = f"tidybot_vla_{num_episodes}"
+os.makedirs(PARQUET_DIR, exist_ok=True)
+
+ACTIONS_DIR = 'actions'
+OBSERVATIONS_DIR = 'observations'
+
+class TidybotVLA(tfds.core.GeneratorBasedBuilder):
+    """DatasetBuilder for tidybot recorded episodes."""
 
     VERSION = tfds.core.Version('1.0.0')
     RELEASE_NOTES = {
@@ -30,7 +35,6 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._embed = hub.load("https://tfhub.dev/google/universal-sentence-encoder-large/5")
 
     def _info(self) -> tfds.core.DatasetInfo:
         """Dataset metadata (homepage, citation,...)."""
@@ -125,12 +129,114 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
                 }),
             }))
 
-    def _split_generators(self, dl_manager: tfds.download.DownloadManager):
-        parquet_files = glob.glob(os.path.join(PARQUET_DIR, 'episode_*.parquet'))
-        return {
-            'train': self._generate_examples(parquet_files)
-        }
+    def _convert_rosbag_to_parquet(self, episode_dir: str) -> str:
+        """Convert actions + observations rosbags into one Parquet file."""
+        obs_bag = os.path.join(episode_dir, "observations")
+        act_bag = os.path.join(episode_dir, "actions")
+
+        episode_id = os.path.basename(episode_dir)
+        output_parquet = os.path.join(PARQUET_DIR, f"{episode_id}.parquet")
+
+        obs_states = []
+        timestamps = []
+
+        # ---- Read observations (arm_pose + gripper_state) ----
+        with AnyReader([obs_bag]) as reader:
+            arm_states, gripper_states = [], []
+
+            for conn, timestamp, rawdata in reader.messages():
+                if '/arm_pose' in conn.topic:
+                    msg = reader.deserialize(rawdata, conn.msgtype)
+                    obs_pose = msg.pose
+                    joint_state = self.inverse_kinematics([
+                        obs_pose.position.x,
+                        obs_pose.position.y,
+                        obs_pose.position.z,
+                        obs_pose.orientation.x,
+                        obs_pose.orientation.y,
+                        obs_pose.orientation.z,
+                        obs_pose.orientation.w,
+                    ])
+                    arm_states.append(joint_state)
+                    timestamps.append(timestamp * 1e-9)
+                elif '/gripper_state' in conn.topic:
+                    msg = reader.deserialize(rawdata, conn.msgtype)
+                    gripper_states.append(msg.data)
+
+            if len(arm_states) != len(gripper_states):
+                raise ValueError(f"Observed message count mismatch: {episode_id}")
+
+            obs_states = [np.concatenate([np.array(joints, dtype=np.float32), [float(g)]]) 
+                        for joints, g in zip(arm_states, gripper_states)]
+
+        # ---- Read actions (target_pose + gripper_command) ----
+        with AnyReader([act_bag]) as reader:
+            arm_target_poses, gripper_cmds = [], []
+
+            for conn, timestamp, rawdata in reader.messages():
+                if '/tidybot/arm/target_pose' in conn.topic:
+                    msg = reader.deserialize(rawdata, conn.msgtype)
+                    pose = msg  # geometry_msgs/msg/Pose
+                    arm_target_poses.append([
+                        pose.position.x, pose.position.y, pose.position.z,
+                        pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w
+                    ])
+                elif '/tidybot/gripper/commands' in conn.topic:
+                    msg = reader.deserialize(rawdata, conn.msgtype)
+                    gripper_cmds.append(float(msg.data))
+
+            if len(arm_target_poses) != len(gripper_cmds):
+                raise ValueError(f"Action message count mismatch: {episode_id}")
+
+        arm_target_poses = np.array(arm_target_poses, dtype=np.float32)  # shape (T, 7)
+        gripper_cmds = np.array(gripper_cmds, dtype=np.float32)
+
+        # Convert quaternions → RPY for delta computation
+        def quat_to_rpy(qx, qy, qz, qw):
+            R = pin.Quaternion(qw, qx, qy, qz).toRotationMatrix()
+            return pin.rpy.matrixToRpy(R)
+
+        eef_rpy = np.array([quat_to_rpy(*q[3:]) for q in arm_target_poses])
+        eef_xyz = arm_target_poses[:, :3]
+
+        # Compute deltas
+        dpos = np.diff(eef_xyz, axis=0, prepend=eef_xyz[[0]])          # (T, 3)
+        drpy = np.diff(eef_rpy, axis=0, prepend=eef_rpy[[0]])          # (T, 3)
+
+        eef_deltas = np.concatenate([dpos, drpy, gripper_cmds[:, None]], axis=1).astype(np.float32)  # (T, 7)
+
+        n = len(obs_states)
+        rows = []
+        for i in range(n):
+            rows.append({
+                "timestamp": timestamps[i],
+                "frame_index": i,
+                "episode_index": i,
+                "task_index": 0,
+                "observation.state": obs_states[i],
+                "observation.state_ros": obs_states[i],
+                "action": eef_deltas[i],
+                "reward": 0.0,
+                "discount": 1.0,
+                "index": i,
+            })
+
+        df = pd.DataFrame(rows)
+        df.to_parquet(output_parquet, index=False)
+        print(f"[INFO] Wrote {output_parquet} ({len(df)} steps)")
+        return output_parquet
     
+    def _split_generators(self, dl_manager: tfds.download.DownloadManager):
+        episode_dirs = sorted(glob.glob(os.path.join(EPISODES_DIR, 'episode_*')))
+        parquet_files = []
+
+        for episode_dir in episode_dirs:
+            pq_path = self._convert_rosbag_to_parquet(episode_dir)
+            if pq_path is not None:
+                parquet_files.append(pq_path)
+
+        return {'train': self._generate_examples(parquet_files)}
+        
     @staticmethod
     def crop_and_resize_single_image(image: np.ndarray, crop_scale: float, output_size=(224, 224)) -> np.ndarray:
         """
@@ -171,7 +277,7 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
     _fk_frame_id = None
 
     @classmethod
-    def compute_eef_deltas_from_joint_positions(cls, actions: np.ndarray) -> np.ndarray:
+    def inverse_kinematics(cls, pose: np.ndarray) -> np.ndarray:
         if cls._model is None:
             ee_frame_name = "end_effector_link"
             urdf_path = os.path.expanduser("~/gen3_robotiq_2f_85.urdf")
@@ -180,47 +286,20 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
             cls._fk_frame_id = cls._model.getFrameId(ee_frame_name)
             if cls._fk_frame_id == len(cls._model.frames):
                 raise ValueError(f"End-effector frame '{ee_frame_name}' not found in URDF.")
+            cls._ik_solver = pin.ik.HybridSolver(cls._model, ee_frame_name)
 
-        def compute_eef_pose(joint_pos: np.ndarray) -> np.ndarray:
-            pin.forwardKinematics(cls._model, cls._data, joint_pos)
-            pin.updateFramePlacements(cls._model, cls._data)
-            pose = cls._data.oMf[cls._fk_frame_id]
-            return np.concatenate([pose.translation, pin.rpy.matrixToRpy(pose.rotation)])
+        x, y, z, qx, qy, qz, qw = pose[:7]
+        target = pin.SE3(pin.Quaternion(qw, qx, qy, qz).toRotationMatrix(), np.array([x, y, z]))
+        q_init = np.zeros(cls._model.nq)
+        q_sol, success = cls._ik_solver.solve(q_init, target)
+        if not success:
+            raise RuntimeError("IK solver failed to converge for EEF pose")
         
-        T = actions.shape[0]
-        eef_poses = np.stack([compute_eef_pose(j[:7]) for j in actions], axis=0)
-        eef_deltas = np.zeros((T, 7), dtype=np.float32)
-        eef_deltas[1:, :6] = eef_poses[1:] - eef_poses[:-1]
-        eef_deltas[:, 6] = actions[:, 7]
-        return eef_deltas
-    
-    @classmethod
-    def compute_eef_poses_from_joint_positions(cls, actions: np.ndarray) -> np.ndarray:
-        if cls._model is None:
-            ee_frame_name = "end_effector_link"
-            urdf_path = os.path.expanduser("~/gen3_robotiq_2f_85.urdf")
-            cls._model = pin.buildModelFromUrdf(urdf_path)
-            cls._data = cls._model.createData()
-            cls._fk_frame_id = cls._model.getFrameId(ee_frame_name)
-            if cls._fk_frame_id == len(cls._model.frames):
-                raise ValueError(f"End-effector frame '{ee_frame_name}' not found in URDF.")
-
-        def compute_eef_pose(joint_pos: np.ndarray) -> np.ndarray:
-            pin.forwardKinematics(cls._model, cls._data, joint_pos)
-            pin.updateFramePlacements(cls._model, cls._data)
-            pose = cls._data.oMf[cls._fk_frame_id]
-            return np.concatenate([pose.translation, pin.rpy.matrixToRpy(pose.rotation)])
+        return q_sol
         
-        T = actions.shape[0]
-        eef_poses = np.stack([compute_eef_pose(j[:7]) for j in actions], axis=0)
-        output = np.zeros((T, 7), dtype=np.float32)
-        output[:, :6] = eef_poses
-        output[:, 6] = actions[:, 7]
-        return output
-    
     def _generate_examples(self, parquet_files: list) -> Iterator[Tuple[str, Any]]:
         # Load language instructions once (assuming one task here)
-        with open(os.path.join(META_DIR, 'tasks.jsonl')) as f:
+        with open(os.path.join(EPISODES_DIR, 'tasks.jsonl')) as f:
             tasks = [json.loads(line) for line in f]
         language_instruction = tasks[0]['task']
 
@@ -234,8 +313,8 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
                 episode_id = os.path.splitext(os.path.basename(pq_file))[0]
 
                 # Open video files once per episode
-                exterior_container = av.open(os.path.join(EXTERN_CAMERA_DIR, f"{episode_id}.mp4"))
-                wrist_container = av.open(os.path.join(WRIST_CAMERA_DIR, f"{episode_id}.mp4"))
+                exterior_container = av.open(os.path.join(EPISODES_DIR, episode_id, "external_camera.mp4"))
+                wrist_container = av.open(os.path.join(EPISODES_DIR, episode_id, "arm_camera.mp4"))
 
                 # Build frame lists
                 exterior_frames = []
@@ -260,31 +339,25 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
                     frame_idx = int(row['frame_index']) 
                     ext_frame_rgb = exterior_frames[frame_idx] 
                     wrist_frame_rgb = wrist_frames[frame_idx] 
+                    obs_state = row['observation.state'].astype(np.float32)
+                    obs_state_ros = row['observation.state_ros'].astype(np.float32)
+                    action = row['action'].astype(np.float32)
 
                     step = { 
                         'observation': { 
                             'image': ext_frame_rgb, 
                             'wrist_image': wrist_frame_rgb, 
-                            'state': np.concatenate([ 
-                                np.deg2rad(row['observation.state'][:7].astype(np.float32)), 
-                                row['observation.state'][7:].astype(np.float32) 
-                            ]), 
-                            'state_ros': np.concatenate([ 
-                                np.deg2rad(row['observation.state_ros'][:7].astype(np.float32)), 
-                                row['observation.state_ros'][7:].astype(np.float32) 
-                            ]), 
+                            'state': obs_state, 
+                            'state_ros': obs_state_ros, 
                         }, 
-                        'action': np.concatenate([ 
-                            np.deg2rad(row['action'][:7].astype(np.float32)), 
-                            row['action'][7:].astype(np.float32) 
-                        ]), 
+                        'action': action, 
                         'discount': float(row.get('discount', 1.0)), 
                         'reward': float(row.get('reward', 0.0)), 
                         'is_first': i == 0, 
                         'is_last': i == len(data) - 1, 
                         'is_terminal': i == len(data) - 1, 
                         'language_instruction': language_instruction, 
-                        'language_embedding': language_embedding, 
+                        'language_embedding': language_instruction, # no language embedding
                         'timestamp': float(row['timestamp']), 
                         'frame_index': int(row['frame_index']), 
                         'episode_index': int(row['episode_index']), 
@@ -293,23 +366,20 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
                     } 
                     episode.append(step) 
                 
-                all_joint_actions = np.stack([step['action'] for step in episode], axis=0)  # (T, 8)
-                eef_deltas = self.compute_eef_poses_from_joint_positions(all_joint_actions)  # (T, 7)
-
+                # Save actions for debugging
                 with open("eef_actions.csv", "w", newline='') as f:
                     writer = csv.writer(f)
                     writer.writerow(["dx", "dy", "dz", "droll", "dpitch", "dyaw", "gripper"])
-                    for step, eef_action in zip(episode, eef_deltas):
-                        step["action"] = eef_action.astype(np.float32)
+                    for step in episode:
                         writer.writerow(step["action"])
 
-                sample = { 
-                    'steps': episode, 
-                    'episode_metadata': { 
-                        'file_path': pq_file, 
-                    }, 
-                } 
- 
+                sample = {
+                    "steps": episode,
+                    "episode_metadata": {
+                        "file_path": pq_file,
+                    },
+                }
+
                 return pq_file, sample 
              
             except Exception as e:     
@@ -328,117 +398,3 @@ class KinovaSmall(tfds.core.GeneratorBasedBuilder):
         #         | beam.Map(_parse_example) 
         #         | beam.Filter(lambda x: x is not None) 
         # ) 
-
-SHA256 fail:
-pip cache purge
-pip install --upgrade pip-tools
-
-torchrun --standalone --nnodes 1 --nproc-per-node 2 vla-scripts/finetune.py \
-  --vla_path "openvla/openvla-7b" \
-  --data_root_dir ~/tensorflow_datasets/ \
-  --dataset_name kinova_99 \
-  --run_root_dir ~/openvla_finetune_logs/ \
-  --adapter_tmp_dir ~/openvla_finetune_adapter_tmp/ \
-  --lora_rank 32 \
-  --batch_size 4 \
-  --grad_accumulation_steps 4 \
-  --learning_rate 5e-4 \
-  --image_aug False \
-  --wandb_project tidybot-openvla \
-  --wandb_entity yuandi-huang-university-of-michigan \
-  --save_steps 2000 
-
-/home/yuandi/tensorflow_datasets/dataset_statistics_aef531d2c5a8775d45398cc8cd6fc62f042c82e55b7ade3b35a4c010aa2a24a7.json
-
-conda install pytorch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 pytorch-cuda=12.1 -c pytorch -c nvidia
-
-conda install pytorch=2.3.1 torchvision=0.18.1 torchaudio=2.3.1 pytorch-cuda=12.1 \
-  -c pytorch -c nvidia # USE THIS
-
-pip install torch==2.2.0+cu121 torchvision==0.17.0+cu121 torchaudio==2.2.0+cu121 -f https://download.pytorch.org/whl/torch_stable.html
-
-# change nvidia driver:
-sudo ln -sf /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.535.183.01 /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1
-
-  liblapack-3.9.0-24_linux64_openblas
-  libopenblas-0.3.27-pthreads_hac2b453_1
-  libosqp-0.6.3-h59595ed_0
-  libqdldl-0.1.5-h27087fc_1
-  libscotch-7.0.4-h2fe6a88_5
-  libspral-2024.05.08-h1b93dcb_1
-  libsqlite-3.42.0-h2797004_0
-  libstdcxx-ng-13.1.0-hfd8a6a1_0
-  libxml2-2.12.7-hc051c1a_1
-  libzlib-1.2.13-hd590300_5
-  metis-5.1.0-h59595ed_1007
-  mumps-include-5.7.2-ha770c72_0
-  mumps-seq-5.7.2-h6e8dedb_0
-  ncurses-6.4-hcb278e6_0
-  numpy-1.26.4-py39h474f0d3_0
-  octomap-1.9.8-h924138e_0
-  openssl-1.1.1w-hd590300_0
-  pinocchio-3.1.0-py39h69fb9f6_1
-  pip-23.2.1-pyhd8ed1ab_0
-  proxsuite-0.6.7-py39h74842e3_0
-  python-3.9.0-hffdb5ce_5_cpython
-  python_abi-3.9-8_cp39
-  qhull-2020.2-h434a139_5
-  qhull-static-2020.2-h434a139_5
-  readline-8.2-h8228510_1
-  scipy-1.13.1-py39haf93ffa_0
-  setuptools-68.0.0-pyhd8ed1ab_0
-  simde-0.8.2-h84d6215_0
-  sqlite-3.42.0-h2c6b66d_0
-  tinyxml2-10.0.0-h59595ed_0
-  tk-8.6.12-h27826a3_0
-  tzdata-2023c-h71feb2d_0
-  unixodbc-2.3.12-h661eb56_0
-  urdfdom-4.0.0-hee28ff1_1
-  urdfdom_headers-1.1.1-h00ab1b0_0
-  wheel-0.41.0-pyhd8ed1ab_0
-  xz-5.2.6-h166bdaf_0
-  zlib-1.2.13-hd590300_5
-  zstd-1.5.6-ha6fb4c9_0
-
-*** CORRUPTED RECORD CAUSED BY TF-DATASETS MISMATCH: pip install --upgrade "tensorflow-datasets==4.9.2"
-
-*** torch has no attribute uint64: pip install safetensors==0.3.3
-*** numpy has no attribute _core: pip install accelerate==0.25.0
-
-"kinova_99": { 
-   "image_obs_keys": {"primary": "image", "secondary": None, "wrist": "wrist_image"}, 
-   "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None}, 
-   "state_obs_keys": ["state", "state_ros"], 
-   "state_encoding": StateEncoding.JOINT, 
-   "action_encoding": ActionEncoding.EEF_POS, 
-},
-
-Traceback (most recent call last):                                                                                                                                                                                 
-  File "/home/yuandi/tidybot_platform/src/tidybot_openvla/openvla/vla-scripts/finetune.py", line 373, in <module>                                                                                                  
-    finetune()
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/draccus/argparsing.py", line 203, in wrapper_inner
-    response = fn(cfg, *args, **kwargs)
-  File "/home/yuandi/tidybot_platform/src/tidybot_openvla/openvla/vla-scripts/finetune.py", line 253, in finetune
-    for batch_idx, batch in enumerate(dataloader):
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 631, in __next__
-    data = self._next_data()
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/torch/utils/data/dataloader.py", line 675, in _next_data
-    data = self._dataset_fetcher.fetch(index)  # may raise StopIteration
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/torch/utils/data/_utils/fetch.py", line 32, in fetch
-    data.append(next(self.dataset_iter))
-  File "/home/yuandi/tidybot_platform/src/tidybot_openvla/openvla/prismatic/vla/datasets/datasets.py", line 146, in __iter__
-    for rlds_batch in self.dataset.as_numpy_iterator():
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/tensorflow/python/data/ops/dataset_ops.py", line 4733, in __next__
-    return nest.map_structure(to_numpy, next(self._iterator))
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/tensorflow/python/data/ops/iterator_ops.py", line 810, in __next__
-    return self._next_internal()
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/tensorflow/python/data/ops/iterator_ops.py", line 773, in _next_internal
-    ret = gen_dataset_ops.iterator_get_next(
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/tensorflow/python/ops/gen_dataset_ops.py", line 3029, in iterator_get_next
-    _ops.raise_from_not_ok_status(e, name)
-  File "/home/yuandi/miniforge3/envs/openvla-3.10/lib/python3.10/site-packages/tensorflow/python/framework/ops.py", line 5883, in raise_from_not_ok_status
-    raise core._status_to_exception(e) from None  # pylint: disable=protected-access
-tensorflow.python.framework.errors_impl.InvalidArgumentError: {{function_node __wrapped__IteratorGetNext_output_types_14_device_/job:localhost/replica:0/task:0/device:CPU:0}} Invalid PNG data, size 44449
-         [[{{function_node cond_1_false_1481}}{{node cond_1/decode_image/DecodeImage}}]] [Op:IteratorGetNext] name: 
-[2025-08-06 16:56:36,592] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 8941 closing signal SIGTERM
-[2025-08-06 16:56:36,592] torch.distributed.elastic.multiprocessing.api: [WARNING] Sending process 8943 closing signal SIGTERM
