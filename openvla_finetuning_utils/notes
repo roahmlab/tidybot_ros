@@ -12,6 +12,20 @@ sed -i '1s|.*|#!/home/yuandi/miniforge3/envs/openvla/bin/python|' \
 
     inet XXX.XX.X.X/XX brd XXX.XX.XXX.XXX scope global docker0
 
+torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
+  --vla_path "openvla/openvla-7b" \
+  --data_root_dir ~/tensorflow_datasets/ \
+  --dataset_name tidybot_vla \
+  --run_root_dir ~/openvla_finetune_logs/ \
+  --adapter_tmp_dir ~/openvla_finetune_adapter_tmp/ \
+  --lora_rank 32 \
+  --batch_size 2 \
+  --grad_accumulation_steps 4 \
+  --learning_rate 5e-4 \
+  --image_aug True \
+  --wandb_project tidybot-openvla \
+  --wandb_entity yuandi-huang-university-of-michigan \
+  --save_steps 2000 
 
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
     link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00

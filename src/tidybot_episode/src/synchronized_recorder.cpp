@@ -296,7 +296,7 @@ private:
         // Setup video files inside episode directory
         base_video_filename_ = episode_dir + "/base_camera.mp4";
         arm_video_filename_ = episode_dir + "/arm_camera.mp4";
-    ext_video_filename_ = episode_dir + "/ext_camera.mp4";
+        ext_video_filename_ = episode_dir + "/ext_camera.mp4";
         
         // Prime observation buffers immediately
         update_observation_buffers();
@@ -345,6 +345,7 @@ private:
         recording_enabled_ = false;
         base_video_initialized_ = false;
         arm_video_initialized_ = false;
+        ext_video_initialized_ = false;
         
         RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
         

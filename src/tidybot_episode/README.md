@@ -47,6 +47,13 @@ Converts an actions/observations bag pair into an HDF5 dataset.
 ros2 run tidybot_episode rosbag_to_hdf5 input_dir:=episode_bag output:=data.hdf5
 ```
 
+### **Data Converter (`rosbag_to_parquet`)**
+Converts an actions/observations bag pair into a parquet format.
+
+```bash
+ros2 run tidybot_episode rosbag_to_parquet input_dir:=episode_bag output:=data.hdf5
+```
+
 ## 🔧 Usage
 
 ### **Recording from Teleop**
@@ -79,6 +86,18 @@ ros2 run tidybot_episode rosbag_to_hdf5 input_dir:=episode_bag output:=dataset.h
             ├── base_pose         # (N x 3)
             ├── gripper_pos       # (N x 1)
             └── wrist_image       # (N x 84 x 84 x 3)
+```
+
+### **Parquet Dataset Format (For RLDS generation)**
+```
+/episode_<timestamp>.parquet
+├── observed state          # EEF XYZ (3) + Quaternion (4) + Gripper Open/Close (1) 
+├── action                  # EEF Delta XYZ (3) + Roll-Pitch-Yaw (3) + Gripper Open/Close (1)
+├── language instruction 
+├── index                   # Unique to each episode
+├── frame_index 
+├── timestamp 
+├── task_index              # Unique to each language instruction
 ```
 
 ## 🔗 Dependencies
