@@ -27,8 +27,8 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2 REQUIRED)
 find_package(HDF5 REQUIRED COMPONENTS C CXX)
-find_package(Arrow REQUIRED CONFIG)
-find_package(Parquet REQUIRED CONFIG)
+# find_package(Arrow QUIET CONFIG)
+# find_package(Parquet QUIET CONFIG)
 
 add_executable(rosbag_to_hdf5 src/rosbag_to_hdf5.cpp)
 ament_target_dependencies(rosbag_to_hdf5
@@ -46,23 +46,23 @@ ament_target_dependencies(rosbag_to_hdf5
   HDF5
 )
 
-add_executable(rosbag_to_parquet src/rosbag_to_parquet.cpp)
-ament_target_dependencies(rosbag_to_parquet
-  rclcpp
-  rosbag2_cpp
-  rosbag2_storage
-  tf2
-  std_msgs
-  std_srvs
-  sensor_msgs
-  geometry_msgs
-  trajectory_msgs
-  tf2_geometry_msgs
-)
-target_link_libraries(rosbag_to_parquet
-    Arrow::arrow_shared
-    Parquet::parquet_shared
-)
+# add_executable(rosbag_to_parquet src/rosbag_to_parquet.cpp)
+# ament_target_dependencies(rosbag_to_parquet
+#   rclcpp
+#   rosbag2_cpp
+#   rosbag2_storage
+#   tf2
+#   std_msgs
+#   std_srvs
+#   sensor_msgs
+#   geometry_msgs
+#   trajectory_msgs
+#   tf2_geometry_msgs
+# )
+# target_link_libraries(rosbag_to_parquet
+#     Arrow::arrow_shared
+#     Parquet::parquet_shared
+# )
 
 add_executable(synchronized_recorder src/synchronized_recorder.cpp)
 ament_target_dependencies(synchronized_recorder
@@ -86,9 +86,9 @@ ament_target_dependencies(synchronized_recorder
 install(TARGETS rosbag_to_hdf5
   DESTINATION lib/${PROJECT_NAME}
 )
-install(TARGETS rosbag_to_parquet
-  DESTINATION lib/${PROJECT_NAME}
-)
+# install(TARGETS rosbag_to_parquet
+#   DESTINATION lib/${PROJECT_NAME}
+# )
 install(TARGETS synchronized_recorder
   DESTINATION lib/${PROJECT_NAME}
 )
