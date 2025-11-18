@@ -1,0 +1,5 @@
+repositories:
+  openvla:
+    type: git
+    url: https://github.com/openvla/openvla.git
+    version: main

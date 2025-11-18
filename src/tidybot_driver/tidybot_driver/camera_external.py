@@ -12,9 +12,9 @@ class Camera(Node):
         super().__init__('tidybot_ext_camera')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=10
+            depth=1
         )
 
         self.raw_publisher_ = self.create_publisher(
@@ -31,7 +31,7 @@ class Camera(Node):
         self.br = CvBridge()
 
         # Use webcam
-        self.cap = cv2.VideoCapture(4)
+        self.cap = cv2.VideoCapture(0)
 
         if not self.cap.isOpened():
             self.get_logger().error("Failed to open webcam (/dev/video4)")
