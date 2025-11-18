@@ -29,6 +29,12 @@ def generate_launch_description():
         description="Enable episode recording services and node if true"
     )
 
+    cameras = DeclareLaunchArgument(
+        "cameras",
+        default_value='["base","arm"]',
+        description="Comma-separated list (YAML) of cameras to record (base, arm, ext)"
+    )
+
     robot_description_path = get_package_share_directory("tidybot_description")
     doc = xacro.process_file(str(robot_description_path + "/urdf/tidybot.xacro"))
     urdf_xml = doc.toxml()
@@ -89,6 +95,7 @@ def generate_launch_description():
             'use_sim': LaunchConfiguration('use_sim'),
             'storage_uri': 'episode_bag',
             'fps': '10.0',
+            'cameras': LaunchConfiguration('cameras'),
         }.items(),
         condition=IfCondition(LaunchConfiguration('record')),
     )
@@ -110,6 +117,7 @@ def generate_launch_description():
     return LaunchDescription([
         use_sim,
         record,
+        cameras,
         phone_teleop_server,
         phone_teleop,
         state_controller,

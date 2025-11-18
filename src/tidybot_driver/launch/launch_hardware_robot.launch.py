@@ -25,6 +25,12 @@ def generate_launch_description():
         description="Base control mode: position or velocity"
     )
 
+    ext_camera = DeclareLaunchArgument(
+        "ext_camera", 
+        default_value="false", 
+        description="Use external camera"
+    )
+
     rsp_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([tidybot_description_pkg, "launch", "description.launch.py"])
@@ -102,9 +108,7 @@ def generate_launch_description():
         package="tidybot_driver",
         executable="camera_ext",
         name="camera_ext",
-        condition=IfCondition(PythonExpression([
-            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
-        ]))
+        condition=IfCondition(LaunchConfiguration("ext_camera"))
     )
 
     base_server = Node(
@@ -127,6 +131,7 @@ def generate_launch_description():
     return LaunchDescription([
         mode,
         base_mode,
+        ext_camera,
         rsp_launch,
         rviz_node,
         tf_relay,

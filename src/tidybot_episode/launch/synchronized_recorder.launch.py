@@ -23,6 +23,11 @@ def generate_launch_description():
             default_value='true',
             description='Use simulation (Gazebo) if true, hardware if false',
         ),
+        DeclareLaunchArgument(
+            'cameras',
+            default_value='["base","arm","ext"]',
+            description='YAML list of cameras to record (base, arm, ext)'
+        ),
         Node(
             package='tidybot_episode',
             executable='synchronized_recorder',
@@ -30,7 +35,8 @@ def generate_launch_description():
             parameters=[{
                 'storage_uri': LaunchConfiguration('storage_uri'),
                 'use_sim_time': LaunchConfiguration('use_sim'),
-                'fps': LaunchConfiguration('fps')
+                'fps': LaunchConfiguration('fps'),
+                'cameras': LaunchConfiguration('cameras')
             }],
             output='screen',
             remappings=[
