@@ -1,15 +1,51 @@
-/build
-/log
-/install
-src/.vscode
-.vscode
-src/build
-/src/log
-/src/install
-venv
-episode_bag
+# Colcon / ROS build products
+/build/
+/install/
+/log/
+/src/build/
+/src/install/
+/src/log/
+**/build/
+**/install/
+**/log/
+
+# Editor and IDE settings
+.vscode/
+src/.vscode/
+.idea/
+.fleet/
+*.swp
+*.swo
+
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+.env
+
+# Recorded data and large artifacts
+episode_bag/
+*.mp4
+*.db3
+*.bag
 *.hdf5
 *.parquet
+*.urdf
+
+# OS-specific junk
+.DS_Store
+Thumbs.db
 
 # Ignore external packages
 /src/external/OrbbecSDK_ROS2
