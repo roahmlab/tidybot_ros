@@ -119,10 +119,21 @@ RUN apt-get install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-too
 # Setup Teleop
 RUN apt-get install python3-flask python3-flask-socketio -y
 
+# Episode converters: Apache Arrow/Parquet and HDF5 dev libs for tidybot_episode
+RUN apt-get update && apt-get install -y ca-certificates lsb-release wget && \
+        wget -q https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+        apt-get install -y ./apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+        rm -f apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+        apt-get update && apt-get install -y \
+            libarrow-dev \
+            libparquet-dev \
+            libhdf5-dev \
+        && rm -rf /var/lib/apt/lists/*
+
 # Setup Phoenix6 and CANivore for base control
 RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg" && \
     curl -s --compressed -o /etc/apt/sources.list.d/ctr2025.list "https://deb.ctr-electronics.com/ctr2025.list"
-# Note: sudo apt install canivore-usb is requried for CANivore support, 
+# Note: canivore-usb and canivore-usb-kernel are required for CANivore support, 
 # but it is not available at build time. Do this manually after running the container.
 
 # Build the workspace
@@ -147,7 +158,11 @@ RUN chown -R ${USER_NAME}:${USER_NAME} /home/${USER_NAME}
 USER ${USER_NAME}
 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
-    rosdep update && rosdep install --from-paths src --ignore-src -r -y && \
+    rosdep update && \
+    rosdep install --from-paths src --ignore-src -r -y --skip-keys \
+    "arrow parquet warehouse_ros_mongo ament_python glog joint_state_publisher \
+    joint_state_publisher_gui opencv opencv4 threadpoolctl setuptools numpy \
+    libgoogle-glog-dev flask flask_socketio" && \
     colcon build --symlink-install
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USER_NAME}/.bashrc

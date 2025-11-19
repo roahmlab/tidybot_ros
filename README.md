@@ -68,8 +68,6 @@ Shared utilities and message definitions.
 ### Prerequisites
 
 - **OS**: Ubuntu 24.04 LTS
-- **ROS**: ROS 2 Jazzy
-- **Python**: 3.10+
 - **Docker**: Latest version (for containerized deployment)
 
 ### Installation
@@ -86,8 +84,6 @@ Shared utilities and message definitions.
    ```
 
 ### Running the System
-
-#### Option 1: Docker (Recommended)
 
 Connect the Canivore-usb module, the Kinova Gen3 arm and Orbbec camera to the dev machine.
 
@@ -125,14 +121,19 @@ touch venv/COLCON_IGNORE
 # Source the environment
 colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
 ```
+
+To add venv path to your PYTHONPATH automatically everytime you start a new session, use
+
+```bash
+echo 'export PYTHONPATH=$HOME/tidybot_platform/venv/lib/python3.12/site-packages:$PYTHONPATH' >> ~/.bashrc
+```
+
 Then in another **host** terminal:
 ```bash
 # Setup the CAN connection
 sudo bash ./scripts/setup_docker_can.sh
 ```
 
-#### Option 2: Native Installation
-TODO
 ## 🎮 Example usage
 
 ### Choose a robot to play with
@@ -224,6 +225,20 @@ The platform supports comprehensive data collection for machine learning:
 
 3. **Hardware Connection Issues**
    - Check CAN bus connection: `candump can0`
+
+4. **Docker Container Issues**
+   - Q: Why I cannot launch Rviz / Gazabo simulation viewer inside the container?
+     - A: Try to establish X11 permissions/Xauthority on the host before starting the container:
+         ```bash
+         xhost +SI:localuser:$(whoami)
+         xhost +SI:localuser:root
+         ```
+         If you are on Wayland, export an X display first:
+         ```bash
+         export DISPLAY=${DISPLAY:-:0}
+         ```
+         Then restart the container.
+   
 
 ### Logs and Debugging
 - ROS logs: `~/.ros/log/`
