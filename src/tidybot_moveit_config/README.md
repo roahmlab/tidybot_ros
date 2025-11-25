@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This package contains the MoveIt2 configuration for the TidyBot++ mobile manipulator. It is the combination of the auto-generated moveit_config package and additional config files
+This package contains the auto-generated moveit_config package from the Tidybot URDF in `tidybot_description` and additional config files
 
 ## 🎯 Key Components
 

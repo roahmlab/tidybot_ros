@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This package provides motion planning, trajectory optimization, and real-time control capabilities for the TidyBot++ mobile manipulator. It integrates with MoveIt2 for advanced motion planning and provides servo control for real-time joystick control and reactive behaviors.
+This package provides motion planning, trajectory optimization, and real-time control nodes. It integrates with `tidybot_moveit_config` and uses MoveIt's API for inverse kinematics and trajectory optimization.
 
 ## 🎯 Key Features
 
@@ -19,9 +19,8 @@ This package provides motion planning, trajectory optimization, and real-time co
 
 ### **Input Processing**
 - **Teleoperation Bridge**: Converts WebXR commands to motion plans
-- **Joystick Integration**: Gamepad control with MoveIt2 Servo rea
+- **Joystick Integration**: Gamepad control with MoveIt2 Servo
 - **Keyboard Control**: Development and testing interface
-- **Policy Interface**: AI/ML policy integration
 
 ## 📁 Package Structure
 

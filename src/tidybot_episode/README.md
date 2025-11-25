@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-`tidybot_episode` bundles the synchronized episode recorder and dataset conversion utilities for TidyBot++. The package sits alongside `tidybot_policy`: when teleop is launched with `record:=true`, the `synchronized_recorder` node is started automatically and its services are bridged into the WebXR UI so operators can trigger recording, stop runs, and choose to save or discard finished episodes. Collected data is organized per episode with matching ROS 2 bags and MP4 camera streams.
+`tidybot_episode` provides synchronized episode recorder and dataset conversion utilities for TidyBot++. The package sits alongside `tidybot_policy`: when teleop is launched with `record:=true`, the `synchronized_recorder` node is started automatically and its services are bridged into the WebXR UI so operators can trigger recording, stop runs, and choose to save or discard finished episodes. Collected data is organized per episode with matching ROS 2 bags and MP4 camera streams.
 
 ## 🎯 Key Features
 
@@ -69,6 +69,10 @@ ros2 run tidybot_episode rosbag_to_parquet input_dir:=episode_bag output:=data.h
 ```bash
 # Convert ROS bag to HDF5
 ros2 run tidybot_episode rosbag_to_hdf5 input_dir:=episode_bag output:=dataset.hdf5
+```
+```bash
+# Convert ROS bag to parquet
+ros2 run tidybot_episode rosbag_to_parquet input_dir:=episode_bag output:=data.parquet
 ```
 
 ## 📊 Data Structure

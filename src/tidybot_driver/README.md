@@ -1,9 +1,6 @@
 # tidybot_driver
 ## 📖 Overview
-# tidybot_driver
-
-## 📖 Overview
-`tidybot_driver` provides the ROS 2 hardware bridge for the TidyBot++ platform. It wraps the Kinova Gen3 arm, Robotiq 2F-85 gripper, Powered-caster holonomic mobile base, and onboard vision devices behind ROS topics, services, and launch files. The package is designed to pair with `tidybot_policy` (for command generation) and `tidybot_solver` (for IK and servo pipelines).
+`tidybot_driver` provides a ROS 2 hardware bridge for the TidyBot++. It wraps the Kinova Gen3 arm, Robotiq 2F-85 gripper, Powered-caster holonomic mobile base, and onboard vision devices behind ROS topics, services, and launch files. The package is designed to pair with `tidybot_policy` (for command generation) and `tidybot_solver` (for IK and servo pipelines).
 
 ## 🎯 Highlights
 - Unified launch (`launch_hardware_robot.launch.py`) to bring up robot description, TF relay, drivers, and cameras with selectable modes (`full`, `arm_only`, `base_only`).

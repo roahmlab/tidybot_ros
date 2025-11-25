@@ -1,26 +1,13 @@
-# tidybot_openvla
-## 📖 Overview
-This package wraps the core OpenVLA source code, allowing deployment of fine-tuned models on hardware. It enables the receival of input images and the publishing of inferred actions as end effector deltas over ROS topics defined in tidybot_driver.
+## Finetuning Infrastructure
+To register the RLDS dataset for training on, we provide an example `configs.py` and `transforms.py` to integrate with the openvla source code. These scripts should be placed [here](https://github.com/openvla/openvla/blob/main/prismatic/vla/datasets/rlds/oxe/configs.py#L54) and [here](https://github.com/openvla/openvla/blob/main/prismatic/vla/datasets/rlds/oxe/transforms.py#L828), respectively. 
 
-## 🎯 Key Features
-TODO
-
-## 📁 Package Structure
-
-```
-tidybot_openvla/
-├── openvla/                            # Original openVLA source code
-│   ├── ...
-│   ├── tidybot_openvla.py              # Launches a node to listen to published images, run inference on a fine-tuned model, and publish actions back to hardware
-```
-
-## 🚀 Communication Setup
-To enable communication between the Tidybot's on-board computer and a remote compute server, ensure the following on both machines:
+## Communication Setup
+To enable communication between the Tidybot's on-board computer and a remote compute server, ensure both machines have the same ROS_DOMAIN_ID and have cyclonedds:
 ```bash
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export CYCLONEDDS_URI=$(realpath cyclonedds.xml)
 ```
-Note that FastDDS is an alternative option, but published images are fragmented before sending, leading to the received images being corrupted. CycloneDDS led to the most reliable results during our testing, and only requires setting up the following configurations on the robot and server side. 
+FastDDS is an alternative option, but the published images are fragmented before sending, leading to the received images being corrupted. We use CycloneDDS which requires setting up the following configurations on the robot and server side. 
 
 Robot Side:
 ```xml
@@ -80,13 +67,11 @@ Server Side:
 </CycloneDDS>
 ```
 
-## 🎛️ Nodes
-
 ### **OpenVLA Inference (`tidybot_openvla_node`)**
 Loads checkpoints for the original OpenVLA model, plus fine-tuned parameters using peft and unnormalization statistics based on the finetuning dataset. Then, listens to incoming images from `tidybot/camera_ext/color/compressed` or `tidybot/camera_wrist/color/compressed` on its own thread, which continuously updates the current image. On a separate thread, performs inference on the most recent image and publishes the end effector action continuously to `tidybot/arm/delta_commands` at 15Hz. Every 5Hz, inference is performed again on the most recent image, which updates the published action.
 
 ```bash
-ros2 run tidybot_openvla openvla_node
+ros2 run tidybot_policy openvla_node
 ```
 
 **Subscribed Topics:**
@@ -94,20 +79,3 @@ ros2 run tidybot_openvla openvla_node
 
 **Published Topics:**
 - `/tidybot/arm/delta_commands` (std_msgs/Float64MultiArray): Inferred end effector action in the form of delta position, delta rotation and gripper state
-
-**Features:**
-- **Action Decoding to Continuous Trajectory**: By publishing the end effector delta continuously, which updates an accumulated target position in the `moveit_ee_pose_ik` node, this allows the robot to execute actions as continuous trajectories with each inference.
-
-## 🐛 Troubleshooting
-
-### **Common Issues**
-
-TODO
-
-## 🔗 Dependencies
-
-TODO
-
-## 📚 Additional Resources
-
-TODO
