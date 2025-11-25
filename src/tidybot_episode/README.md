@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-`tidybot_episode` bundles the synchronized episode recorder and dataset conversion utilities for TidyBot++. The package sits alongside `tidybot_teleop`: when teleop is launched with `record:=true`, the `synchronized_recorder` node is started automatically and its services are bridged into the WebXR UI so operators can trigger recording, stop runs, and choose to save or discard finished episodes. Collected data is organized per episode with matching ROS 2 bags and MP4 camera streams.
+`tidybot_episode` bundles the synchronized episode recorder and dataset conversion utilities for TidyBot++. The package sits alongside `tidybot_policy`: when teleop is launched with `record:=true`, the `synchronized_recorder` node is started automatically and its services are bridged into the WebXR UI so operators can trigger recording, stop runs, and choose to save or discard finished episodes. Collected data is organized per episode with matching ROS 2 bags and MP4 camera streams.
 
 ## 🎯 Key Features
 
@@ -18,7 +18,7 @@
 ## 🚀 Launch Files
 
 ### `synchronized_recorder.launch.py`
-Launch the full synchronized recorder node (used automatically by `tidybot_teleop`).
+Launch the full synchronized recorder node (used automatically by `tidybot_policy`).
 
 ```bash
 ros2 launch tidybot_episode synchronized_recorder.launch.py storage_uri:=episode_bag fps:=10.0 use_sim:=true

@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
-  <name>tidybot_teleop</name>
+  <name>tidybot_policy</name>
   <version>0.0.0</version>
-  <description>TidyBot teleoperation package</description>
+  <description>TidyBot policy package</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>

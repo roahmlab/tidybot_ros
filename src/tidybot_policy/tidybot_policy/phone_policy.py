@@ -22,9 +22,9 @@ import gc
 from std_srvs.srv import Empty
 
 
-class TeleopController(Node):
+class PhonePolicy(Node):
     def __init__(self):
-        super().__init__("teleop_controller")
+        super().__init__("phone_policy")
         self.declare_parameter("use_sim", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
         self.get_logger().info(
@@ -334,7 +334,7 @@ def convert_webxr_pose(pos, quat):
 
 def main():
     rclpy.init()
-    teleop_controller = TeleopController()
+    teleop_controller = PhonePolicy()
     rclpy.spin(teleop_controller)
     teleop_controller.destroy_node()
     rclpy.shutdown()

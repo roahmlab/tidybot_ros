@@ -2,7 +2,7 @@ from setuptools import find_packages, setup
 
 from glob import glob
 
-package_name = 'tidybot_teleop'
+package_name = 'tidybot_policy'
 
 setup(
     name=package_name,
@@ -25,16 +25,16 @@ setup(
     zip_safe=True,
     maintainer='janchen',
     maintainer_email='janchen@umich.edu',
-    description='Tidybot teleoperation package for ROS2',
+    description='Tidybot policy package for ROS2',
     license='Apache License 2.0',
     entry_points={
         'console_scripts': [
-            'phone_teleop_server = tidybot_teleop.phone_teleop_server:main',
-            'phone_teleop = tidybot_teleop.phone_teleop:main',
-            'state_controller = tidybot_teleop.state_controller:main',
-            'reset_env = tidybot_teleop.reset_env:main',
-            'remote_teleop = tidybot_teleop.remote_teleop:main',
-            'joystick_teleop = tidybot_teleop.joystick_teleop:main',
+            'phone_teleop_server = tidybot_policy.phone_teleop_server:main',
+            'phone_policy = tidybot_policy.phone_policy:main',
+            'state_controller = tidybot_policy.state_controller:main',
+            'reset_env = tidybot_policy.reset_env:main',
+            'remote_policy_diffusion = tidybot_policy.remote_policy_diffusion:main',
+            'gamepad_policy = tidybot_policy.gamepad_policy:main',
         ],
     },
 )

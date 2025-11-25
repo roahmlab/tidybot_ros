@@ -29,9 +29,9 @@ class ArmControlFrame(Enum):
     BASE = 0
     EE = 1
 
-class JoystickController(Node):
+class GamepadPolicy(Node):
     def __init__(self):
-        super().__init__("joystick_controller")
+        super().__init__("gamepad_policy")
         self.declare_parameter("use_sim", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
         self.declare_parameter("control_frequency", 20.0)
@@ -372,7 +372,7 @@ class JoystickController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    joystick_controller = JoystickController()
+    joystick_controller = GamepadPolicy()
     rclpy.spin(joystick_controller)
     joystick_controller.destroy_node()
     rclpy.shutdown()

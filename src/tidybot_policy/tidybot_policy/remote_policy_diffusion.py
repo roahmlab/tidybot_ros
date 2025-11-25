@@ -22,9 +22,9 @@ from scipy.spatial.transform import Rotation as R
 
 REMOTE_CONTROL_FREQUENCY = 10  # Hz
 
-class RemoteController(Node):
+class RemotePolicyDiffusion(Node):
     def __init__(self):
-        super().__init__("remote_controller")
+        super().__init__("remote_policy_diffusion")
         # TODO: add real robot control
         self.declare_parameter("use_sim", True)
         self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
@@ -255,7 +255,7 @@ class RemoteController(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    remote_controller = RemoteController()
+    remote_controller = RemotePolicyDiffusion()
     try:
         rclpy.spin(remote_controller)
     except rclpy.exceptions.ROSInterruptException:

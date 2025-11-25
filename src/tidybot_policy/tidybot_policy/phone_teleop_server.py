@@ -21,7 +21,7 @@ RESET = "\x1b[0m"
 BOLD = "\x1b[1m"
 
 # Ensure the template and static directories are set correctly
-pkg_share = get_package_share_directory("tidybot_teleop")
+pkg_share = get_package_share_directory("tidybot_policy")
 config_path = os.path.join(pkg_share, "config")
 
 class WebServer:

@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-`tidybot_description` captures the URDF/XACRO source for the TidyBot++ platform, including meshes, controller interfaces, and Gazebo plugins. The package feeds robot_state_publisher on hardware (via `tidybot_driver`) and acts as the foundation for simulation launch files consumed by `tidybot_teleop`, `tidybot_solver`, and Gazebo workflows.
+`tidybot_description` captures the URDF/XACRO source for the TidyBot++ platform, including meshes, controller interfaces, and Gazebo plugins. The package feeds robot_state_publisher on hardware (via `tidybot_driver`) and acts as the foundation for simulation launch files consumed by `tidybot_policy`, `tidybot_solver`, and Gazebo workflows.
 
 ## 🤖 Robot Components
 
