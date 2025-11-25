@@ -6,7 +6,7 @@
   <description>Package to interface with the TidyBot hardware</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>
-  <license>TODO: License declaration</license>
+  <license>MIT</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

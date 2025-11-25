@@ -6,8 +6,7 @@
   <description>TidyBot policy package</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>
-  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
-  <license>Apache 2License 2.0</license>
+  <license>MIT</license>
 
   <buildtool_depend>ament_python</buildtool_depend>
   <build_depend>tidybot_utils</build_depend>

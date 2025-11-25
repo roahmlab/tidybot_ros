@@ -6,7 +6,7 @@
   <description>tidybot description package</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
   <maintainer email="yuandi@umich.edu">yuandi</maintainer>
-  <license>Apache-2.0</license>
+  <license>MIT</license>
 
   <test_depend>ament_copyright</test_depend>
   <test_depend>ament_flake8</test_depend>

@@ -5,7 +5,8 @@
   <version>0.0.0</version>
   <description>Package for recording and replaying robot episodes</description>
   <maintainer email="janchen@umich.edu">janchen</maintainer>
-  <license>TODO: License declaration</license>
+  <maintainer email="yuandi@umich.edu">yuandi</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
