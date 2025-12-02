@@ -36,7 +36,7 @@ class OpenVLANode(Node):
             depth=10
         )
 
-        # Subscriber to camera feed
+        # Subscriber to selected camera feed
         self.visual_sub = self.create_subscription(
             CompressedImage,
             '/tidybot/camera_ext/color/compressed',
@@ -69,10 +69,11 @@ class OpenVLANode(Node):
 
         self.vla = PeftModel.from_pretrained(
             base_model,
-            "/home/yuandi/openvla_finetune_adapter_tmp/openvla-7b+kinova_99+b16+lr-0.0005+lora-r32+dropout-0.0",
+            "...",  # Absolute path to peft model
         ).to("cuda:0")
 
-        with open("/home/yuandi/tensorflow_datasets/dataset_statistics_aef531d2c5a8775d45398cc8cd6fc62f042c82e55b7ade3b35a4c010aa2a24a7.json", "r") as f:
+        # Absolute path to tensorflow dataset statistics
+        with open("...", "r") as f:
             stats = json.load(f)
         self.vla.config.norm_stats["tidybot_vla"] = stats
 

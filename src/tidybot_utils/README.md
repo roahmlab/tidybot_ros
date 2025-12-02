@@ -2,14 +2,14 @@
 
 ## 📖 Overview
 
-This package defines custom message and service types specific to the TidyBot++ platform. It provides standardized communication interfaces for teleoperation, environment control, and system coordination across all TidyBot++ packages.
+This package defines custom message and service types for the tidybot_policy package.
 
 ## 📦 Package Structure
 
 ```
 tidybot_utils/
 ├── msg/
-│   ├── TeleopMsg.msg                    # Phone teleoperation message
+│   ├── TeleopMsg.msg               # Phone teleoperation message
 ├── srv/
 │   ├── ResetEnv.srv                # Environment reset service
 ├── include/
@@ -19,7 +19,7 @@ tidybot_utils/
 
 ## 📨 Message Types
 
-### **WSMsg**
+### **TeleopMSG**
 WebXR teleoperation command message from smartphone/web interface.
 
 **File**: `msg/TeleopMsg.msg`
@@ -31,7 +31,7 @@ uint64 timestamp
 # Control state information
 string state_update              # Current control state ("start", "active", "end")
 string device_id                 # Unique device identifier
-string teleop_mode              # Control mode ("base", "arm", "gripper")
+string teleop_mode               # Control mode ("base", "arm", "gripper")
 
 # 3D position command (meters)
 float64 pos_x

@@ -49,3 +49,5 @@ Thumbs.db
 
 # Ignore external packages
 /src/external/OrbbecSDK_ROS2
+/src/tidybot_openvla
+/openvla_finetuning_utils
