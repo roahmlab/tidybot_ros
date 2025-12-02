@@ -9,10 +9,10 @@ The TidyBot++ is a mobile manipulator consisting of:
 - **Manipulator**: Kinova Gen3 7-DOF robotic arm
 - **End Effector**: Robotiq 2F-85 parallel gripper
 - **Sensors**: Integrated wrist camera, base-mounted camera, optional external cameras
-
 ## 🔢 Policy Deployment Demos
-
-
+![Image](https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f)
+## 🏗️ System Architecture
+![Image](https://github.com/user-attachments/assets/097e7578-3f0e-4434-8396-53b5bb39c490)
 ## 📦 Package Descriptions
 
 ### Core Packages
@@ -32,8 +32,9 @@ Hardware interface for real robot control.
 - Joint state publishing and command handling
 
 #### `tidybot_policy`
-Teleoperation and policy deployment systems.
+Teleoperation and remote control policies.
 - WebXR-based smartphone teleoperation
+- Gamepad-based teleoperation
 - Remote policy server integration
 - Real-time control command processing
 - Episode recording integration
@@ -54,8 +55,8 @@ MoveIt2 configuration package (auto-generated).
 #### `tidybot_episode`
 Data recording and replay system.
 - ROS bag recording of control episodes
-- Data conversion to HDF5/parquet format
-- Dataset generation for model training
+- Data conversion to HDF5 format
+- Dataset generation for machine learning
 
 #### `tidybot_utils`
 Shared utilities and message definitions.
@@ -136,20 +137,21 @@ sudo bash ./scripts/setup_docker_can.sh
 
 ## 🎮 Example usage
 
-### Choose a robot environment
+### Choose a robot to play with
 
-### 1. Simulated robot
+#### 1. Simulated robot
 ```bash
 ros2 launch tidybot_description launch_sim_robot.launch.py
 ```
 - Launch the Gazebo simulation environment and publish corresponding topics for robot control and monitoring
-- Launch RViz2 for robot visualization and camera view
+- Launch RViz2 for robot state visualization and camera view
 
-### 2. Physical robot
+#### 2. Physical robot
 ```bash
 # Start hardware drivers
 ros2 launch tidybot_driver launch_hardware_robot.launch.py mode:=full
 ```
+- Launch RViz2 for robot state visualization and camera view
 
 ### Choose a control mode
 
@@ -165,10 +167,10 @@ Connect to the a Xbox Series X gamepad and relay joystick messages to the robot
 ros2 launch tidybot_policy launch_gamepad_policy.launch.py use_sim:=<true | false>
 ```
 
-### 3. Remote mode
-Follow the GPU Laptop setup guide in [Original Tidybot++ Codebase](https://github.com/jimmyyhwu/tidybot2#gpu-laptop). Then copy the `policy_server.py` into the diffusion policy codebase ans start the policy server on the GPU server following [this](https://github.com/jimmyyhwu/tidybot2#policy-inference). 
+### Collect demonstratinos for Diffusion Policy training
 
-After setting up, connect the server to the machine running low level control by
+#### 1. Setup the data collection pipeline
+Follow the previous section on how to launch a robot. Then launch the teleop with recording enabled
 
 ```bash
 ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false> record:=true
@@ -181,19 +183,23 @@ The recorded episodes will be stored in `episode_bag` folder in the current dire
 After the data collection is done. Run the converted node to convert all the rosbags into a .hdf5 tarball.
 
 ```bash
-ros2 launch tidybot_teleop remote.launch.py 
+ros2 run tidybot_episode rosbag_to_hdf5
 ```
+The converted dataset will be saved as `data.hdf5` under the current directory
 
-Set up the ssh connection between the robot and inference machines.
+### Policy Training
+We recommend going to the original [Tidybot++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-training) codebae and learn how to train a diffusion policy for the tidybot platform. The structure of the dataset obtained from our platform is the same as the original Tidybot++ platform so you can try a policy in the same way on our platform.
 
-## 📊 Data Collection
-
-The platform supports the following data collection for imitation learning:
-
-- **Observations**: Camera feeds, joint states, end-effector poses
-- **Actions**: Control commands, trajectory waypoints
-- **Episodes**: Complete task executions with start/end markers
-- **Export Formats**: ROS bags, HDF5, tensorflow dataset, custom formats
+### Policy Inference
+The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instrution in the original [Tidybo++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) project to setup the policy server on a GPU machine. Once the GPU server is running. Setup a SSH tunnel from the dev machine to the GPU server by
+```bash
+ssh -L 5555:localhost:5555 <gpu-server-hostname>
+```
+Then launch the remote policy on the dev machine by
+```bash
+ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py use_sim:=<true | false>
+```
+This launch file will also launch a webserver that can be used to control the policy inference. By pressing the middle of the screen, the inference will be enabled. If there's no user interaction detected on the webserver, the inference will be paused.
 
 ## 🔧 Configuration
 
@@ -228,17 +234,18 @@ The platform supports the following data collection for imitation learning:
 3. **Hardware Connection Issues**
    - Check CAN bus connection: `candump can0`
 
-4. **Docker Container X Display Issues**
-   - Try to establish X11 permissions/Xauthority on the host before starting the container:
-      ```bash
-      xhost +SI:localuser:$(whoami)
-      xhost +SI:localuser:root
-      ```
-      If you are on Wayland, export an X display first:
-      ```bash
-      export DISPLAY=${DISPLAY:-:0}
-      ```
-      Then restart the container.
+4. **Docker Container Issues**
+   - Q: Why I cannot launch Rviz / Gazabo simulation viewer inside the container?
+     - A: Try to establish X11 permissions/Xauthority on the host before starting the container:
+         ```bash
+         xhost +SI:localuser:$(whoami)
+         xhost +SI:localuser:root
+         ```
+         If you are on Wayland, export an X display first:
+         ```bash
+         export DISPLAY=${DISPLAY:-:0}
+         ```
+         Then restart the container.
    
 
 ### Logs and Debugging
@@ -251,15 +258,8 @@ The platform supports the following data collection for imitation learning:
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Submit a pull request
-
-## 📞 Support
-
-- **Maintainers**: 
-  - janchen@umich.edu
-  - yuandi@umich.edu
-- **Issues**: Create GitHub issues for bug reports and feature requests
-- **Documentation**: See individual package READMEs for detailed information
+4. Test thoroughly
+5. Submit a pull request
 
 ## 🔗 Related Projects
 
@@ -269,3 +269,5 @@ The platform supports the following data collection for imitation learning:
 - [OrbbecSDK ROS2](https://github.com/orbbec/OrbbecSDK_ROS2)
 - [Diffusion Policy](https://github.com/real-stanford/diffusion_policy)
 ---
+
+*TidyBot++ Platform - Enabling advanced mobile manipulation research and applications*
