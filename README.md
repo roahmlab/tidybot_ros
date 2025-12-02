@@ -138,7 +138,7 @@ sudo bash ./scripts/setup_docker_can.sh
 
 ### Choose a robot to play with
 
-### 1. Simulated robot
+#### 1. Simulated robot
 Perfect for development and testing without hardware.
 ```bash
 ros2 launch tidybot_description launch_sim_robot.launch.py
@@ -146,7 +146,7 @@ ros2 launch tidybot_description launch_sim_robot.launch.py
 - Launch the Gazebo simulation environment and publish corresponding topics for robot control and monitoring
 - Launch RViz2 for robot visualization and camera view
 
-### 2. Physical robot
+#### 2. Physical robot
 Direct control of the physical robot.
 ```bash
 # Start hardware drivers
@@ -155,43 +155,51 @@ ros2 launch tidybot_driver launch_hardware_robot.launch.py mode:=full
 
 ### Choose a control mode
 
-### 1. Phone Teleop mode
+#### 1. Phone Teleop mode
 Publish the WebXR app for phone and tablet to connect and relay the web messages to the robot
 ```bash
-ros2 launch tidybot_teleop teleop.launch.py use_sim:=true
+ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false>
 ```
 
-### 2. Joystick mode
-Connect to the gamepad and relay joystick messages to the robot
+#### 2. Gamepad mode
+Connect to the a Xbox Series X gamepad and relay joystick messages to the robot
 ```bash
-ros2 launch tidybot_teleop joystick.launch.py use_sim:=true
+ros2 launch tidybot_policy launch_gamepad_policy.launch.py use_sim:=<true | false>
 ```
 
-### 3. Remote mode
-Following the GPU Laptop setup guide in [Original Tidybot++ Codebase](https://github.com/jimmyyhwu/tidybot2#gpu-laptop). Then copy the `policy_server.py` into the diffusion policy codebase ans start the policy server on the GPU server following [this](https://github.com/jimmyyhwu/tidybot2#policy-inference). 
+### Collect demonstratinos for Diffusion Policy training
 
-After setup the GPU laptop, connect the machine running low level control to the server by
-
-```bash
-ssh -L 5555:localhost:5555 <gpu-laptop-hostname>
-```
-
-and launch the remote teleoperation by
+#### 1. Setup the data collection pipeline
+Follow the previous section on how to launch a robot. Then launch the teleop with recording enabled
 
 ```bash
-ros2 launch tidybot_teleop remote.launch.py 
+ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false> record:=true
 ```
+This launch file should publish a webserver that will promt the user to save/discard the recorded episode after the episode ends. If such a window does not pop up, try to refresh the webpage.
 
-Set up the ssh connection between 
+The recorded episodes will be stored in `episode_bag` folder in the current directory as ros bags.
 
-## 📊 Data Collection
+#### 3. Convert the ros bags to compatible dataset
+After the data collection is done. Run the converted node to convert all the rosbags into a .hdf5 tarball.
 
-The platform supports comprehensive data collection for machine learning:
+```bash
+ros2 run tidybot_episode rosbag_to_hdf5
+```
+The converted dataset will be saved as `data.hdf5` under the current directory
 
-- **Observations**: Camera feeds, joint states, end-effector poses
-- **Actions**: Control commands, trajectory waypoints
-- **Episodes**: Complete task executions with start/end markers
-- **Export Formats**: ROS bags, HDF5, custom formats
+### Policy Training
+We recommend going to the original [Tidybot++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-training) codebae and learn how to train a diffusion policy for the tidybot platform. The structure of the dataset obtained from our platform is the same as the original Tidybot++ platform so you can try a policy in the same way on our platform.
+
+### Policy Inference
+The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instrution in the original [Tidybo++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) project to setup the policy server on a GPU machine. Once the GPU server is running. Setup a SSH tunnel from the dev machine to the GPU server by
+```bash
+ssh -L 5555:localhost:5555 <gpu-server-hostname>
+```
+Then launch the remote policy on the dev machine by
+```bash
+ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py use_sim:=<true | false>
+```
+This launch file will also launch a webserver that can be used to control the policy inference. By pressing the middle of the screen, the inference will be enabled. If there's no user interaction detected on the webserver, the inference will be paused.
 
 ## 🔧 Configuration
 
@@ -252,18 +260,6 @@ The platform supports comprehensive data collection for machine learning:
 3. Make your changes
 4. Test thoroughly
 5. Submit a pull request
-
-## 📄 License
-
-TODO
-
-## 📞 Support
-
-- **Maintainers**: 
-  - janchen@umich.edu
-  - yuandi@umich.edu
-- **Issues**: Create GitHub issues for bug reports and feature requests
-- **Documentation**: See individual package READMEs for detailed information
 
 ## 🔗 Related Projects
 

@@ -51,7 +51,7 @@ class PhonePolicy(Node):
         )
 
         # Reset service: clear references and send home commands once
-        self.reset_srv = self.create_service(Empty, "/tidybot/controller/reset", self.reset_callback)
+        self.reset_srv = self.create_service(Empty, "/tidybot/policy/reset", self.reset_callback)
 
         # Subscribe to joint states to buffer latest joint positions (for gripper state)
         self.latest_joint_state = None
@@ -166,24 +166,17 @@ class PhonePolicy(Node):
                         # Use local arm frame observation (arm_base_link -> bracelet_link)
                         self.arm_ref_pos = self.arm_obs_pos.copy()
                         self.arm_ref_quat = self.arm_obs_quat
-                        # Store base yaw at reference time for orientation mapping
-                        self.arm_ref_base_yaw = self.base_obs[2]
                         # Initialize gripper reference from buffered joint states
                         self.gripper_ref = self.get_gripper_state_from_joint_states()
-
-                    # Rotations around z-axis to go between global frame (base) and local frame (arm)
-                    z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.base_obs[2])
-                    z_rot_inv = z_rot.inv()
-                    ref_z_rot = R.from_rotvec(np.array([0.0, 0.0, 1.0]) * self.arm_ref_base_yaw)
 
                     # Position (publish in arm_base_link local frame)
                     pos_diff = xr_pos - self.arm_xr_ref_pos  # WebXR delta in XR/world frame
                     # Map XR delta into current base-aligned local frame; arm_base_link aligns with base axes
-                    arm_target_pos = self.arm_ref_pos + z_rot_inv.apply(pos_diff)
+                    arm_target_pos = self.arm_ref_pos + pos_diff
 
                     # Orientation (local frame): map XR delta into current base-aligned local frame
                     arm_target_quat = (
-                        z_rot_inv * (xr_quat * self.arm_xr_ref_rot_inv) * ref_z_rot
+                        xr_quat * self.arm_xr_ref_rot_inv
                     ) * self.arm_ref_quat
 
                     arm_command = Pose()

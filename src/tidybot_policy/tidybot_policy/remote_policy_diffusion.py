@@ -37,7 +37,7 @@ class RemotePolicyDiffusion(Node):
 
         # Reset service for remote controller (align with state_controller expectations)
         self.reset_service = self.create_service(
-            Empty, "/tidybot/controller/reset", self.reset_env_callback
+            Empty, "/tidybot/policy/reset", self.reset_env_callback
         )
 
         self.control_timer = self.create_timer(

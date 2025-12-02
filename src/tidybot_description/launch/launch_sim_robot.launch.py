@@ -207,8 +207,8 @@ def generate_launch_description():
             condition=IfCondition(
                 PythonExpression(
                     ['"', LaunchConfiguration("base_mode"), '" == "velocity"']
-                )
-            ),
+                ),
+        )
         )
     )
     ld.add_action(

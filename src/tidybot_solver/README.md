@@ -2,145 +2,73 @@
 
 ## 📖 Overview
 
-This package provides motion planning, trajectory optimization, and real-time control capabilities for the TidyBot++ mobile manipulator. It integrates with MoveIt2 for advanced motion planning and provides servo control for real-time joystick control and reactive behaviors.
-
-## 🎯 Key Features
-
-### **Motion Planning Integration**
-- **MoveIt2 Integration**: Full integration with MoveIt2 motion planning framework
-- **Collision Avoidance**: Real-time collision detection and avoidance
-- **Path Optimization**: Trajectory smoothing and optimization
-- **Multi-DOF Planning**: Coordinated planning for arm and base
-
-### **Real-Time Control**
-- **Cartesian Control**: End-effector pose control in Cartesian space
-- **Joint Space Control**: Direct joint angle control
-- **Velocity Control**: Real-time velocity-based control in end-effector frame or base frame
-
-### **Input Processing**
-- **Teleoperation Bridge**: Converts WebXR commands to motion plans
-- **Joystick Integration**: Gamepad control with MoveIt2 Servo rea
-- **Keyboard Control**: Development and testing interface
-- **Policy Interface**: AI/ML policy integration
+This package provides motion planning, trajectory optimization, and real-time control capabilities for the TidyBot++ mobile manipulator. It integrates with MoveIt2 for advanced motion planning and provides velocity based kinematics solver for real-time joystick control and position based kinematics solver for phone teleoperation and remote policy control.
 
 ## 📁 Package Structure
 
 ```
 tidybot_solver/
 ├── config/
-│   ├── demo_servo_config.yaml      # Servo control parameters for keyboard input demo
-│   ├── servo_parameters.yaml       # General servo settings
-│   └── tidybot_servo_config.yaml   # TidyBot-specific servo config
+│   ├── demo_servo_config.yaml      #  MoveIt Servo config parameters for keyboard input demo
+│   ├── servo_parameters.yaml       # General MoveIt Servo settings
+│   └── tidybot_servo_config.yaml   # TidyBot-specific MoveIt Servo config
 ├── launch/
 │   ├── demo_twist.launch.py        # Demo servo control for arm
-│   └── joystick_twist.launch.py    # Joystick servo control
+│   ├── launch_moveit_pose_ik.launch.py # Position based solver bridge launch file
+│   └── launch_moveit_vel_ik.launch.py # Velocity based solver bridge launch file
 ├── src/
-│   ├── demo_plan.cpp               # Motion planning with Moveit2 API demonstration
-│   ├── keyboard_input.cpp          # Keyboard control interface
-│   └── teleop_to_moveit.cpp        # Teleoperation to MoveIt bridge
+│   ├── keyboard_input.cpp          # Keyboard control interface for velocity control demostration
+│   ├── moveit_ee_pose_ik.cpp       # Kinematics solver bridge for positiob based commands using MoveIt ik solver
+│   └── moveit_ee_vel_ik.cpp        # Kinematics sovler bridge for velocity based commands using Moveit Servo
 ├── include/
 │   └── tidybot_solver/             # C++ header files
 └── CMakeLists.txt
 ```
 
-## 🚀 Launch Files
+## 🚀 Try a real-time controlled robotic arm
 
-### `demo_twist.launch.py`
-Launch demonstration of motion planning and control capabilities.
+Launch a simulation scene with the Kinova Gen3 arm and a MoveIt Servo node for realtime servoing
 
 ```bash
 # Launch motion planning demo
-ros2 launch tidybot_solver demo_twist.launch.py
-
+ros2 launch tidybot_solver launch_realtime_servo.launch.py
+```
+Then in another terminal, launch the keyboard input 
+```bash
 # Run keyboard input node
 ros2 run tidybot_solver keyboard_input
 ```
+The `keyboard_input` node should prompt you with the key bindings to control the simulated arm in Gazebo
 
-**Features:**
-- Real-time servo motion planning demonstration
-- Keyboard control interface for testing
-- Collision avoidance visualization
-- Trajectory execution monitoring
+## `launch_moveit_vel_ik.launch.py`
+Launch velocity based solver bridge with MoveIt Servo API integration. Used by tidybot_policy package
 
-### `joystick_twist.launch.py`
-Launch joystick-controlled servo system with MoveIt2 integration. Included in tidybot_policy package
+The velocity based solver bridge will subscribe to 
+   - `/tidybot/arm/target_vel`: the target velocity of the end-effector in the planning frame 
+   - `/tidybot/gripper/commands`: the gripper commands indicating the desired gripper state
 
-**Features:**
-- Real-time servo control via joystick
-- Collision-aware motion
-- Emergency stop integration
-- Smooth trajectory generation
+Then computes the joint space command for the arm and relay it together with the gripper command to the simulation/hardware control interface
 
-## 🎛️ Control Nodes
+ROS2 arguments:
+   - `use_sim` whether to use simulation time
 
-### **Teleop to MoveIt Bridge (`teleop_to_moveit`)**
-Converts teleoperation commands to MoveIt2 motion plans and servo commands.
+## `launch_moveit_pose_ik.launch.py`
+Launch position based solver bridge with MoveIt IK solver. Used by tidybot_policy package for phone teleoperation and remote policy control. We choose MoveIt API instead of MoveIt Servo API because the MoveIt Servo does not seem to do as well for positoinal based control as for velocity control.
 
-```bash
-ros2 run tidybot_solver teleop_to_moveit
-```
+The position based solver bridge will subscribe to:
+   - `/tidybot/arm/target_pose`: the target pose of the end-effector in the planning frame
+   - `/tidybot/arm/delta_commands`: delta commands for position and orientation
+   - `/tidybot/gripper/commands`: the gripper commands
 
-**Subscribed Topics:**
-- `/tidybot/arm/target_pose` (geometry_msgs/Pose): Desired pose for the end-effector read from the WebXR app
-- `/tidybot/arm/delta_commands` (std_msgs/Float64MultiArray): Commanded end effector deltas, formatted as [delta_pos, delta_rot, gripper]
-- `/tidybot/gripper/commands` (std_msgs/Float64): Gripper state command read from the WebXR
+Then computes the joint space command for the arm using MoveIt's IK solver and relays it to the simulation/hardware control interface.
 
-**Published Topics:**
-- `/gen3_7dof_controller/joint_trajectory` (trajectory_msgs/JointTrajectory): Publish the computed joint trajectory for the arm to the arm ros2 controller
-- `/robotiq_2f_85_controller/commands` (std_msgs/Float64MultiArray): Publish the gripper state to the gripper ros2 controller
-- `/tidybot/hardware/arm/commands` (sensor_msgs/JointState): Solved joint angles to publish to hardware
-
-**Features:**
-- **Real-time Planning**: Continuous trajectory updates
-- **Collision Avoidance**: Automatic collision detection and avoidance
-- **Smooth Motion**: Velocity-based servo control for natural movement
-- **Safety Monitoring**: Joint limits and workspace constraints
-
-### **Joystick to MoveIt Bridge (`joystick_to_moveit`)**
-TODO
-
-### **Motion Planning Demo (`demo_plan`)**
-Demonstrates using Moveit2 C++ API to do motion planning for the arm
-
-```bash
-ros2 run tidybot_solver demo_plan
-```
-
-### **Keyboard Control (`keyboard_input`)**
-Simple keyboard interface for development and testing.
-
-```bash
-ros2 run tidybot_solver keyboard_input
-```
-
-**Key Bindings:**
-- **Arrow keys and '.' ';'**: Cartesian Jog
-- **1|2|3|4|5|6|7**: Joint Jog
-- **r**: Reverse the direction of jogging
-- **j**: Select joint jog mode
-- **t**: Select twist mode
-- **w|e**: Switch between sending command in base frame or end effector fram
-- **p**: Pause
-- **q**: Quit
+ROS2 arguments:
+   - `use_sim` whether to use simulation time
 
 ## ⚙️ Configuration
 
 ### **Servo Control Parameters**
 Refer to `config/servo_paramters.yaml` for a complete parameter list
-
-## 🔧 Integration with MoveIt2
-
-### **Planning Groups**
-The package works with the following MoveIt2 planning groups:
-- **gen3_7dof**: 7-DOF Kinova arm
-
-### **Motion Planning Pipeline**
-1. **Goal Specification**: Define target poses or joint configurations
-2. **Collision Scene**: Update planning scene with obstacles
-3. **Path Planning**: Generate collision-free trajectories
-4. **Trajectory Optimization**: Smooth and optimize paths
-5. **Execution**: Execute trajectories on real or simulated robot
-
 ## 🐛 Troubleshooting
 
 ### **Common Issues**
@@ -168,22 +96,6 @@ The package works with the following MoveIt2 planning groups:
    # Verify servo parameters
    ros2 param list /servo_node
    ```
-
-## 🔗 Dependencies
-
-### **ROS 2 Packages**
-- `moveit_core` (MoveIt2 core functionality)
-- `moveit_ros_planning_interface` (Planning interface)
-- `moveit_servo` (Real-time servo control)
-- `moveit_visual_tools` (Visualization utilities)
-- `moveit_msgs` (MoveIt message types)
-- `geometry_msgs`, `trajectory_msgs`
-- `tidybot_utils` (Custom message types)
-
-### **External Libraries**
-- `Eigen3` (Linear algebra)
-- `OMPL` (Open Motion Planning Library)
-- `FCL` (Flexible Collision Library)
 
 ## 📚 Additional Resources
 

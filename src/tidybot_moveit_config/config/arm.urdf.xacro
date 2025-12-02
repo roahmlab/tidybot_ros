@@ -3,7 +3,7 @@
     <xacro:arg name="initial_positions_file" default="initial_positions.yaml" />
 
     <!-- Import tidybot urdf file -->
-    <xacro:include filename="$(find tidybot_description)/urdf/arm.urdf" />
+    <xacro:include filename="$(find tidybot_description)/urdf/arm.xacro" />
 
     <!-- Import control_xacro -->
     <xacro:include filename="tidybot.ros2_control.xacro" />
