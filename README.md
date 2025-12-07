@@ -10,7 +10,11 @@ The TidyBot++ is a mobile manipulator consisting of:
 - **End Effector**: Robotiq 2F-85 parallel gripper
 - **Sensors**: Integrated wrist camera, base-mounted camera, optional external cameras
 ## 🔢 Policy Deployment Demos
-![Image](https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f)
+| <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
+|:--:|:--:|
+| Diffusion policy in Gazebo Sim | VLA on hardware |
+
+
 ## 🏗️ System Architecture
 ![Image](https://github.com/user-attachments/assets/097e7578-3f0e-4434-8396-53b5bb39c490)
 ## 📦 Package Descriptions
@@ -123,7 +127,7 @@ touch venv/COLCON_IGNORE
 colcon build && source install/setup.bash && export PYTHONPATH=$PWD/venv/lib/python3.12/site-packages:$PYTHONPATH
 ```
 
-To add venv path to your PYTHONPATH automatically everytime you start a new session, use
+To add venv path to your PYTHONPATH automatically every time you start a new session, use
 
 ```bash
 echo 'export PYTHONPATH=$HOME/tidybot_platform/venv/lib/python3.12/site-packages:$PYTHONPATH' >> ~/.bashrc
@@ -167,7 +171,7 @@ Connect to the a Xbox Series X gamepad and relay joystick messages to the robot
 ros2 launch tidybot_policy launch_gamepad_policy.launch.py use_sim:=<true | false>
 ```
 
-### Collect demonstratinos for Diffusion Policy training
+### Collect demonstrations for Diffusion Policy training
 
 #### 1. Setup the data collection pipeline
 Follow the previous section on how to launch a robot. Then launch the teleop with recording enabled
@@ -175,7 +179,7 @@ Follow the previous section on how to launch a robot. Then launch the teleop wit
 ```bash
 ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false> record:=true
 ```
-This launch file should publish a webserver that will promt the user to save/discard the recorded episode after the episode ends. If such a window does not pop up, try to refresh the webpage.
+This launch file should publish a webserver that will prompt the user to save/discard the recorded episode after the episode ends. If such a window does not pop up, try to refresh the webpage.
 
 The recorded episodes will be stored in `episode_bag` folder in the current directory as ros bags.
 
@@ -191,7 +195,7 @@ The converted dataset will be saved as `data.hdf5` under the current directory
 We recommend going to the original [Tidybot++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-training) codebae and learn how to train a diffusion policy for the tidybot platform. The structure of the dataset obtained from our platform is the same as the original Tidybot++ platform so you can try a policy in the same way on our platform.
 
 ### Policy Inference
-The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instrution in the original [Tidybo++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) project to setup the policy server on a GPU machine. Once the GPU server is running. Setup a SSH tunnel from the dev machine to the GPU server by
+The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instructions from the original [Tidybo++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) project to setup the policy server on a GPU machine. Once the GPU server is running, setup a SSH tunnel from the dev machine to GPU server by
 ```bash
 ssh -L 5555:localhost:5555 <gpu-server-hostname>
 ```
