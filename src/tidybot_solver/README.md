@@ -17,9 +17,9 @@ tidybot_solver/
 │   ├── launch_moveit_pose_ik.launch.py # Position based solver bridge launch file
 │   └── launch_moveit_vel_ik.launch.py # Velocity based solver bridge launch file
 ├── src/
-│   ├── keyboard_input.cpp          # Keyboard control interface for velocity control demostration
-│   ├── moveit_ee_pose_ik.cpp       # Kinematics solver bridge for positiob based commands using MoveIt ik solver
-│   └── moveit_ee_vel_ik.cpp        # Kinematics sovler bridge for velocity based commands using Moveit Servo
+│   ├── keyboard_input.cpp          # Keyboard control interface for velocity control demonstration
+│   ├── moveit_ee_pose_ik.cpp       # Kinematics solver bridge for position based commands using MoveIt ik solver
+│   └── moveit_ee_vel_ik.cpp        # Kinematics solver bridge for velocity based commands using Moveit Servo
 ├── include/
 │   └── tidybot_solver/             # C++ header files
 └── CMakeLists.txt
@@ -53,7 +53,7 @@ ROS2 arguments:
    - `use_sim` whether to use simulation time
 
 ## `launch_moveit_pose_ik.launch.py`
-Launch position based solver bridge with MoveIt IK solver. Used by tidybot_policy package for phone teleoperation and remote policy control. We choose MoveIt API instead of MoveIt Servo API because the MoveIt Servo does not seem to do as well for positoinal based control as for velocity control.
+Launch position based solver bridge with MoveIt IK solver. Used by tidybot_policy package for phone teleoperation and remote policy control. We choose MoveIt API instead of MoveIt Servo API because the MoveIt Servo does not seem to do as well for position based control as for velocity control.
 
 The position based solver bridge will subscribe to:
    - `/tidybot/arm/target_pose`: the target pose of the end-effector in the planning frame
