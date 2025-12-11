@@ -8,14 +8,8 @@ This package contains the auto-generated moveit_config package from the Tidybot 
 
 ### **Robot Model Configuration**
 - URDF Integration with tidybot_description package
-- Joint Groups for arm, base, and combined motion planning
-- End Effector configuration for gripper control
+- Joint groups for arm, gripper, base, and combined motion planning
 - Collision detection and self-collision matrix
-
-### **Motion Planning**
-- Planning Groups: arm (gen3_7dof)
-- Multiple planning pipeline configurations
-- Collision detection settings
 
 ### **Kinematics**
 - KDL kinematic solver configurations

@@ -92,7 +92,7 @@ ros2 run tidybot_episode rosbag_to_parquet input_dir:=episode_bag output:=data.p
             └── wrist_image       # (N x 84 x 84 x 3)
 ```
 
-### **Parquet Dataset Format (For RLDS generation)**
+### **Parquet Dataset Format (For RLDS/LeRobot generation)**
 ```
 /episode_<timestamp>.parquet
 ├── observed state          # EEF XYZ (3) + Quaternion (4) + Gripper Open/Close (1) 

@@ -31,7 +31,7 @@ class Camera(Node):
         self.br = CvBridge()
 
         # Use webcam
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture(4)
 
         if not self.cap.isOpened():
             self.get_logger().error("Failed to open webcam (/dev/video4)")
@@ -43,7 +43,7 @@ class Camera(Node):
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.get_logger().info(f"Webcam resolution: {w}x{h}")
 
-        fps = 10
+        fps = 30
         self.timer = self.create_timer(1.0 / fps, self.timer_callback)
 
     def timer_callback(self):

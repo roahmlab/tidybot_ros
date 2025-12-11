@@ -1,14 +1,14 @@
 # tidybot_driver
 ## 📖 Overview
-`tidybot_driver` provides a ROS 2 hardware bridge for the TidyBot++. It wraps the Kinova Gen3 arm, Robotiq 2F-85 gripper, Powered-caster holonomic mobile base, and onboard vision devices behind ROS topics, services, and launch files. The package is designed to pair with `tidybot_policy` (for command generation) and `tidybot_solver` (for IK and servo pipelines).
+`tidybot_driver` provides a ROS 2 hardware bridge for the TidyBot++. It wraps the Kinova Gen3 arm, Robotiq 2F-85 gripper, powered-caster holonomic mobile base, and onboard vision devices behind ROS topics, services, and launch files. The package is designed to pair with `tidybot_policy` (for command generation) and `tidybot_solver` (for IK and servo pipelines).
 
 ## 🎯 Highlights
 - Unified launch (`launch_hardware_robot.launch.py`) to bring up robot description, TF relay, drivers, and cameras with selectable modes (`full`, `arm_only`, `base_only`).
-- Arm server with compliant joint controller, hardware reset service, and real-time joint-state publishing.
+- Arm server with compliant joint controller, hardware reset service, and joint state publishing.
 - Base server supporting position or velocity control modes via CANivore USB-C bridge.
 - Wrist RTSP and external USB camera publishers with configurable frame rate/resolution.
 - Joint state publisher to combine base and arm states for downstream consumers.
-- Optional RViz configuration (`config/hardware.rviz`) for quick visual diagnostics.
+- Optional RViz configuration (`config/hardware.rviz`).
 
 ## 📁 Package Layout
 
@@ -94,7 +94,7 @@ Launch actions:
 
 ### `joint_state_publisher`
 - Reads hardware feedback and republishes consolidated joint states for MoveIt and logging.
-- Handles the selected `mode` to include only active subsystems.
+- Handles the selected `mode` and inputs placeholder states for non-active components.
 
 ### Utility scripts
 - `play_csv_pose.py` / `play_csv_delta.py`: replay motions recorded offline (expects CSVs with teleop pose/delta columns).

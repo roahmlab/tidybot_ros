@@ -238,11 +238,14 @@ private:
 
         if (record_arm_camera_)
         {
+            rclcpp::QoS qos(1);
+            qos.reliability(RMW_QOS_POLICY_RELIABILITY_BEST_EFFORT)
+            .history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
             arm_image_sub_ = image_transport::create_subscription(
                 this, "/tidybot/camera_wrist/color/raw",
                 [this](const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
                     last_arm_image_ = msg;
-                }, "raw");
+                }, "raw", qos.get_rmw_qos_profile());
         }
         else
         {

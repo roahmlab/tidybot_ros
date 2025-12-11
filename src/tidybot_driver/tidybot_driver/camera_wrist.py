@@ -21,13 +21,13 @@ class Camera(Node):
         super().__init__('tidybot_wrist_camera')
 
         qos = QoSProfile(
-            reliability=ReliabilityPolicy.RELIABLE,
+            reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
-            depth=10
+            depth=5
         )
         self.declare_parameter('fps', 30)
-        self.declare_parameter('image_width', 640)
-        self.declare_parameter('image_height', 480)
+        self.declare_parameter('image_width', 224)
+        self.declare_parameter('image_height', 224)
         self.declare_parameter('read_timeout_sec', 0.1)  # seconds to wait for read()
 
         self.fps = self.get_parameter('fps').get_parameter_value().integer_value

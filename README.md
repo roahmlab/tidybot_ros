@@ -1,6 +1,8 @@
 # TidyBot++ ROS2 Platform
 
-A comprehensive ROS 2 platform for controlling the [TidyBot++](https://tidybot2.github.io/) mobile manipulator robot. This platform provides simulation, hardware control, teleoperation, and data collection capabilities for a mobile robot equipped with a Kinova Gen3 7-DOF arm and Robotiq 2F-85 gripper. Credit to Jimmy Wu et. al for the original hardware design, hardware drivers and WebXR teleoperation interface.
+A comprehensive ROS 2 platform for controlling the [TidyBot++](https://tidybot2.github.io/) mobile manipulator. This codebase integrates a policy learning pipeline into both simulated and real environments, and encapsulates all communication using ROS 2 nodes. Developed at the [ROAHM Lab](https://www.roahmlab.com/) at the University of Michigan, Ann Arbor.
+
+Credit to Jimmy Wu et. al for the original hardware design, low-level controllers and WebXR teleoperation interface (see full citation below).
 
 ## 🤖 Robot Overview
 
@@ -8,8 +10,13 @@ The TidyBot++ is a mobile manipulator consisting of:
 - **Mobile Base**: Omnidirectional platform with holonomic drive
 - **Manipulator**: Kinova Gen3 7-DOF robotic arm
 - **End Effector**: Robotiq 2F-85 parallel gripper
-- **Sensors**: Integrated wrist camera, base-mounted camera, optional external cameras
+- **Sensors**: RGBD wrist/base-mounted cameras, optional external cameras
+
+A complete bill of materials and hardware setup guide is available in the [original project documentation](https://tidybot2.github.io/docs/).
+
 ## 🔢 Policy Deployment Demos
+Using this codebase, we have successfully trained diffusion policies and finetuned vision-language-action models. Below are demonstrations of policies deployed in our simulated environment and on hardware:
+
 | <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
 |:--:|:--:|
 | Diffusion policy in Gazebo Sim | VLA on hardware |
@@ -17,56 +24,51 @@ The TidyBot++ is a mobile manipulator consisting of:
 
 ## 🏗️ System Architecture
 ![Image](https://github.com/user-attachments/assets/097e7578-3f0e-4434-8396-53b5bb39c490)
-## 📦 Package Descriptions
 
-### Core Packages
+## 📦 Core Packages
 
-#### `tidybot_description`
+#### [`tidybot_description`](./src/tidybot_description/README.md)
 Robot model definition and simulation setup.
 - URDF/XACRO files for complete robot description
-- Gazebo simulation configuration
-- RViz visualization setup
-- Controller configuration files
+- Configurations for Gazebo simulation
+- Setup for RViz visualization 
 
-#### `tidybot_driver` 
-Hardware interface for real robot control.
-- Kinova arm driver integration
+#### [`tidybot_driver`](./src/tidybot_driver/README.md)
+Low-level controllers for hardware.
+- Kinova Kortex API integration
 - Mobile base control interface
-- Camera streaming capabilities
-- Joint state publishing and command handling
+- Publishers for camera feeds
+- Joint state publisher
 
-#### `tidybot_policy`
-Teleoperation and remote control policies.
+#### [`tidybot_policy`](./src/tidybot_policy/README.md)
+Teleoperation and policy deployment.
 - WebXR-based smartphone teleoperation
 - Gamepad-based teleoperation
-- Remote policy server integration
+- Remote inference integration
 - Real-time control command processing
 - Episode recording integration
 
-#### `tidybot_solver`
-Motion planning and control integration.
+#### [`tidybot_solver`](./src/tidybot_solver/README.md)
+Motion planning and inverse kinematics. We integrate the original TidyBot++ WebXR teleoperation interface with MoveIt2.
 - MoveIt2 integration for arm planning
 - Real-time servo control capabilities
-- Trajectory execution and monitoring
+- Execution of trajectories on low-level controllers
 
-#### `tidybot_moveit_config`
-MoveIt2 configuration package (auto-generated).
+#### [`tidybot_moveit_config`](./src/tidybot_moveit_config/README.md)
+MoveIt2 configuration package (auto-generated from robot description).
 - Motion planning configuration
 - Kinematics solver setup
 - Collision detection parameters
 - Planning scene configuration
 
-#### `tidybot_episode`
+#### [`tidybot_episode`](./src/tidybot_episode/README.md)
 Data recording and replay system.
-- ROS bag recording of control episodes
-- Data conversion to HDF5 format
-- Dataset generation for machine learning
+- ROS bag recording of teleoperation episodes
+- Data conversion to HDF5 format or .parquet
+- Dataset generation for policy training
 
-#### `tidybot_utils`
-Shared utilities and message definitions.
-- Custom message types for teleoperation
-- Service definitions for environment reset
-- Utility functions and constants
+#### [`tidybot_utils`](./src/tidybot_utils/README.md)
+Custom messages and services for teleoperation
 
 ## 🚀 Quick Start
 
@@ -141,7 +143,7 @@ sudo bash ./scripts/setup_docker_can.sh
 
 ## 🎮 Example usage
 
-### Choose a robot to play with
+### Choose a robot environment
 
 #### 1. Simulated robot
 ```bash
@@ -192,10 +194,10 @@ ros2 run tidybot_episode rosbag_to_hdf5
 The converted dataset will be saved as `data.hdf5` under the current directory
 
 ### Policy Training
-We recommend going to the original [Tidybot++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-training) codebae and learn how to train a diffusion policy for the tidybot platform. The structure of the dataset obtained from our platform is the same as the original Tidybot++ platform so you can try a policy in the same way on our platform.
+We recommend going to the original [Tidybot++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-training) codebase to train a diffusion policy for the tidybot platform. Our platform generates datasets with an identical structure to the original project.
 
 ### Policy Inference
-The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instructions from the original [Tidybo++](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) project to setup the policy server on a GPU machine. Once the GPU server is running, setup a SSH tunnel from the dev machine to GPU server by
+The policy server in this part is adapted from the original Tidybot++ project. You can follow the same instructions from the original [documentation](https://github.com/jimmyyhwu/tidybot2?tab=readme-ov-file#policy-inference) to setup the policy server on a GPU machine. Once the GPU server is running, setup a SSH tunnel from the dev machine to GPU server by
 ```bash
 ssh -L 5555:localhost:5555 <gpu-server-hostname>
 ```
@@ -239,17 +241,16 @@ This launch file will also launch a webserver that can be used to control the po
    - Check CAN bus connection: `candump can0`
 
 4. **Docker Container Issues**
-   - Q: Why I cannot launch Rviz / Gazabo simulation viewer inside the container?
-     - A: Try to establish X11 permissions/Xauthority on the host before starting the container:
-         ```bash
-         xhost +SI:localuser:$(whoami)
-         xhost +SI:localuser:root
-         ```
-         If you are on Wayland, export an X display first:
-         ```bash
-         export DISPLAY=${DISPLAY:-:0}
-         ```
-         Then restart the container.
+   - If the Rviz / Gazebo simulation viewer does not launch, try to establish X11 permissions/Xauthority on the host before starting the container:
+      ```bash
+      xhost +SI:localuser:$(whoami)
+      xhost +SI:localuser:root
+      ```
+      If you are on Wayland, export an X display first:
+      ```bash
+      export DISPLAY=${DISPLAY:-:0}
+      ```
+      Then restart the container.
    
 
 ### Logs and Debugging
@@ -265,13 +266,22 @@ This launch file will also launch a webserver that can be used to control the po
 4. Test thoroughly
 5. Submit a pull request
 
+## 📞 **Maintainers**:
+- Zhuoyang Chen (janchen@umich.edu)
+- Yuandi Huang (yuandi@umich.edu)
+
 ## 🔗 Related Projects
 
 - [The original Tidybot++ project](https://tidybot2.github.io/)
+   ```bibtex
+   @inproceedings{wu2024tidybot,
+    title = {TidyBot++: An Open-Source Holonomic Mobile Manipulator for Robot Learning},
+    author = {Wu, Jimmy and Chong, William and Holmberg, Robert and Prasad, Aaditya and Gao, Yihuai and Khatib, Oussama and Song, Shuran and Rusinkiewicz, Szymon and Bohg, Jeannette},
+    booktitle = {Conference on Robot Learning},
+    year = {2024}
+  }
 - [MoveIt2](https://moveit.ros.org/)
 - [Kinova Gen3 ROS2](https://github.com/Kinovarobotics/ros2_kortex)
 - [OrbbecSDK ROS2](https://github.com/orbbec/OrbbecSDK_ROS2)
 - [Diffusion Policy](https://github.com/real-stanford/diffusion_policy)
 ---
-
-*TidyBot++ Platform - Enabling advanced mobile manipulation research and applications*

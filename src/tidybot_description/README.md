@@ -6,16 +6,16 @@
 
 ## 🤖 Robot Components
 
-### **Base Platform**
+### **Mobile Base**
 - Powered-caster holonomic base with omnidirectional drive (x, y, yaw)
 - Configurable in position or velocity control modes (`tidybot_controllers.yaml`)
 
-### **Manipulator Stack**
+### **Manipulator**
 - Kinova Gen3 7-DOF arm with compliant joint controller support
-- Transmission macros and ROS2 control interfaces for joint trajectory execution
+- Transmission macros and ROS2 control interfaces for executing trajectories
 
 ### **End Effectors**
-- Robotiq 2F-85 grasping configuration with visual/collision meshes
+- Robotiq 2F-85 with visual/collision meshes
 - Placeholder macros for Kinova Lite gripper variants
 
 ### **Vision & Sensors**

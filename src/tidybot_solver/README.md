@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This package provides motion planning, trajectory optimization, and real-time control capabilities for the TidyBot++ mobile manipulator. It integrates with MoveIt2 for advanced motion planning and provides velocity based kinematics solver for real-time joystick control and position based kinematics solver for phone teleoperation and remote policy control.
+This package provides motion planning and trajectory optimization using MoveIt2. It includes a velocity-based kinematics solver for real-time joystick control and position-based kinematics solver for phone teleoperation or remote inference.
 
 ## 📁 Package Structure
 
@@ -25,7 +25,7 @@ tidybot_solver/
 └── CMakeLists.txt
 ```
 
-## 🚀 Try a real-time controlled robotic arm
+## 🚀 Keyboard Teleoperation Demo in Gazebo
 
 Launch a simulation scene with the Kinova Gen3 arm and a MoveIt Servo node for realtime servoing
 
@@ -41,7 +41,7 @@ ros2 run tidybot_solver keyboard_input
 The `keyboard_input` node should prompt you with the key bindings to control the simulated arm in Gazebo
 
 ## `launch_moveit_vel_ik.launch.py`
-Launch velocity based solver bridge with MoveIt Servo API integration. Used by tidybot_policy package
+Launches velocity based solver bridge with MoveIt Servo API integration. Used by tidybot_policy package
 
 The velocity based solver bridge will subscribe to 
    - `/tidybot/arm/target_vel`: the target velocity of the end-effector in the planning frame 
@@ -53,7 +53,7 @@ ROS2 arguments:
    - `use_sim` whether to use simulation time
 
 ## `launch_moveit_pose_ik.launch.py`
-Launch position based solver bridge with MoveIt IK solver. Used by tidybot_policy package for phone teleoperation and remote policy control. We choose MoveIt API instead of MoveIt Servo API because the MoveIt Servo does not seem to do as well for position based control as for velocity control.
+Launches position based solver bridge with MoveIt IK solver. Used by tidybot_policy package for phone teleoperation and remote policy control. We choose MoveIt API instead of MoveIt Servo API because the MoveIt Servo does not seem to do as well for position based control as for velocity control.
 
 The position based solver bridge will subscribe to:
    - `/tidybot/arm/target_pose`: the target pose of the end-effector in the planning frame
