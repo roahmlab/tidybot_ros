@@ -42,6 +42,7 @@ episode_bag/
 *.hdf5
 *.parquet
 *.urdf
+!tidybot_isaac.urdf
 
 # OS-specific junk
 .DS_Store
