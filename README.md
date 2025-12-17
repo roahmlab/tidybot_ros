@@ -17,7 +17,7 @@ A complete bill of materials and hardware setup guide is available in the [origi
 ## 🔢 Policy Deployment Demos
 Using this codebase, we have successfully trained diffusion policies and finetuned vision-language-action models. Below are demonstrations of policies deployed in our simulated environment and on hardware:
 
-| <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/5474a5de-8b30-43ec-b47a-9cdd591eae9e" width="325"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
+| <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/abe826a9-dc3a-4d32-8665-148473e8a45c" width="325"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
 |:--:|:--:|:--:|
 | Diffusion policy in Gazebo Sim | Diffusion policy in Isaac Sim | VLA on hardware |
 
