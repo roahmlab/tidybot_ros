@@ -19,7 +19,7 @@ Using this codebase, we have successfully trained diffusion policies and finetun
 
 | <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/abe826a9-dc3a-4d32-8665-148473e8a45c" width="530"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
 |:--:|:--:|:--:|
-| Diffusion policy in Gazebo Sim | Diffusion policy in Isaac Sim | VLA on hardware |
+| Diffusion policy in Gazebo Sim | Diffusion policy on hardware | VLA on hardware |
 
 
 ## 🏗️ System Architecture
