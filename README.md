@@ -4,6 +4,10 @@ A comprehensive ROS 2 platform for controlling the [TidyBot++](https://tidybot2.
 
 This project is an adaptation of the original TidyBot++ project (Wu et. al., full citation below) and other open-source projects. 
 
+## 📞 **Maintainers**:
+- Zhuoyang Chen (janchen@umich.edu)
+- Yuandi Huang (yuandi@umich.edu)
+
 ## 🤖 Robot Overview
 
 The TidyBot++ is a mobile manipulator consisting of:
@@ -266,9 +270,7 @@ This launch file will also launch a webserver that can be used to control the po
 4. Test thoroughly
 5. Submit a pull request
 
-## 📞 **Maintainers**:
-- Zhuoyang Chen (janchen@umich.edu)
-- Yuandi Huang (yuandi@umich.edu)
+
 
 ## 🔗 Related Projects
 
