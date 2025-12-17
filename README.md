@@ -2,7 +2,7 @@
 
 A comprehensive ROS 2 platform for controlling the [TidyBot++](https://tidybot2.github.io/) mobile manipulator. This codebase integrates a policy learning pipeline into both simulated and real environments, and encapsulates all communication using ROS 2 nodes. Developed at the [ROAHM Lab](https://www.roahmlab.com/) at the University of Michigan, Ann Arbor.
 
-Credit to Jimmy Wu et. al for the original hardware design, low-level controllers and WebXR teleoperation interface (see full citation below).
+This project is an adaptation of the original TidyBot++ project (Wu et. al., full citation below) and other open-source projects. 
 
 ## 🤖 Robot Overview
 
