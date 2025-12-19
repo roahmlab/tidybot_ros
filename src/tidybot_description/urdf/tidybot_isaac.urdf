@@ -430,7 +430,7 @@
       <inertia ixx="2.89328108496468E-06" ixy="-1.57935047237397E-19" ixz="-1.93980378593255E-19" iyy="1.86719750325683E-06" iyz="-1.21858577871576E-06" izz="1.21905238907251E-06"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -439,7 +439,7 @@
       </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -538,7 +538,7 @@
       <inertia ixx="2.89328108496468E-06" ixy="-1.57935047237397E-19" ixz="-1.93980378593255E-19" iyy="1.86719750325683E-06" iyz="-1.21858577871576E-06" izz="1.21905238907251E-06"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
       </geometry>
@@ -547,7 +547,7 @@
       </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
       <geometry>
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
       </geometry>

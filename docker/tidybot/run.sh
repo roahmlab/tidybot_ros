@@ -1,17 +1,21 @@
 #!/usr/bin/env bash
+#
+# Run the TidyBot platform container
+#
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+DOCKER_DIR=$SCRIPT_DIR/..
+REPO_ROOT=$SCRIPT_DIR/../..
+
 IMAGE_TAG=tidybot_platform
 CONTAINER_NAME=tidybot_platform
-DATA_DIR=$SCRIPT_DIR/../
+DATA_DIR=$REPO_ROOT
 XRUN="/run/user/$(id -u)"
 USER_NAME=${USER_NAME:-$(whoami)}
 
 # Resolve host group IDs for reliable permission mapping inside container
 RENDER_GID=$(getent group render | cut -d: -f3 || true)
 VIDEO_GID=$(getent group video | cut -d: -f3 || true)
-
-capabilities_str=\""capabilities=compute,utility,graphics,display\""
 
 DOCKER_OPTIONS=""
 DOCKER_OPTIONS+="-it "
@@ -59,7 +63,6 @@ if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
   # Mount host NVIDIA ICD/EGL vendor JSONs so Vulkan/EGL can find the driver in-container
   if [ -d "/usr/share/vulkan/icd.d" ]; then
     DOCKER_OPTIONS+="-v /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro "
-    # Hint Vulkan to NVIDIA ICD (path inside container after bind-mount)
     DOCKER_OPTIONS+="-e VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json "
   fi
   if [ -d "/usr/share/glvnd/egl_vendor.d" ]; then
@@ -72,9 +75,12 @@ else
   DOCKER_OPTIONS+="-e LIBGL_DRI3_DISABLE=${LIBGL_DRI3_DISABLE:-0} "
   DOCKER_OPTIONS+="-e LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-0} "
 fi
+
+# ROS 2 DDS configuration (must match Isaac Sim container for cross-container communication)
 DOCKER_OPTIONS+="-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} "
+DOCKER_OPTIONS+="-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp "
 DOCKER_OPTIONS+="-e FASTRTPS_DEFAULT_PROFILES_FILE=/fastdds.xml "
-DOCKER_OPTIONS+="-v $SCRIPT_DIR/fastdds_isaac.xml:/fastdds.xml:ro "
+DOCKER_OPTIONS+="-v $DOCKER_DIR/fastdds.xml:/fastdds.xml:ro "
 
 echo $CONTAINER_NAME
 
@@ -98,3 +104,4 @@ else
   echo "Attaching to existing container"
   docker exec -it $CONTAINER_NAME /entrypoint.sh
 fi
+

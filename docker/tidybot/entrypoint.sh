@@ -11,3 +11,4 @@ if [ -f "/home/${USER}/tidybot_platform/install/setup.bash" ]; then
 fi
 
 exec "/bin/bash"
+
