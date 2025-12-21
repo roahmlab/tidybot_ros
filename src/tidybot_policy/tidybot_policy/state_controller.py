@@ -1,12 +1,12 @@
 from enum import Enum
 import rclpy
 from rclpy.node import Node
+from rclpy.callback_groups import ReentrantCallbackGroup
 from std_msgs.msg import String
 from std_srvs.srv import Empty
 from std_srvs.srv import SetBool
 from geometry_msgs.msg import Pose
 from ros_gz_interfaces.srv import ControlWorld, SpawnEntity
-from std_srvs.srv import Empty
 from ament_index_python.packages import get_package_share_directory
 import subprocess
 
@@ -27,12 +27,19 @@ class State(Enum):
 class StateController(Node):
     def __init__(self):
         super().__init__("state_controller")
-        self.declare_parameter("use_sim", True)
+        
+        # Use reentrant callback group for service calls
+        self.callback_group = ReentrantCallbackGroup()
+        
+        # sim_mode: "hardware", "gazebo", or "isaac"
+        self.declare_parameter("sim_mode", "hardware")
         self.declare_parameter("use_remote", False)
         self.declare_parameter("record", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        self.sim_mode = self.get_parameter("sim_mode").get_parameter_value().string_value
         self.use_remote = self.get_parameter("use_remote").get_parameter_value().bool_value
         self.record = self.get_parameter("record").get_parameter_value().bool_value
+        
+        self.get_logger().info(f"StateController initialized with sim_mode: {self.sim_mode}")
 
         self.state_sub = self.create_subscription(
             String, "/teleop_state", self.state_callback, 10
@@ -55,6 +62,16 @@ class StateController(Node):
         self.reset_controller_cli = self.create_client(Empty, "/tidybot/policy/reset")
         while not self.reset_controller_cli.wait_for_service(timeout_sec=1.0):
             self.get_logger().info("Waiting for policy reset service...")
+        
+        # Isaac Sim reset service (provided by isaac_sim_bridge)
+        if self.sim_mode == "isaac":
+            self.isaac_reset_cli = self.create_client(
+                Empty, 
+                "/isaac_sim/reset_env",
+                callback_group=self.callback_group
+            )
+            while not self.isaac_reset_cli.wait_for_service(timeout_sec=5.0):
+                self.get_logger().info("Waiting for Isaac Sim reset service...")
 
         self.state = State.IDLE
         self.awaiting_save_decision = False
@@ -64,12 +81,15 @@ class StateController(Node):
         match msg.data:
             case "reset_env":
                 if self.state == State.IDLE or self.state == State.EPISODE_FINISHED:
-                    self.get_logger().info(f"{GREEN}{BOLD}Resetting environment...{RESET}")
+                    self.get_logger().info(f"{GREEN}{BOLD}Resetting environment (sim_mode={self.sim_mode})...{RESET}")
                     self.state = State.ENVIRONMENT_RESET
-                    # Reset the environment
-                    if self.use_sim:
+                    # Reset the environment based on sim_mode
+                    if self.sim_mode == "gazebo":
                         subprocess.run(["ros2", "run", "tidybot_policy", "reset_env"])
-                    else:
+                    elif self.sim_mode == "isaac":
+                        # Call Isaac Sim bridge reset service (synchronous call via service)
+                        self.reset_isaac_sim()
+                    else:  # hardware
                         self.reset_base_cli.call_async(Empty.Request())
                         self.reset_arm_cli.call_async(Empty.Request())
                     # Reset Controller
@@ -105,6 +125,25 @@ class StateController(Node):
         req = SetBool.Request()
         req.data = save
         self.finalize_recording_cli.call_async(req)
+
+    def reset_isaac_sim(self):
+        """Call Isaac Sim bridge reset service and wait for completion."""
+        
+        self.get_logger().info("Calling Isaac Sim reset service...")
+        future = self.isaac_reset_cli.call_async(Empty.Request())
+        
+        # Wait for the service to complete (with timeout)
+        import time
+        start_time = time.time()
+        timeout = 15.0  # seconds
+        
+        while not future.done():
+            if time.time() - start_time > timeout:
+                self.get_logger().error(f"Timeout ({timeout}s) waiting for Isaac Sim reset")
+                return
+            rclpy.spin_once(self, timeout_sec=0.1)
+        
+        self.get_logger().info("Isaac Sim reset complete")
 
 
 def main(args=None):

@@ -32,8 +32,10 @@ class ArmControlFrame(Enum):
 class GamepadPolicy(Node):
     def __init__(self):
         super().__init__("gamepad_policy")
-        self.declare_parameter("use_sim", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        # sim_mode: "hardware", "gazebo", or "isaac"
+        self.declare_parameter("sim_mode", "hardware")
+        self.sim_mode = self.get_parameter("sim_mode").get_parameter_value().string_value
+        self.is_sim = self.sim_mode in ["gazebo", "isaac"]
         self.declare_parameter("control_frequency", 20.0)
         self.control_frequency = (
             self.get_parameter("control_frequency").get_parameter_value().double_value
@@ -106,7 +108,7 @@ class GamepadPolicy(Node):
             Float64, "/tidybot/gripper/commands", 10
         )
         self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot/base/target_vel", 10)
-        if self.use_sim:
+        if self.is_sim:
             self.base_pub_sim = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_vel_controller/commands", 10
             )
@@ -205,7 +207,7 @@ class GamepadPolicy(Node):
             if self.last_control_enabled:
                 # Send a single zero command to stop hardware safely
                 self.base_pub.publish(base_cmd)
-                if self.use_sim:
+                if self.is_sim:
                     self.base_pub_sim.publish(base_cmd)
                 self.arm_pub.publish(arm_cmd)
                 self.publish_gripper()
@@ -226,7 +228,7 @@ class GamepadPolicy(Node):
             base_cmd_msg = Float64MultiArray()
             base_cmd_msg.data = base_values
             self.base_pub.publish(base_cmd_msg)
-            if self.use_sim:
+            if self.is_sim:
                 self.base_pub_sim.publish(base_cmd_msg)
 
         elif self.control_mode == ControlMode.ARM:
@@ -265,7 +267,7 @@ class GamepadPolicy(Node):
                 return
 
         self.get_logger().info(f"{GREEN}Requesting arm and base reset...{RESET}")
-        if not self.use_sim:
+        if not self.is_sim:
             self._call_reset_service(self.reset_arm_cli, "arm")
             self._call_reset_service(self.reset_base_cli, "base")
         self.last_reset_time = now

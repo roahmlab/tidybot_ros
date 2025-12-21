@@ -86,6 +86,8 @@ RUN apt-get update && apt-get install -y \
         ros-${ROS_DISTRO}-ros2-control \
         ros-${ROS_DISTRO}-ros2-controllers \
         ros-${ROS_DISTRO}-joint-state-broadcaster \
+        ros-${ROS_DISTRO}-joint-state-publisher \
+        ros-${ROS_DISTRO}-joint-state-publisher-gui \
         ros-${ROS_DISTRO}-joint-trajectory-controller \
         ros-${ROS_DISTRO}-rqt-controller-manager \
         ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
@@ -98,7 +100,8 @@ RUN apt-get update && apt-get install -y \
         ros-${ROS_DISTRO}-diagnostic-updater \
         ros-${ROS_DISTRO}-diagnostic-msgs \
         ros-${ROS_DISTRO}-statistics-msgs \
-        ros-${ROS_DISTRO}-backward-ros && \
+        ros-${ROS_DISTRO}-backward-ros \
+        ros-${ROS_DISTRO}-simulation-interfaces && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo

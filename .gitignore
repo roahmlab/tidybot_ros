@@ -54,5 +54,4 @@ Thumbs.db
 /openvla_finetuning_utils
 
 # Ignore Isaac Sim workspace
-isaac_workspace/*.usd
-isaac_workspace/tidybot_isaac/
+isaac_sim_workspace/

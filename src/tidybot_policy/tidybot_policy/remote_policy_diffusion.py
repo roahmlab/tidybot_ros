@@ -25,11 +25,12 @@ REMOTE_CONTROL_FREQUENCY = 10  # Hz
 class RemotePolicyDiffusion(Node):
     def __init__(self):
         super().__init__("remote_policy_diffusion")
-        # TODO: add real robot control
-        self.declare_parameter("use_sim", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        # sim_mode: "hardware", "gazebo", or "isaac"
+        self.declare_parameter("sim_mode", "hardware")
+        self.sim_mode = self.get_parameter("sim_mode").get_parameter_value().string_value
+        self.is_sim = self.sim_mode in ["gazebo", "isaac"]
         self.get_logger().info(
-            "Remote controller initialized with use_sim: {}".format(self.use_sim)
+            f"Remote controller initialized with sim_mode: {self.sim_mode}"
         )
 
         self.tf_buffer = Buffer()
@@ -84,7 +85,7 @@ class RemotePolicyDiffusion(Node):
         self.base_pub = self.create_publisher(
             Float64MultiArray, "/tidybot/base/target_pose", 10
         )
-        if self.use_sim:
+        if self.is_sim:
             self.base_pub_sim = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
             )
@@ -153,7 +154,7 @@ class RemotePolicyDiffusion(Node):
         base_command = Float64MultiArray()
         base_command.data = [rep_base_pose[0], rep_base_pose[1], rep_base_pose[2]]
         self.base_pub.publish(base_command)
-        if self.use_sim:
+        if self.is_sim:
             self.base_pub_sim.publish(base_command)
 
         if rep_gripper is not None:

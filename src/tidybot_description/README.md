@@ -156,7 +156,7 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Step 1: Import Robot into Isaac Sim
+### Step 1: Import Robot into Isaac Sim and Load Exntensions
 
 1. **Start Isaac Sim** (via Docker or native installation)
 
@@ -170,6 +170,10 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
    - Click "Import"
 
 3. **Verify the robot** appears in the stage at `/World/tidybot`
+4. **Load Simulation Control Extension** 
+    - Go to `Window` → `Extensions`
+    - Search for `isaacsim.ros2.sim_control`
+    - Enable the extension
 
 ### Step 2: Configure the Robot
 
@@ -187,6 +191,7 @@ Run this after importing the URDF into Isaac Sim.
 import omni.usd
 from pxr import Usd, UsdPhysics, Sdf
 import omni.graph.core as og
+from pxr import UsdPhysics
 
 # Configuration
 ROBOT_PATH = "/World/tidybot"
@@ -242,7 +247,7 @@ if not stage.GetPrimAtPath(joints_path).IsValid():
 print(f"Joints path: {joints_path}")
 
 # Configure joint drives
-def configure_drive(joint_path, stiffness, damping, drive_type="angular"):
+def configure_drive(joint_path, stiffness, damping, max_force, drive_type="angular"):
     prim = stage.GetPrimAtPath(joint_path)
     if not prim.IsValid():
         print(f"  WARNING: Joint not found: {joint_path}")
@@ -251,21 +256,29 @@ def configure_drive(joint_path, stiffness, damping, drive_type="angular"):
     drive.CreateTypeAttr("force")
     drive.CreateStiffnessAttr(stiffness)
     drive.CreateDampingAttr(damping)
-    print(f"  Configured: {joint_path}")
+    drive.CreateMaxForceAttr(max_force)
+    print(f"  Configured: {joint_path} (stiffness={stiffness}, damping={damping}, maxForce={max_force})")
     return True
 
 print("\nConfiguring base joints...")
+# Base joints need high stiffness, moderate damping, and HIGH max force for responsive movement
+# The base is heavy (~34 kg) so it needs significant force to move quickly
 for name in BASE_JOINTS:
     drive_type = "linear" if name in ["joint_x", "joint_y"] else "angular"
-    configure_drive(f"{joints_path}/{name}", 1e7, 1e5, drive_type)
+    # Stiffness: 1e6 (high for position tracking)
+    # Damping: 1e4 (moderate for smooth motion without oscillation)  
+    # MaxForce: 1e6 (very high to allow fast movement)
+    configure_drive(f"{joints_path}/{name}", 1e6, 1e4, 1e6, drive_type)
 
 print("\nConfiguring arm joints...")
 for name in ARM_JOINTS:
-    configure_drive(f"{joints_path}/{name}", 1e4, 1e3, "angular")
+    # Arm joints: moderate stiffness and damping, high max force
+    configure_drive(f"{joints_path}/{name}", 1e5, 1e3, 1e4, "angular")
 
 print("\nConfiguring gripper joints...")
 for name in GRIPPER_JOINTS:
-    configure_drive(f"{joints_path}/{name}", 1e3, 1e2, "angular")
+    # Gripper joints: lower stiffness for compliant grasping
+    configure_drive(f"{joints_path}/{name}", 1e4, 1e2, 1e3, "angular")
 
 # Create ROS 2 Action Graph
 print("\nCreating ROS 2 Action Graph...")
@@ -297,6 +310,7 @@ og.Controller.edit(
             ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
             ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
             ("ReadSimTime.outputs:simulationTime", "PublishClock.inputs:timeStamp"),
+            ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
             ("SubscribeJointState.outputs:execOut", "ArticulationController.inputs:execIn"),
             ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
             ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
