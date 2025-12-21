@@ -52,7 +52,7 @@
     </inertial>
   </link>
   <joint name="joint_x" type="prismatic">
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.0"/>
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.085"/>
     <parent link="world"/>
     <child link="joint_x_jointbody"/>
     <axis xyz="1 0 0"/>
@@ -659,7 +659,7 @@
     <child link="left_inner_knuckle"/>
     <axis xyz="1 0 0"/>
     <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <mimic joint="left_outer_knuckle_joint" multiplier="1" offset="0"/>
+    <!-- mimic removed - handled by bridge node -->
   </joint>
   <joint name="left_inner_finger_joint" type="revolute">
     <origin rpy="0 0 0" xyz="0 0.0061 0.0471"/>
@@ -667,7 +667,7 @@
     <child link="left_inner_finger"/>
     <axis xyz="1 0 0"/>
     <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <mimic joint="left_outer_knuckle_joint" multiplier="-1" offset="0"/>
+    <!-- mimic removed - handled by bridge node -->
   </joint>
   <joint name="left_inner_finger_pad_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>
@@ -681,7 +681,7 @@
     <child link="right_outer_knuckle"/>
     <axis xyz="1 0 0"/>
     <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <mimic joint="left_outer_knuckle_joint" multiplier="1" offset="0"/>
+    <!-- mimic removed - handled by bridge node -->
   </joint>
   <joint name="right_outer_finger_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 0.0315 -0.0041"/>
@@ -696,7 +696,7 @@
     <child link="right_inner_knuckle"/>
     <axis xyz="1 0 0"/>
     <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <mimic joint="left_outer_knuckle_joint" multiplier="1" offset="0"/>
+    <!-- mimic removed - handled by bridge node -->
   </joint>
   <joint name="right_inner_finger_joint" type="revolute">
     <origin rpy="0 0 0" xyz="0 0.0061 0.0471"/>
@@ -704,7 +704,7 @@
     <child link="right_inner_finger"/>
     <axis xyz="1 0 0"/>
     <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <mimic joint="left_outer_knuckle_joint" multiplier="-1" offset="0"/>
+    <!-- mimic removed - handled by bridge node -->
   </joint>
   <joint name="right_inner_finger_pad_joint" type="fixed">
     <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>

@@ -99,53 +99,6 @@ docker pull nvcr.io/nvidia/isaac-sim:5.1.0
 
 ---
 
-## 🔄 Converting URDF to USD for Isaac Sim
-
-### Step 1: Prepare the URDF
-
-The Isaac Sim-compatible URDF is located at:
-```
-src/tidybot_description/urdf/tidybot_isaac.urdf
-```
-
-**Important Notes:**
-- This URDF uses STL meshes instead of DAE (Isaac Sim doesn't fully support DAE)
-- All mesh paths use the container mount point `/tidybot_description/...`
-- The `scale="0.001 0.001 0.001"` attribute is required for gripper STL meshes (originally in mm)
-
-### Step 2: Start Isaac Sim
-
-```bash
-./docker/isaac-sim-ros2/run.sh restart
-```
-
-Wait for the GUI to fully load (you'll see "Isaac Sim ... is loaded" in the terminal).
-
-### Step 3: Import URDF
-
-Refer to [Isaac Sim Tutorial: Import URDF](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/importer_exporter/import_urdf.html) for detailed instructions.
-
-**Important Notes:**
-- The `tidybot_isaac.urdf` is at `/tidybot_description/urdf/tidybot_isaac.urdf` in the container
-- Set output path (USD Output) to a writable location like `/tmp/` or `/isaac_workspace/`
-
-### Step 4: Verify the Import
-
-After import, you should see the TidyBot robot in the viewport:
-- Mobile base with Kinova mount
-- Kinova Gen3 7-DOF arm
-- Robotiq 2F-85 gripper
-
-### Common Import Issues
-
-| Error | Solution |
-|-------|----------|
-| `Failed to resolve mesh` | Ensure mesh paths start with `file:///tidybot_description/...` |
-| `Used null prim` | Links have empty geometry tags - add valid geometry or remove |
-| `No mass specified for link world` | Normal warning - the world link is a virtual anchor |
-
----
-
 ## 🔗 ROS 2 Communication Between Containers
 
 Both containers are configured to communicate via ROS 2 DDS using the shared `fastdds.xml` configuration.
@@ -156,64 +109,6 @@ Both containers are configured to communicate via ROS 2 DDS using the shared `fa
 | ROS_DOMAIN_ID | `0` (configurable via environment) |
 | RMW_IMPLEMENTATION | `rmw_fastrtps_cpp` |
 | DDS Config | `docker/fastdds.xml` |
-
-### Verify Communication
-
-**In the TidyBot container:**
-```bash
-ros2 topic list
-```
-
-**In the Isaac Sim container (with ROS 2 bridge enabled):**
-```bash
-ros2 topic list
-ros2 topic echo /clock
-```
-
-You should see topics from both containers when Isaac Sim is running with the ROS 2 bridge enabled.
-
-### Setting Up the ROS 2 Bridge in Isaac Sim
-
-After importing the robot, use the Script Editor (Window > Script Editor) to set up the ActionGraph:
-
-```python
-import omni.graph.core as og
-
-og.Controller.edit(
-    {"graph_path": "/ActionGraph", "evaluator_name": "execution"},
-    {
-        og.Controller.Keys.CREATE_NODES: [
-            ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-            ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
-            ("PublishClock", "isaacsim.ros2.bridge.ROS2PublishClock"),
-            ("PublishJointState", "isaacsim.ros2.bridge.ROS2PublishJointState"),
-            ("SubscribeJointState", "isaacsim.ros2.bridge.ROS2SubscribeJointState"),
-            ("ArticulationController", "isaacsim.core.nodes.IsaacArticulationController"),
-        ],
-        og.Controller.Keys.CONNECT: [
-            ("OnPlaybackTick.outputs:tick", "ReadSimTime.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "PublishClock.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "ArticulationController.inputs:execIn"),
-            ("ReadSimTime.outputs:simulationTime", "PublishClock.inputs:timeStamp"),
-            ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
-            ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
-            ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
-        ],
-        og.Controller.Keys.SET_VALUES: [
-            ("PublishClock.inputs:topicName", "/clock"),
-            ("PublishJointState.inputs:topicName", "/joint_states"),
-            ("SubscribeJointState.inputs:topicName", "/joint_command"),
-            ("ArticulationController.inputs:robotPath", "/World/tidybot/joint_x_jointbody"),
-        ],
-    },
-)
-```
-
-After running the script, set the `targetPrim` for `PublishJointState` to your robot's articulation root.
-
----
 
 ## 🛠️ Troubleshooting
 

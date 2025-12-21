@@ -33,8 +33,9 @@ tidybot_description/
 ├── launch/
 │   ├── description.launch.py         # Basic robot state publisher
 │   ├── display.launch.py             # RViz visualization
-│   ├── launch_sim_arm.launch.py      # Arm-only simulation for manipulation test
-│   └── launch_sim_robot.launch.py    # Full robot simulation
+│   ├── launch_sim_arm.launch.py      # Arm-only Gazebo simulation
+│   ├── launch_sim_robot.launch.py    # Full robot Gazebo simulation
+│   └── launch_isaac_sim.launch.py    # Isaac Sim integration
 ├── urdf/
 │   ├── tidybot.xacro                 # Main robot description
 │   ├── bot.xacro                     # Robot assembly macro
@@ -92,14 +93,268 @@ ros2 launch tidybot_description sim_arm.launch.py
 Launch full robot simulation in Gazebo for manipulation test.
 
 ```bash
-ros2 launch tidybot_description sim_tidybot.launch.py base_mode:=velocity
+ros2 launch tidybot_description launch_sim_robot.launch.py base_mode:=velocity
 ```
 
 **Parameters:**
 - `use_rviz` (bool): Launch RViz visualization (default: true)
 - `rviz_config` (string): RViz configuration file (default: tidybot.rviz)
 - `base_mode` (string): Base control mode - `position` or `velocity` (default: position)
-- `world` (string): Gazebo world file (default: empty, choices: office|warehouse|fetch_coke|fetch_cube )
+- `world` (string): Gazebo world file (default: empty, choices: office|warehouse|fetch_coke|fetch_cube)
+
+### `launch_isaac_sim.launch.py`
+Launch TidyBot ROS 2 stack for use with Isaac Sim (instead of Gazebo).
+
+```bash
+ros2 launch tidybot_description launch_isaac_sim.launch.py
+```
+
+**Parameters:**
+- `use_rviz` (bool): Launch RViz for visualization (default: true)
+- `publish_rate` (float): Isaac Sim bridge publishing rate in Hz (default: 50.0)
+- `use_velocity_control` (bool): Use velocity control for base instead of position (default: false)
+- `rviz_config` (string): Path to RViz config file (default: tidybot.rviz)
+
+> **Note:** Isaac Sim must be running separately with the ROS 2 Action Graph configured. See the [Isaac Sim Integration](#-isaac-sim-integration) section below.
+
+## 🎮 Isaac Sim Integration
+
+This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazebo.
+
+### Prerequisites
+
+- Isaac Sim running in the `isaac_sim_tidybot` container launched by the [Isaac Sim container run script](../../docker/isaac-sim-ros2/run.sh) with the ros2 bridge setup
+
+### Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         ISAAC SIM (Docker Container)                         │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  Action Graph (OmniGraph):                                               │ │
+│  │    • PublishClock → /clock                                               │ │
+│  │    • PublishJointState → /joint_states                                   │ │
+│  │    • SubscribeJointState ← /joint_command                                │ │
+│  │    • ArticulationController (applies joint commands)                     │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                    │ FastDDS
+                                    ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                       TIDYBOT ROS 2 (Docker Container)                       │
+│  ┌─────────────────┐     ┌─────────────────┐     ┌────────────────────────┐ │
+│  │ isaac_sim_bridge │ ←── │   MoveIt IK     │ ←── │   Policy Node          │ │
+│  │                 │     │                 │     │   (phone/gamepad/etc)  │ │
+│  │ Publishes:      │     │ Publishes:      │     │                        │ │
+│  │ • /joint_command│     │ • arm traj      │     │ Publishes:             │ │
+│  └─────────────────┘     │ • gripper cmds  │     │ • /tidybot/arm/target  │ │
+│                          └─────────────────┘     │ • base cmds            │ │
+│                                                   └────────────────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │  robot_state_publisher (publishes /tf from /joint_states)               │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Step 1: Import Robot into Isaac Sim
+
+1. **Start Isaac Sim** (via Docker or native installation)
+
+2. **Import the URDF:**
+   - Go to `File` → `Import`
+   - Select `/tidybot_description/urdf/tidybot_isaac.urdf` (a pre-configured URDF for Isaac Sim)
+   - **Important settings:**
+     - ✅ Static Base (checked)
+     - Output directory: `/isaac_workspace/` or similar writable path
+     - Leave other configurations as default
+   - Click "Import"
+
+3. **Verify the robot** appears in the stage at `/World/tidybot`
+
+### Step 2: Configure the Robot
+
+Use the setup script in Isaac Sim's Script Editor to configure physics and ROS 2 integration:
+
+1. Open Isaac Sim's Script Editor (`Window` → `Script Editor`)
+2. Paste and run the following script:
+
+```python
+"""
+Isaac Sim Setup Script for TidyBot++
+Run this after importing the URDF into Isaac Sim.
+"""
+
+import omni.usd
+from pxr import Usd, UsdPhysics, Sdf
+import omni.graph.core as og
+
+# Configuration
+ROBOT_PATH = "/World/tidybot"
+BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
+ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
+GRIPPER_JOINTS = ["left_outer_knuckle_joint", "left_inner_knuckle_joint", "left_inner_finger_joint",
+                  "right_outer_knuckle_joint", "right_inner_knuckle_joint", "right_inner_finger_joint"]
+
+stage = omni.usd.get_context().get_stage()
+
+# Find robot
+robot_prim = stage.GetPrimAtPath(ROBOT_PATH)
+if not robot_prim.IsValid():
+    for prim in stage.Traverse():
+        if prim.GetName() == "tidybot":
+            ROBOT_PATH = str(prim.GetPath())
+            robot_prim = prim
+            break
+
+print(f"Robot path: {ROBOT_PATH}")
+
+if not robot_prim.IsValid():
+    raise Exception("Robot not found! Check the path.")
+
+# Find articulation root (first rigid body under robot)
+artic_root_path = None
+for child in robot_prim.GetAllChildren():
+    if child.HasAPI(UsdPhysics.RigidBodyAPI):
+        artic_root_path = str(child.GetPath())
+        if not child.HasAPI(UsdPhysics.ArticulationRootAPI):
+            UsdPhysics.ArticulationRootAPI.Apply(child)
+        print(f"Articulation root: {artic_root_path}")
+        break
+
+if not artic_root_path:
+    for name in ["joint_x_jointbody", "base_link", "base"]:
+        path = f"{ROBOT_PATH}/{name}"
+        prim = stage.GetPrimAtPath(path)
+        if prim.IsValid():
+            artic_root_path = path
+            if not prim.HasAPI(UsdPhysics.ArticulationRootAPI):
+                UsdPhysics.ArticulationRootAPI.Apply(prim)
+            print(f"Articulation root: {artic_root_path}")
+            break
+
+if not artic_root_path:
+    raise Exception("Could not find articulation root!")
+
+# Find joints path
+joints_path = f"{ROBOT_PATH}/joints"
+if not stage.GetPrimAtPath(joints_path).IsValid():
+    joints_path = ROBOT_PATH
+print(f"Joints path: {joints_path}")
+
+# Configure joint drives
+def configure_drive(joint_path, stiffness, damping, drive_type="angular"):
+    prim = stage.GetPrimAtPath(joint_path)
+    if not prim.IsValid():
+        print(f"  WARNING: Joint not found: {joint_path}")
+        return False
+    drive = UsdPhysics.DriveAPI.Apply(prim, drive_type)
+    drive.CreateTypeAttr("force")
+    drive.CreateStiffnessAttr(stiffness)
+    drive.CreateDampingAttr(damping)
+    print(f"  Configured: {joint_path}")
+    return True
+
+print("\nConfiguring base joints...")
+for name in BASE_JOINTS:
+    drive_type = "linear" if name in ["joint_x", "joint_y"] else "angular"
+    configure_drive(f"{joints_path}/{name}", 1e7, 1e5, drive_type)
+
+print("\nConfiguring arm joints...")
+for name in ARM_JOINTS:
+    configure_drive(f"{joints_path}/{name}", 1e4, 1e3, "angular")
+
+print("\nConfiguring gripper joints...")
+for name in GRIPPER_JOINTS:
+    configure_drive(f"{joints_path}/{name}", 1e3, 1e2, "angular")
+
+# Create ROS 2 Action Graph
+print("\nCreating ROS 2 Action Graph...")
+graph_path = "/World/ROS2_ActionGraph"
+existing = stage.GetPrimAtPath(graph_path)
+if existing.IsValid():
+    stage.RemovePrim(graph_path)
+
+og.Controller.edit(
+    {"graph_path": graph_path, "evaluator_name": "execution"},
+    {
+        og.Controller.Keys.CREATE_NODES: [
+            ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+            ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+            ("PublishClock", "isaacsim.ros2.bridge.ROS2PublishClock"),
+            ("PublishJointState", "isaacsim.ros2.bridge.ROS2PublishJointState"),
+            ("SubscribeJointState", "isaacsim.ros2.bridge.ROS2SubscribeJointState"),
+            ("ArticulationController", "isaacsim.core.nodes.IsaacArticulationController"),
+        ],
+        og.Controller.Keys.SET_VALUES: [
+            ("PublishClock.inputs:topicName", "/clock"),
+            ("PublishJointState.inputs:topicName", "/joint_states"),
+            ("SubscribeJointState.inputs:topicName", "/joint_command"),
+            ("ArticulationController.inputs:robotPath", artic_root_path),
+            ("PublishJointState.inputs:targetPrim", [Sdf.Path(artic_root_path)]),
+        ],
+        og.Controller.Keys.CONNECT: [
+            ("OnPlaybackTick.outputs:tick", "PublishClock.inputs:execIn"),
+            ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
+            ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
+            ("ReadSimTime.outputs:simulationTime", "PublishClock.inputs:timeStamp"),
+            ("SubscribeJointState.outputs:execOut", "ArticulationController.inputs:execIn"),
+            ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+            ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+            ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
+            ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+        ],
+    }
+)
+
+print("\n" + "="*50)
+print("SETUP COMPLETE!")
+print("="*50)
+print(f"Articulation root: {artic_root_path}")
+print("\nSave scene and press PLAY to start simulation.")
+```
+
+The script above does these things:
+- Locates the robot and sets the **Articulation Root** on the first dynamic rigid body
+- Configures **joint drives** with appropriate stiffness/damping for base, arm, and gripper
+- Creates a **ROS 2 Action Graph** that publishes `/clock` and `/joint_states`, and subscribes to `/joint_command`
+
+After executing the script, press the `Play` button or space to start the simulation in Isaac Sim
+
+### Step 3: Launch ROS 2 Stack
+
+In the TidyBot ROS 2 container:
+
+```bash
+# Launch the Isaac Sim integration stack
+ros2 launch tidybot_description launch_isaac_sim.launch.py
+
+# Verify communication
+ros2 topic echo /joint_states  # Should show joint positions from Isaac Sim
+ros2 topic echo /clock         # Should show simulation time
+```
+
+After the ROS2-Isaac Sim bridge is up, you can run the policies to control the robot in Isaac Sim
+
+### Troubleshooting Isaac Sim
+
+1. **No `/joint_states` messages:**
+   - Ensure Isaac Sim is in PLAY mode
+   - Check that ROS 2 Bridge extension is enabled
+   - Verify FastDDS configuration in both containers
+
+2. **Robot doesn't move:**
+   - Check ArticulationRoot is on a dynamic body (not `world` link)
+   - Verify joint drives are configured with sufficient stiffness
+   - Check `/joint_command` topic is receiving messages
+
+3. **Robot falls through ground:**
+   - Ensure ground plane has collision enabled
+   - Check that base joints have high stiffness (1e7)
+
+4. **Physics instability / robot disappears:**
+   - Reduce physics timestep
+   - Check for conflicting ArticulationRoot definitions
+   - Ensure no kinematic bodies are part of the articulation chain
 
 ## 🎛️ Controller Configuration
 
@@ -173,7 +428,8 @@ The package defines multiple controller configurations in `config/tidybot_contro
 - `moveit_configs_utils`
 
 ### External Dependencies
-- Gazebo Harmonic
+- Gazebo Harmonic (for Gazebo simulation)
+- NVIDIA Isaac Sim 5.1.0+ (for Isaac Sim simulation)
 - RViz2
 
 ## 📚 Additional Resources

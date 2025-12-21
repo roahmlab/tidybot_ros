@@ -52,3 +52,7 @@ Thumbs.db
 /src/external/OrbbecSDK_ROS2
 /src/tidybot_openvla
 /openvla_finetuning_utils
+
+# Ignore Isaac Sim workspace
+isaac_workspace/*.usd
+isaac_workspace/tidybot_isaac/
