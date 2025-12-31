@@ -23,9 +23,6 @@ Simulation Control:
     Uses simulation_interfaces package to control Isaac Sim via:
     - /reset_simulation - Reset all entities to initial state
 
-The gripper uses mimic joints which are expanded here since Isaac Sim doesn't
-support mimic joints natively.
-
 Initial joint positions from tidybot.ros2_control.xacro:
     Base: joint_x=0.0, joint_y=0.0, joint_th=0.0
     Arm:  joint_1=0.0, joint_2=-0.35, joint_3=3.141522, 
@@ -97,10 +94,11 @@ class IsaacSimBridge(Node):
                           'joint_5', 'joint_6', 'joint_7']
         
         # Gripper joints with their mimic multipliers relative to the leader joint
-        # left_outer_knuckle_joint is the leader
+        # left_outer_knuckle_joint is the leader - only this joint is commanded directly
+        # All other joints follow the ACTUAL state of the leader (feedback-based mimic)
         self.gripper_leader = 'left_outer_knuckle_joint'
-        self.gripper_mimic_config = {
-            'left_outer_knuckle_joint': 1.0,    # Leader
+        self.gripper_follower_config = {
+            # Follower joints with their multipliers relative to leader's ACTUAL position
             'left_inner_knuckle_joint': 1.0,    # Same direction
             'left_inner_finger_joint': -1.0,    # Opposite direction
             'right_outer_knuckle_joint': 1.0,   # Same direction
@@ -303,10 +301,20 @@ class IsaacSimBridge(Node):
         cmd.position.extend(self.arm_positions)
         cmd.velocity.extend([0.0] * len(self.arm_joints))
         
-        # Gripper joints - expand mimic joints
-        for joint_name, multiplier in self.gripper_mimic_config.items():
+        # Gripper joints
+        
+        # Command the leader joint to target position
+        cmd.name.append(self.gripper_leader)
+        cmd.position.append(self.gripper_position)
+        cmd.velocity.append(0.0)
+        
+        # Get the actual position of the leader joint from feedback
+        leader_actual_pos = self.current_joint_states.get(self.gripper_leader, self.gripper_position)
+        
+        # Follower joints track the leader's actual position
+        for joint_name, multiplier in self.gripper_follower_config.items():
             cmd.name.append(joint_name)
-            cmd.position.append(self.gripper_position * multiplier)
+            cmd.position.append(leader_actual_pos * multiplier)
             cmd.velocity.append(0.0)
         
         self.joint_cmd_pub.publish(cmd)

@@ -189,9 +189,9 @@ Run this after importing the URDF into Isaac Sim.
 """
 
 import omni.usd
-from pxr import Usd, UsdPhysics, Sdf
+from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf
 import omni.graph.core as og
-from pxr import UsdPhysics
+import math
 
 # Configuration
 ROBOT_PATH = "/World/tidybot"
@@ -199,11 +199,38 @@ BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
 GRIPPER_JOINTS = ["left_outer_knuckle_joint", "left_inner_knuckle_joint", "left_inner_finger_joint",
                   "right_outer_knuckle_joint", "right_inner_knuckle_joint", "right_inner_finger_joint"]
+CAMERAS = {
+    "arm_camera": {
+        "parent_link": "bracelet_link/end_effector_link/arm_camera_link",
+        "topic": "/tidybot/camera_wrist/color",
+        "frame_id": "arm_camera_link",
+        "width": 640,
+        "height": 480,
+        "horizontal_fov": 1.247,  # radians (~71.4 degrees)
+        # Pose offset from link (camera optical frame relative to link)
+        "position": Gf.Vec3d(0.0, -0.01, 0.03),
+        "orientation": Gf.Quatf(0.0, -1.0, 0.0, 0.0),  # Quaternion (w,x,y,z)
+    },
+    "base_camera": {
+        "parent_link": "base/base_camera_link",
+        "topic": "/tidybot/camera_base/color",
+        "frame_id": "base_camera_link",
+        "width": 640,
+        "height": 360,
+        "horizontal_fov": 1.434,  # radians (~82.2 degrees)
+        "position": Gf.Vec3d(0.0, 0.0, 0.0),
+        "orientation": Gf.Quatf(0.5, 0.5, -0.5, -0.5),
+    },
+}
 
 stage = omni.usd.get_context().get_stage()
 
+# Helper function to get prim at path (handles string to Sdf.Path conversion)
+def get_prim(path_str):
+    return stage.GetPrimAtPath(Sdf.Path(path_str))
+
 # Find robot
-robot_prim = stage.GetPrimAtPath(ROBOT_PATH)
+robot_prim = get_prim(ROBOT_PATH)
 if not robot_prim.IsValid():
     for prim in stage.Traverse():
         if prim.GetName() == "tidybot":
@@ -229,7 +256,7 @@ for child in robot_prim.GetAllChildren():
 if not artic_root_path:
     for name in ["joint_x_jointbody", "base_link", "base"]:
         path = f"{ROBOT_PATH}/{name}"
-        prim = stage.GetPrimAtPath(path)
+        prim = get_prim(path)
         if prim.IsValid():
             artic_root_path = path
             if not prim.HasAPI(UsdPhysics.ArticulationRootAPI):
@@ -242,13 +269,13 @@ if not artic_root_path:
 
 # Find joints path
 joints_path = f"{ROBOT_PATH}/joints"
-if not stage.GetPrimAtPath(joints_path).IsValid():
+if not get_prim(joints_path).IsValid():
     joints_path = ROBOT_PATH
 print(f"Joints path: {joints_path}")
 
 # Configure joint drives
 def configure_drive(joint_path, stiffness, damping, max_force, drive_type="angular"):
-    prim = stage.GetPrimAtPath(joint_path)
+    prim = get_prim(joint_path)
     if not prim.IsValid():
         print(f"  WARNING: Joint not found: {joint_path}")
         return False
@@ -277,46 +304,132 @@ for name in ARM_JOINTS:
 
 print("\nConfiguring gripper joints...")
 for name in GRIPPER_JOINTS:
-    # Gripper joints: lower stiffness for compliant grasping
-    configure_drive(f"{joints_path}/{name}", 1e4, 1e2, 1e3, "angular")
+    # Gripper joints: moderate stiffness for compliant grasping
+    configure_drive(f"{joints_path}/{name}", 1e5, 1e3, 1e4, "angular")
+
+# Create cameras under parent links
+def create_camera(camera_name, config):
+    """Create a camera prim under the parent link."""
+    parent_path = f"{ROBOT_PATH}/{config['parent_link']}"
+    parent_prim = get_prim(parent_path)
+    if not parent_prim.IsValid():
+        print(f"  WARNING: Parent link not found: {parent_path}")
+        return None
+    
+    camera_path = f"{parent_path}/{camera_name}"
+    
+    # Remove existing camera if present
+    existing = get_prim(camera_path)
+    if existing.IsValid():
+        stage.RemovePrim(Sdf.Path(camera_path))
+    
+    # Create camera prim
+    camera = UsdGeom.Camera.Define(stage, Sdf.Path(camera_path))
+    
+    # Calculate focal length from horizontal FOV and horizontal aperture
+    # Default horizontal aperture is 20.955mm (35mm film equivalent)
+    h_aperture = 20.955
+    focal_length = h_aperture / (2.0 * math.tan(config["horizontal_fov"] / 2.0))
+    
+    # Set camera properties
+    camera.CreateFocalLengthAttr(focal_length)
+    camera.CreateHorizontalApertureAttr(h_aperture)
+    camera.CreateVerticalApertureAttr(h_aperture * config["height"] / config["width"])
+    camera.CreateClippingRangeAttr(Gf.Vec2f(0.01, 100.0))
+    
+    # Set transform (position and orientation)
+    xformable = UsdGeom.Xformable(camera.GetPrim())
+    xformable.ClearXformOpOrder()
+    
+    pos = config["position"]
+    orient = config["orientation"]
+    
+    xformable.AddTranslateOp().Set(pos)
+    xformable.AddOrientOp().Set(orient)
+    
+    print(f"  Created camera: {camera_path} (focal_length={focal_length:.2f}mm)")
+    return camera_path
+
+print("\nConfiguring cameras...")
+camera_paths = {}
+for cam_name, cam_config in CAMERAS.items():
+    cam_path = create_camera(cam_name, cam_config)
+    if cam_path:
+        camera_paths[cam_name] = cam_path
 
 # Create ROS 2 Action Graph
 print("\nCreating ROS 2 Action Graph...")
 graph_path = "/World/ROS2_ActionGraph"
-existing = stage.GetPrimAtPath(graph_path)
+existing = get_prim(graph_path)
 if existing.IsValid():
-    stage.RemovePrim(graph_path)
+    stage.RemovePrim(Sdf.Path(graph_path))
+
+# Build node list - base nodes plus camera nodes
+nodes_to_create = [
+    ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
+    ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
+    ("PublishClock", "isaacsim.ros2.bridge.ROS2PublishClock"),
+    ("PublishJointState", "isaacsim.ros2.bridge.ROS2PublishJointState"),
+    ("SubscribeJointState", "isaacsim.ros2.bridge.ROS2SubscribeJointState"),
+    ("ArticulationController", "isaacsim.core.nodes.IsaacArticulationController"),
+]
+
+# Add camera render product and publisher nodes
+for cam_name in camera_paths:
+    nodes_to_create.extend([
+        (f"{cam_name}_RenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
+        (f"{cam_name}_CameraHelper", "isaacsim.ros2.bridge.ROS2CameraHelper"),
+    ])
+
+# Build values list
+values_to_set = [
+    ("PublishClock.inputs:topicName", "/clock"),
+    ("PublishJointState.inputs:topicName", "/joint_states"),
+    ("SubscribeJointState.inputs:topicName", "/joint_command"),
+    ("ArticulationController.inputs:robotPath", artic_root_path),
+    ("PublishJointState.inputs:targetPrim", [Sdf.Path(artic_root_path)]),
+]
+
+# Add camera values
+for cam_name, cam_path in camera_paths.items():
+    config = CAMERAS[cam_name]
+    values_to_set.extend([
+        (f"{cam_name}_RenderProduct.inputs:cameraPrim", [Sdf.Path(cam_path)]),
+        (f"{cam_name}_RenderProduct.inputs:width", config["width"]),
+        (f"{cam_name}_RenderProduct.inputs:height", config["height"]),
+        (f"{cam_name}_CameraHelper.inputs:topicName", f"{config['topic']}/raw"),
+        (f"{cam_name}_CameraHelper.inputs:frameId", config["frame_id"]),
+        (f"{cam_name}_CameraHelper.inputs:type", "rgb"),
+    ])
+
+# Build connections list
+connections = [
+    ("OnPlaybackTick.outputs:tick", "PublishClock.inputs:execIn"),
+    ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
+    ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
+    ("ReadSimTime.outputs:simulationTime", "PublishClock.inputs:timeStamp"),
+    ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
+    ("SubscribeJointState.outputs:execOut", "ArticulationController.inputs:execIn"),
+    ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
+    ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
+    ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
+    ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
+]
+
+# Add camera connections
+for cam_name in camera_paths:
+    connections.extend([
+        ("OnPlaybackTick.outputs:tick", f"{cam_name}_RenderProduct.inputs:execIn"),
+        (f"{cam_name}_RenderProduct.outputs:execOut", f"{cam_name}_CameraHelper.inputs:execIn"),
+        (f"{cam_name}_RenderProduct.outputs:renderProductPath", f"{cam_name}_CameraHelper.inputs:renderProductPath"),
+    ])
 
 og.Controller.edit(
     {"graph_path": graph_path, "evaluator_name": "execution"},
     {
-        og.Controller.Keys.CREATE_NODES: [
-            ("OnPlaybackTick", "omni.graph.action.OnPlaybackTick"),
-            ("ReadSimTime", "isaacsim.core.nodes.IsaacReadSimulationTime"),
-            ("PublishClock", "isaacsim.ros2.bridge.ROS2PublishClock"),
-            ("PublishJointState", "isaacsim.ros2.bridge.ROS2PublishJointState"),
-            ("SubscribeJointState", "isaacsim.ros2.bridge.ROS2SubscribeJointState"),
-            ("ArticulationController", "isaacsim.core.nodes.IsaacArticulationController"),
-        ],
-        og.Controller.Keys.SET_VALUES: [
-            ("PublishClock.inputs:topicName", "/clock"),
-            ("PublishJointState.inputs:topicName", "/joint_states"),
-            ("SubscribeJointState.inputs:topicName", "/joint_command"),
-            ("ArticulationController.inputs:robotPath", artic_root_path),
-            ("PublishJointState.inputs:targetPrim", [Sdf.Path(artic_root_path)]),
-        ],
-        og.Controller.Keys.CONNECT: [
-            ("OnPlaybackTick.outputs:tick", "PublishClock.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "PublishJointState.inputs:execIn"),
-            ("OnPlaybackTick.outputs:tick", "SubscribeJointState.inputs:execIn"),
-            ("ReadSimTime.outputs:simulationTime", "PublishClock.inputs:timeStamp"),
-            ("ReadSimTime.outputs:simulationTime", "PublishJointState.inputs:timeStamp"),
-            ("SubscribeJointState.outputs:execOut", "ArticulationController.inputs:execIn"),
-            ("SubscribeJointState.outputs:jointNames", "ArticulationController.inputs:jointNames"),
-            ("SubscribeJointState.outputs:positionCommand", "ArticulationController.inputs:positionCommand"),
-            ("SubscribeJointState.outputs:velocityCommand", "ArticulationController.inputs:velocityCommand"),
-            ("SubscribeJointState.outputs:effortCommand", "ArticulationController.inputs:effortCommand"),
-        ],
+        og.Controller.Keys.CREATE_NODES: nodes_to_create,
+        og.Controller.Keys.SET_VALUES: values_to_set,
+        og.Controller.Keys.CONNECT: connections,
     }
 )
 
@@ -324,13 +437,25 @@ print("\n" + "="*50)
 print("SETUP COMPLETE!")
 print("="*50)
 print(f"Articulation root: {artic_root_path}")
+print(f"Cameras configured: {list(camera_paths.keys())}")
+print("\nROS 2 Topics:")
+print("  /clock - Simulation clock")
+print("  /joint_states - Robot joint states")
+print("  /joint_command - Joint position/velocity commands")
+for cam_name in camera_paths:
+    config = CAMERAS[cam_name]
+    print(f"  {config['topic']}/image_raw - {cam_name} RGB image")
 print("\nSave scene and press PLAY to start simulation.")
 ```
 
 The script above does these things:
 - Locates the robot and sets the **Articulation Root** on the first dynamic rigid body
 - Configures **joint drives** with appropriate stiffness/damping for base, arm, and gripper
-- Creates a **ROS 2 Action Graph** that publishes `/clock` and `/joint_states`, and subscribes to `/joint_command`
+- Creates **camera prims** under the arm and base camera links with proper FOV and resolution
+- Creates a **ROS 2 Action Graph** that:
+  - Publishes `/clock` and `/joint_states`
+  - Subscribes to `/joint_command` for robot control
+  - Publishes camera images to `/arm_camera/image_raw` and `/base_camera/image_raw`
 
 After executing the script, press the `Play` button or space to start the simulation in Isaac Sim
 
@@ -453,6 +578,7 @@ The package defines multiple controller configurations in `config/tidybot_contro
 - [Gazebo Harmonic](https://gazebosim.org/docs/harmonic)
 - [Gazebo ROS2 Integration](https://docs.ros.org/en/jazzy/p/ros_gz_sim)
 - [ROS2 Control Framework](https://control.ros.org/jazzy/doc/getting_started/getting_started.html)
+- [Isaac Sim](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/index.html)
 
 
 
