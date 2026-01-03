@@ -189,7 +189,7 @@ Run this after importing the URDF into Isaac Sim.
 """
 
 import omni.usd
-from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf
+from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf, PhysxSchema
 import omni.graph.core as og
 import math
 
@@ -299,13 +299,149 @@ for name in BASE_JOINTS:
 
 print("\nConfiguring arm joints...")
 for name in ARM_JOINTS:
-    # Arm joints: moderate stiffness and damping, high max force
-    configure_drive(f"{joints_path}/{name}", 1e5, 1e3, 1e4, "angular")
+    # Arm joints: high stiffness for fast tracking, moderate damping, high max force
+    configure_drive(f"{joints_path}/{name}", 1e6, 1e4, 1e6, "angular")
 
-print("\nConfiguring gripper joints...")
-for name in GRIPPER_JOINTS:
-    # Gripper joints: moderate stiffness for compliant grasping
-    configure_drive(f"{joints_path}/{name}", 1e5, 1e3, 1e4, "angular")
+# Configure gripper joints using Mimic Joint API
+# Reference: https://docs.isaacsim.omniverse.nvidia.com/5.1.0/robot_setup_tutorials/rig_closed_loop_structures.html
+# The Robotiq 2F-85 uses a single leader joint with follower joints mimicking it
+# 
+# Note: TidyBot control architecture uses POSITION control for the gripper
+# (commands like 0.0=open, 0.8=closed). We use stiffness>0 for position tracking
+# but limit maxForce for compliant grasping (gripper stops when hitting objects).
+print("\nConfiguring gripper joints with Mimic Joint API...")
+
+# Leader joint configuration (left_outer_knuckle_joint)
+LEADER_JOINT = "left_outer_knuckle_joint"
+leader_path = f"{joints_path}/{LEADER_JOINT}"
+leader_prim = get_prim(leader_path)
+
+if leader_prim.IsValid():
+    # Configure leader joint with POSITION CONTROL for ROS 2 compatibility
+    # TidyBot control architecture uses position commands (0=open, ~0.8=closed)
+    # Use moderate stiffness for position tracking, limited maxForce for compliant grasping
+    drive = UsdPhysics.DriveAPI.Apply(leader_prim, "angular")
+    drive.CreateTypeAttr("force")
+    drive.CreateStiffnessAttr(1000.0)    # Position control stiffness
+    drive.CreateDampingAttr(100.0)       # Damping to prevent oscillation
+    drive.CreateMaxForceAttr(10.0)       # Limited force for compliant grasping
+    
+    # Set max velocity (130 deg/s from Robotiq datasheet)
+    physx_joint = PhysxSchema.PhysxJointAPI.Apply(leader_prim)
+    physx_joint.CreateMaxJointVelocityAttr(130.0)  # degrees per second
+    
+    print(f"  Leader: {LEADER_JOINT} (stiffness=1000, damping=100, maxForce=10)")
+else:
+    print(f"  WARNING: Leader joint not found: {leader_path}")
+
+# Follower joints with Mimic Joint API
+# Gearing: positive = same direction, negative = opposite direction
+MIMIC_JOINTS = {
+    # Joint name: gearing (multiplier relative to leader)
+    "right_outer_knuckle_joint": -1.0,   # Same direction as leader
+    "left_inner_knuckle_joint": 1.0,    # Same direction as leader
+    "right_inner_knuckle_joint": 1.0,   # Same direction as leader
+    "left_inner_finger_joint": 1.0,    # Same direction
+    "right_inner_finger_joint": -1.0,   # Same direction
+}
+
+for joint_name, gearing in MIMIC_JOINTS.items():
+    joint_path = f"{joints_path}/{joint_name}"
+    joint_prim = get_prim(joint_path)
+    
+    if not joint_prim.IsValid():
+        print(f"  WARNING: Mimic joint not found: {joint_path}")
+        continue
+    
+    # Remove any existing drive (mimic joints shouldn't have their own drive)
+    # The mimic API copies drive from reference joint
+    existing_drive = UsdPhysics.DriveAPI.Get(joint_prim, "angular")
+    if existing_drive:
+        # Clear drive values
+        if existing_drive.GetStiffnessAttr():
+            existing_drive.GetStiffnessAttr().Set(0.0)
+        if existing_drive.GetDampingAttr():
+            existing_drive.GetDampingAttr().Set(0.0)
+        if existing_drive.GetMaxForceAttr():
+            existing_drive.GetMaxForceAttr().Set(0.0)
+    
+    # Apply Mimic Joint API
+    # For revolute joints, use "rotX" axis (axis selection doesn't matter for 1-DOF joints)
+    mimic_api = PhysxSchema.PhysxMimicJointAPI.Apply(joint_prim, "rotX")
+    
+    # Set reference joint (the leader)
+    mimic_api.CreateReferenceJointRel().SetTargets([Sdf.Path(leader_path)])
+    
+    # Set gearing (multiplier)
+    mimic_api.CreateGearingAttr(gearing)
+    
+    # Set offset (usually 0)
+    mimic_api.CreateOffsetAttr(0.0)
+    
+    print(f"  Mimic: {joint_name} -> {LEADER_JOINT} (gearing={gearing})")
+
+print("Gripper configuration complete!")
+
+# ============================================================================
+# Set initial joint positions (applied on simulation reset)
+# ============================================================================
+print("\nSetting initial joint positions...")
+
+# Initial positions in RADIANS (from tidybot.ros2_control.xacro)
+# Note: DriveAPI uses DEGREES, JointStateAPI uses RADIANS
+INITIAL_JOINT_POSITIONS = {
+    # Base joints (linear joints use meters)
+    "joint_x": 0.0,        # meters
+    "joint_y": 0.0,        # meters
+    "joint_th": 0.0,       # radians
+    # Arm joints (gen3_7dof) - radians
+    "joint_1": 0.0,
+    "joint_2": -0.35,
+    "joint_3": 3.141522,
+    "joint_4": -2.36,
+    "joint_5": 0.0,
+    "joint_6": -1.13,
+    "joint_7": 1.574186,
+    # Gripper - only leader joint (others follow via Mimic Joint API)
+    "left_outer_knuckle_joint": 0.0,
+}
+
+# Find and configure each joint by traversing the stage
+for prim in stage.Traverse():
+    joint_name = prim.GetName()
+    if joint_name not in INITIAL_JOINT_POSITIONS:
+        continue
+    
+    pos = INITIAL_JOINT_POSITIONS[joint_name]
+    
+    # Determine if linear or angular joint
+    if joint_name in ["joint_x", "joint_y"]:
+        drive_type = "linear"
+        state_type = "linear"
+        pos_drive = pos  # Linear uses meters for both
+        pos_state = pos
+        unit = "m"
+    else:
+        drive_type = "angular"
+        state_type = "angular"
+        pos_drive = pos * 180.0 / math.pi  # DriveAPI uses degrees
+        pos_state = pos * 180.0 / math.pi  # JointStateAPI also uses degrees in Isaac Sim
+        unit = "°"
+    
+    # 1. Set drive target (where controller aims)
+    drive_api = UsdPhysics.DriveAPI.Get(prim, drive_type)
+    if drive_api:
+        drive_api.GetTargetPositionAttr().Set(pos_drive)
+    
+    # 2. Set the physics body initial state (where joint STARTS on reset)
+    state_api = PhysxSchema.JointStateAPI.Apply(prim, state_type)
+    if state_api:
+        state_api.CreatePositionAttr(pos_state)
+        state_api.CreateVelocityAttr(0.0)
+    
+    print(f"  Set {joint_name}: start={pos_state:.2f}{unit}, target={pos_drive:.2f}{unit}")
+
+print("Initial positions configured!")
 
 # Create cameras under parent links
 def create_camera(camera_name, config):

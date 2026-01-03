@@ -395,626 +395,267 @@
     <child link="robotiq_arg2f_base_link"/>
     <origin rpy="0.0 0.0 1.57" xyz="0.0 0.0 0.0"/>
   </joint>
+  <!-- Robotiq 2F-85 Gripper - Isaac Sim compatible model with closed-loop kinematics -->
+  <!-- Base link (exported from Isaac Sim) -->
   <link name="robotiq_arg2f_base_link">
     <inertial>
-      <origin rpy="0 0 0" xyz="8.625E-08 -4.6583E-06 0.03145"/>
-      <mass value="0.22652"/>
-      <inertia ixx="0.00020005" ixy="-4.2442E-10" ixz="-2.9069E-10" iyy="0.00017832" iyz="-3.4402E-08" izz="0.00013478"/>
+      <origin xyz="0.0000228 -0.0000006 0.0323229" rpy="0. 0. 0."/>
+      <mass value="0.6098911"/>
+      <inertia ixx="0.0005407" ixy="0." ixz="-0." iyy="0.0003629" iyz="-0." izz="0.0004747"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0. 0. 0." rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <!-- The DAE file doesn't show well in Gazebo so we're using the STL instead -->
-        <!-- <mesh filename="file://$(find simulation)/meshes/grippers/robotiq_2f_85/meshes/visual/robotiq_arg2f_85_base_link.dae" scale="0.001 0.001 0.001"/> -->
-        <!-- We replaced all dae files below with stl because Isaac Sim currently does not support dae mesh files -->
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/robotiq_arg2f_85_base_link.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0. 0. 0." rpy="1.5707964 0. 1.5707964"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_base_link.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/robotiq_arg2f_85_base_link.obj"/>
       </geometry>
     </collision>
   </link>
   <gazebo reference="robotiq_arg2f_base_link">
     <material>Gazebo/Black</material>
   </gazebo>
+  <!-- Left side links -->
   <link name="left_outer_knuckle">
     <inertial>
-      <origin rpy="0 0 0" xyz="-0.000200000000003065 0.0199435877845359 0.0292245259211331"/>
-      <mass value="0.00853198276973456"/>
-      <inertia ixx="2.89328108496468E-06" ixy="-1.57935047237397E-19" ixz="-1.93980378593255E-19" iyy="1.86719750325683E-06" iyz="-1.21858577871576E-06" izz="1.21905238907251E-06"/>
+      <origin xyz="0.0121152 -0.000638 0." rpy="0. 0. 0."/>
+      <mass value="0.0127346"/>
+      <inertia ixx="0.0000003" ixy="0." ixz="0." iyy="0.0000021" iyz="0." izz="0.0000021"/>
     </inertial>
     <visual>
-      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
+      <origin xyz="-0.0306 -0.05466 0." rpy="-3.1415927 0. 3.1415927"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_outer_knuckle.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
+      <origin xyz="-0.0306 -0.05466 0." rpy="-3.1415927 0. 3.1415927"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_outer_knuckle.obj"/>
       </geometry>
     </collision>
   </link>
   <link name="left_outer_finger">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.00030115855001899 0.0373907951953854 -0.0208027427000385"/>
-      <mass value="0.022614240507152"/>
-      <inertia ixx="1.52518312458174E-05" ixy="9.76583423954399E-10" ixz="-5.43838577022588E-10" iyy="6.17694243867776E-06" iyz="6.78636130740228E-06" izz="1.16494917907219E-05"/>
+      <origin xyz="0.0000055 -0.0659505 0.0689531" rpy="0. 0. 0."/>
+      <mass value="0.0391792"/>
+      <inertia ixx="0.0000132" ixy="-0." ixz="-0." iyy="0.0000043" iyz="-0." izz="0.0000109"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="-0. -0. -0." rpy="1.5707964 -0.0000001 1.5707963"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_outer_finger.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="-0. -0. -0." rpy="1.5707964 -0.0000001 1.5707963"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_outer_finger.obj"/>
       </geometry>
     </collision>
   </link>
   <link name="left_inner_finger">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.000299999999999317 0.0160078233491243 -0.0136945669206257"/>
-      <mass value="0.0104003125914103"/>
-      <inertia ixx="2.71909453810972E-06" ixy="1.35402465472579E-21" ixz="-7.1817349065269E-22" iyy="7.69100314106116E-07" iyz="6.74715432769696E-07" izz="2.30315190420171E-06"/>
+      <origin xyz="0.0185829 -0.0274476 -0." rpy="0. 0. 0."/>
+      <mass value="0.0197616"/>
+      <inertia ixx="0.000001" ixy="0." ixz="-0." iyy="0.0000028" iyz="-0." izz="0.0000032"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 0.09809 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_finger.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.06776 0.09809 0." rpy="-3.1415927 0. 0."/>
+      <geometry>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_finger_pad.obj"/>
+      </geometry>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 0.09809 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_finger.obj"/>
       </geometry>
     </collision>
-  </link>
-  <link name="left_inner_finger_pad">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.022 0.00635 0.0375"/>
-      </geometry>
-      <material name="">
-        <color rgba="0.0 0.0 0.0 1"/>
-      </material>
-    </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 0.09809 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <box size="0.022 0.00635 0.0375"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_finger_pad.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.0 0.0 0.0 1"/>
-      </material>
     </collision>
   </link>
   <link name="left_inner_knuckle">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.000123011831763771 0.0507850843201817 0.00103968640075166"/>
-      <mass value="0.0271177346495152"/>
-      <inertia ixx="2.61910379223783E-05" ixy="-2.43616858946494E-07" ixz="-6.37789906117123E-09" iyy="2.8270243746167E-06" iyz="-5.37200748039765E-07" izz="2.83695868220296E-05"/>
+      <origin xyz="0.0176393 -0.0211796 -0." rpy="0. 0. 0."/>
+      <mass value="0.0273069"/>
+      <inertia ixx="0.0000045" ixy="-0." ixz="0." iyy="0.000008" iyz="-0." izz="0.0000118"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_knuckle.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/left_inner_knuckle.obj"/>
       </geometry>
     </collision>
   </link>
+  <!-- Right side links -->
   <link name="right_outer_knuckle">
     <inertial>
-      <origin rpy="0 0 0" xyz="-0.000200000000003065 0.0199435877845359 0.0292245259211331"/>
-      <mass value="0.00853198276973456"/>
-      <inertia ixx="2.89328108496468E-06" ixy="-1.57935047237397E-19" ixz="-1.93980378593255E-19" iyy="1.86719750325683E-06" iyz="-1.21858577871576E-06" izz="1.21905238907251E-06"/>
+      <origin xyz="-0.0121152 0.000638 0." rpy="0. 0. 0."/>
+      <mass value="0.0127346"/>
+      <inertia ixx="0.0000003" ixy="-0." ixz="0." iyy="0.0000021" iyz="-0." izz="0.0000021"/>
     </inertial>
     <visual>
-      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
+      <origin xyz="0.0306 0.05466 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_outer_knuckle.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="-1.57079632679 0 0" xyz="0 0 0"/>
+      <origin xyz="0.0306 0.05466 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_outer_knuckle.obj"/>
       </geometry>
     </collision>
   </link>
   <link name="right_outer_finger">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.00030115855001899 0.0373907951953854 -0.0208027427000385"/>
-      <mass value="0.022614240507152"/>
-      <inertia ixx="1.52518312458174E-05" ixy="9.76583423954399E-10" ixz="-5.43838577022588E-10" iyy="6.17694243867776E-06" iyz="6.78636130740228E-06" izz="1.16494917907219E-05"/>
+      <origin xyz="-0.0000055 0.0659505 0.0689531" rpy="0. 0. 0."/>
+      <mass value="0.0391792"/>
+      <inertia ixx="0.0000132" ixy="0." ixz="0." iyy="0.0000043" iyz="-0." izz="0.0000109"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="-0. 0. 0." rpy="1.5707964 0.0000001 -1.5707964"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_outer_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_outer_finger.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="-0. 0. 0." rpy="1.5707964 0.0000001 -1.5707964"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_outer_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_outer_finger.obj"/>
       </geometry>
     </collision>
   </link>
   <link name="right_inner_finger">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.000299999999999317 0.0160078233491243 -0.0136945669206257"/>
-      <mass value="0.0104003125914103"/>
-      <inertia ixx="2.71909453810972E-06" ixy="1.35402465472579E-21" ixz="-7.1817349065269E-22" iyy="7.69100314106116E-07" iyz="6.74715432769696E-07" izz="2.30315190420171E-06"/>
+      <origin xyz="0.0185829 0.0274476 0." rpy="0. 0. 0."/>
+      <mass value="0.0197616"/>
+      <inertia ixx="0.000001" ixy="0." ixz="-0." iyy="0.0000028" iyz="-0." izz="0.0000032"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 -0.09809 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_finger.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
+    </visual>
+    <visual>
+      <origin xyz="0.06776 -0.09809 0." rpy="0. 0. 0."/>
+      <geometry>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_finger_pad.obj"/>
+      </geometry>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 -0.09809 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_finger.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_finger.obj"/>
       </geometry>
     </collision>
-  </link>
-  <link name="right_inner_finger_pad">
-    <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
-      <geometry>
-        <box size="0.022 0.00635 0.0375"/>
-      </geometry>
-      <material name="">
-        <color rgba="0.0 0.0 0.0 1"/>
-      </material>
-    </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.06776 -0.09809 0." rpy="0. 0. 0."/>
       <geometry>
-        <box size="0.022 0.00635 0.0375"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_finger_pad.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.0 0.0 0.0 1"/>
-      </material>
     </collision>
   </link>
   <link name="right_inner_knuckle">
     <inertial>
-      <origin rpy="0 0 0" xyz="0.000123011831763771 0.0507850843201817 0.00103968640075166"/>
-      <mass value="0.0271177346495152"/>
-      <inertia ixx="2.61910379223783E-05" ixy="-2.43616858946494E-07" ixz="-6.37789906117123E-09" iyy="2.8270243746167E-06" iyz="-5.37200748039765E-07" izz="2.83695868220296E-05"/>
+      <origin xyz="0.0176393 -0.0211796 -0." rpy="0. 0. 0."/>
+      <mass value="0.0273069"/>
+      <inertia ixx="0.0000045" ixy="0." ixz="-0." iyy="0.000008" iyz="-0." izz="0.0000118"/>
     </inertial>
     <visual>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/visual/robotiq_arg2f_85_inner_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_knuckle.obj"/>
       </geometry>
-      <material name="">
-        <color rgba="0.1 0.1 0.1 1"/>
-      </material>
     </visual>
     <collision>
-      <origin rpy="0 0 0" xyz="0 0 0"/>
+      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/collision/robotiq_arg2f_85_inner_knuckle.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85_isaac_sim/right_inner_knuckle.obj"/>
       </geometry>
     </collision>
   </link>
+  <!-- Joints - Isaac Sim closed-loop kinematic structure -->
+  <!-- Left outer knuckle joint (leader) -->
   <joint name="left_outer_knuckle_joint" type="revolute">
-    <origin rpy="0 0 3.141592653589793" xyz="0 -0.0306011 0.054904"/>
+    <origin xyz="0. -0.0306 0.05466" rpy="1.5707964 0. -1.5707964"/>
     <parent link="robotiq_arg2f_base_link"/>
     <child link="left_outer_knuckle"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="0." upper="0.8203047" effort="26." velocity="2.5562093"/>
   </joint>
+  <!-- Left outer finger (fixed to outer knuckle) -->
   <joint name="left_outer_finger_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.0315 -0.0041"/>
+    <origin xyz="-0.0306 -0.05466 -0." rpy="-1.5707965 1.5707963 0."/>
     <parent link="left_outer_knuckle"/>
     <child link="left_outer_finger"/>
-    <axis xyz="1 0 0"/>
   </joint>
-  <joint name="left_inner_knuckle_joint" type="revolute">
-    <!-- <origin xyz="0 ${reflect * -0.0127} 0.06142" rpy="${pi / 2 + .725} 0 ${(reflect - 1) * pi / 2}" /> -->
-    <origin rpy="0 0 3.141592653589793" xyz="0 -0.0127 0.06142"/>
-    <parent link="robotiq_arg2f_base_link"/>
-    <child link="left_inner_knuckle"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <!-- mimic removed - handled by bridge node -->
-  </joint>
+  <!-- Left inner finger joint (connects outer finger to inner finger) -->
   <joint name="left_inner_finger_joint" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0.0061 0.0471"/>
+    <origin xyz="-0. -0.06776 0.09809" rpy="-1.5707963 -0.0000001 1.5707963"/>
     <parent link="left_outer_finger"/>
     <child link="left_inner_finger"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <!-- mimic removed - handled by bridge node -->
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-3.1415927" upper="3.1415927" effort="0." velocity="174.5329252"/>
   </joint>
-  <joint name="left_inner_finger_pad_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>
+  <!-- Left inner knuckle joint (connects inner finger to inner knuckle - closes the loop) -->
+  <joint name="left_inner_knuckle_joint" type="revolute">
+    <origin xyz="0.0179 -0.00651 0." rpy="3.1415927 0. 0."/>
     <parent link="left_inner_finger"/>
-    <child link="left_inner_finger_pad"/>
-    <axis xyz="0 0 1"/>
+    <child link="left_inner_knuckle"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-3.1415927" upper="3.1415927" effort="0." velocity="174.5329252"/>
   </joint>
+  <!-- Right outer knuckle joint -->
   <joint name="right_outer_knuckle_joint" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0.0306011 0.054904"/>
+    <origin xyz="0. 0.0306 0.05466" rpy="-1.5707964 0. -1.5707964"/>
     <parent link="robotiq_arg2f_base_link"/>
     <child link="right_outer_knuckle"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <!-- mimic removed - handled by bridge node -->
+    <axis xyz="0. 0. 1."/>
+    <limit lower="0." upper="0.8203047" effort="0." velocity="174.5329252"/>
   </joint>
+  <!-- Right outer finger (fixed to outer knuckle) -->
   <joint name="right_outer_finger_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 0.0315 -0.0041"/>
+    <origin xyz="0.0306 0.05466 0." rpy="1.5707963 -1.5707963 0."/>
     <parent link="right_outer_knuckle"/>
     <child link="right_outer_finger"/>
-    <axis xyz="1 0 0"/>
   </joint>
-  <joint name="right_inner_knuckle_joint" type="revolute">
-    <!-- <origin xyz="0 ${reflect * -0.0127} 0.06142" rpy="${pi / 2 + .725} 0 ${(reflect - 1) * pi / 2}" /> -->
-    <origin rpy="0 0 0.0" xyz="0 0.0127 0.06142"/>
-    <parent link="robotiq_arg2f_base_link"/>
-    <child link="right_inner_knuckle"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <!-- mimic removed - handled by bridge node -->
-  </joint>
+  <!-- Right inner finger joint (connects outer finger to inner finger) -->
   <joint name="right_inner_finger_joint" type="revolute">
-    <origin rpy="0 0 0" xyz="0 0.0061 0.0471"/>
+    <origin xyz="-0. 0.06776 0.09809" rpy="1.5707964 0.0000001 -1.5707964"/>
     <parent link="right_outer_finger"/>
     <child link="right_inner_finger"/>
-    <axis xyz="1 0 0"/>
-    <limit effort="1000" lower="-1.0" upper="1.0" velocity="1.0"/>
-    <!-- mimic removed - handled by bridge node -->
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-3.1415927" upper="3.1415927" effort="0." velocity="174.5329252"/>
   </joint>
-  <joint name="right_inner_finger_pad_joint" type="fixed">
-    <origin rpy="0 0 0" xyz="0 -0.0220203446692936 0.03242"/>
+  <!-- Right inner knuckle joint (connects inner finger to inner knuckle - closes the loop) -->
+  <joint name="right_inner_knuckle_joint" type="revolute">
+    <origin xyz="0.0179 0.00651 0." rpy="0. 0. 0."/>
     <parent link="right_inner_finger"/>
-    <child link="right_inner_finger_pad"/>
-    <axis xyz="0 0 1"/>
+    <child link="right_inner_knuckle"/>
+    <axis xyz="0. 0. 1."/>
+    <limit lower="-3.1415927" upper="3.1415927" effort="0." velocity="174.5329252"/>
   </joint>
-  <ros2_control name="TidybotSystem" type="system">
-    <hardware>
-      <plugin>mock_components/GenericSystem</plugin>
-    </hardware>
-    <joint name="joint_x">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_y">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_th">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_1">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_2">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">-0.35</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_3">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">3.141522</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_4">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">-2.36</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_5">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_6">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">-1.13</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="joint_7">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">1.574186</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="left_outer_knuckle_joint">
-      <command_interface name="position"/>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-      <param name="position_proportional_gain">0.1</param>
-    </joint>
-    <joint name="right_inner_finger_joint">
-      <param name="mimic">left_outer_knuckle_joint</param>
-      <param name="multiplier">-1.0</param>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="right_outer_knuckle_joint">
-      <param name="mimic">left_outer_knuckle_joint</param>
-      <param name="multiplier">1.0</param>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="right_inner_knuckle_joint">
-      <param name="mimic">left_outer_knuckle_joint</param>
-      <param name="multiplier">1.0</param>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="left_inner_finger_joint">
-      <param name="mimic">left_outer_knuckle_joint</param>
-      <param name="multiplier">-1.0</param>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-    </joint>
-    <joint name="left_inner_knuckle_joint">
-      <param name="mimic">left_outer_knuckle_joint</param>
-      <param name="multiplier">1.0</param>
-      <state_interface name="position">
-        <param name="initial_value">0.0</param>
-      </state_interface>
-      <state_interface name="velocity"/>
-    </joint>
-  </ros2_control>
-  <gazebo>
-    <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>/home/janchen/Documents/tidybot_platform/install/tidybot_description/share/tidybot_description/config/tidybot_controllers.yaml</parameters>
-      <robot_description_param>robot_description</robot_description_param>
-    </plugin>
-    <plugin filename="libignition-gazebo-sensors-system.so" name="ignition::gazebo::systems::Sensors"/>
-  </gazebo>
-  <!-- <gazebo>
-    <plugin filename="ignition-gazebo-joint-state-publisher-system" name="ignition::gazebo::systems::JointStatePublisher"/>
-
-    <plugin
-        filename="ignition-gazebo-pose-publisher-system"
-        name="ignition::gazebo::systems::PosePublisher">
-        <publish_link_pose>true</publish_link_pose>
-
-        <use_pose_vector_msg>true</use_pose_vector_msg>
-    </plugin>
-
-  </gazebo> -->
-  <gazebo reference="arm_camera_link">
-    <sensor name="arm_camera" type="rgbd_camera">
-      <always_on>1</always_on>
-      <update_rate>30</update_rate>
-      <visualize>true</visualize>
-      <pose>0 -0.01 0.03 0 4.7124 1.5708</pose>
-      <topic>/arm_camera</topic>
-      <gz_frame_id>arm_camera_link</gz_frame_id>
-      <camera>
-        <horizontal_fov>1.247</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>480</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.03</near>
-          <far>3.0</far>
-        </clip>
-        <noise>
-          <type>gaussian</type>
-          <mean>0.0</mean>
-          <stddev>0.007</stddev>
-        </noise>
-      </camera>
-    </sensor>
-  </gazebo>
-  <gazebo reference="base_camera_link">
-    <sensor name="base_camera" type="rgbd_camera">
-      <always_on>1</always_on>
-      <update_rate>30</update_rate>
-      <visualize>true</visualize>
-      <pose>0 0 0 0 0 0</pose>
-      <topic>/base_camera</topic>
-      <gz_frame_id>base_camera_link</gz_frame_id>
-      <camera>
-        <horizontal_fov>1.434</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>360</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.03</near>
-          <far>3.0</far>
-        </clip>
-        <noise>
-          <type>gaussian</type>
-          <mean>0.0</mean>
-          <stddev>0.007</stddev>
-        </noise>
-      </camera>
-    </sensor>
-  </gazebo>
-  <transmission name="joint_1_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_1_motor"/>
-    <joint name="joint_1"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_2_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_2_motor"/>
-    <joint name="joint_2"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_3_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_3_motor"/>
-    <joint name="joint_3"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_4_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_4_motor"/>
-    <joint name="joint_4"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_5_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_5_motor"/>
-    <joint name="joint_5"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_6_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_6_motor"/>
-    <joint name="joint_6"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_7_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <actuator name="joint_7_motor"/>
-    <joint name="joint_7"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="joint_x_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="joint_x"/>
-    <actuator name="joint_x_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="joint_y_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="joint_y"/>
-    <actuator name="joint_y_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="joint_th_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="joint_th"/>
-    <actuator name="joint_th_motor">
-      <mechanicalReduction>1</mechanicalReduction>
-    </actuator>
-  </transmission>
-  <transmission name="left_inner_knuckle_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="left_inner_knuckle_joint"/>
-    <actuator name="left_inner_knuckle_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="right_inner_knuckle_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_inner_knuckle_joint"/>
-    <actuator name="right_inner_knuckle_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="left_inner_finger_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="left_inner_finger_joint"/>
-    <actuator name="left_inner_finger_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="right_inner_finger_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_inner_finger_joint"/>
-    <actuator name="right_inner_finger_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="left_outer_knuckle_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="left_outer_knuckle_joint"/>
-    <actuator name="left_outer_knuckle_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
-  <transmission name="right_outer_knuckle_joint_trans">
-    <type>transmission_interface/SimpleTransmission</type>
-    <joint name="right_outer_knuckle_joint"/>
-    <actuator name="right_outer_knuckle_joint_motor"/>
-    <mechanicalReduction>1</mechanicalReduction>
-  </transmission>
 </robot>
