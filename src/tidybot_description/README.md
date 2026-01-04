@@ -295,12 +295,12 @@ for name in BASE_JOINTS:
     # Stiffness: 1e6 (high for position tracking)
     # Damping: 1e4 (moderate for smooth motion without oscillation)  
     # MaxForce: 1e6 (very high to allow fast movement)
-    configure_drive(f"{joints_path}/{name}", 1e6, 1e4, 1e6, drive_type)
+    configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, drive_type)
 
 print("\nConfiguring arm joints...")
 for name in ARM_JOINTS:
     # Arm joints: high stiffness for fast tracking, moderate damping, high max force
-    configure_drive(f"{joints_path}/{name}", 1e6, 1e4, 1e6, "angular")
+    configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, "angular")
 
 # Configure gripper joints using Mimic Joint API
 # Reference: https://docs.isaacsim.omniverse.nvidia.com/5.1.0/robot_setup_tutorials/rig_closed_loop_structures.html
@@ -319,18 +319,19 @@ leader_prim = get_prim(leader_path)
 if leader_prim.IsValid():
     # Configure leader joint with POSITION CONTROL for ROS 2 compatibility
     # TidyBot control architecture uses position commands (0=open, ~0.8=closed)
-    # Use moderate stiffness for position tracking, limited maxForce for compliant grasping
+    # Use LOW stiffness for compliant grasping to prevent object penetration
+    # The gripper will "give" when it contacts objects instead of pushing through
     drive = UsdPhysics.DriveAPI.Apply(leader_prim, "angular")
     drive.CreateTypeAttr("force")
-    drive.CreateStiffnessAttr(1000.0)    # Position control stiffness
-    drive.CreateDampingAttr(100.0)       # Damping to prevent oscillation
-    drive.CreateMaxForceAttr(10.0)       # Limited force for compliant grasping
+    drive.CreateStiffnessAttr(200.0)      # Low stiffness for compliant grasping
+    drive.CreateDampingAttr(50.0)         # Moderate damping to prevent oscillation
+    drive.CreateMaxForceAttr(10.0)        # Very limited force to prevent penetration
     
     # Set max velocity (130 deg/s from Robotiq datasheet)
     physx_joint = PhysxSchema.PhysxJointAPI.Apply(leader_prim)
     physx_joint.CreateMaxJointVelocityAttr(130.0)  # degrees per second
     
-    print(f"  Leader: {LEADER_JOINT} (stiffness=1000, damping=100, maxForce=10)")
+    print(f"  Leader: {LEADER_JOINT} (stiffness=200, damping=50, maxForce=10)")
 else:
     print(f"  WARNING: Leader joint not found: {leader_path}")
 

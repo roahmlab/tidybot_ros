@@ -180,8 +180,8 @@ if [ "$COMMAND" == "restart" ]; then
         echo "ROS 2 Jazzy is available. Run: ros2 topic list"
         docker run --rm $DOCKER_OPTIONS $IMAGE_NAME bash
     else
-        echo "Starting Isaac Sim GUI with ROS 2 support..."
-        docker run --rm $DOCKER_OPTIONS $IMAGE_NAME
+        echo "Starting Isaac Sim GUI with ROS 2 Simulation Control support..."
+        docker run --rm $DOCKER_OPTIONS $IMAGE_NAME ./isaac-sim.sh --/isaac/startup/ros_sim_control_extension=True
     fi
 elif [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
     if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
@@ -193,8 +193,8 @@ elif [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
             echo "ROS 2 Jazzy is available. Run: ros2 topic list"
             docker run --rm $DOCKER_OPTIONS $IMAGE_NAME bash
         else
-            echo "Starting Isaac Sim GUI with ROS 2 support..."
-            docker run --rm $DOCKER_OPTIONS $IMAGE_NAME
+            echo "Starting Isaac Sim GUI with ROS 2 Simulation Control support..."
+            docker run --rm $DOCKER_OPTIONS $IMAGE_NAME ./isaac-sim.sh --/isaac/startup/ros_sim_control_extension=True
         fi
     fi
 else
