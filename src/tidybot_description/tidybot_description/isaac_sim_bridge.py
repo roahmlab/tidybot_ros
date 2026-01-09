@@ -92,10 +92,18 @@ class IsaacSimBridge(Node):
         self.arm_joints = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 
                           'joint_5', 'joint_6', 'joint_7']
         
-        # Gripper configuration: only leader joint is commanded
-        # Other joints use Mimic Joint API in Isaac Sim to follow the leader
+        # Gripper configuration: all joints driven directly with gear ratios
+        # Simplified parallel-jaw gripper (no closed-loop kinematics)
+        # Outer knuckles are symmetric leaders
+        # Inner fingers rotate opposite to keep pads parallel
+        # Inner knuckles follow (no collision, mainly cosmetic)
         self.gripper_joints = {
-            'left_outer_knuckle_joint': 1.0,    # Leader joint only
+            'left_outer_knuckle_joint': 1.0,     
+            'right_outer_knuckle_joint': 1.0,    
+            'left_inner_finger_joint': -0.9,     
+            'right_inner_finger_joint': 0.9,    
+            'left_inner_knuckle_joint': -1.0,    
+            'right_inner_knuckle_joint': -1.0,    
         }
         
         # Current target state (initialize to home position)

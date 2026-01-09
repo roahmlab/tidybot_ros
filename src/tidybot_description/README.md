@@ -186,10 +186,14 @@ Use the setup script in Isaac Sim's Script Editor to configure physics and ROS 2
 """
 Isaac Sim Setup Script for TidyBot++
 Run this after importing the URDF into Isaac Sim.
+
+Gripper: Uses simplified parallel-jaw approach (no closed-loop kinematics).
+All gripper joints are driven directly with compliant position control.
+The isaac_sim_bridge.py applies gear ratios to command all joints together.
 """
 
 import omni.usd
-from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf, PhysxSchema
+from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf, PhysxSchema, UsdShade
 import omni.graph.core as og
 import math
 
@@ -302,84 +306,74 @@ for name in ARM_JOINTS:
     # Arm joints: high stiffness for fast tracking, moderate damping, high max force
     configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, "angular")
 
-# Configure gripper joints using Mimic Joint API
-# Reference: https://docs.isaacsim.omniverse.nvidia.com/5.1.0/robot_setup_tutorials/rig_closed_loop_structures.html
-# The Robotiq 2F-85 uses a single leader joint with follower joints mimicking it
+# Configure gripper joints - Simplified Parallel-Jaw Gripper
+# All joints are driven directly with compliant position control
+# Inner knuckle collisions are removed in the URDF to break the closed-loop
 # 
-# Note: TidyBot control architecture uses POSITION control for the gripper
-# (commands like 0.0=open, 0.8=closed). We use stiffness>0 for position tracking
-# but limit maxForce for compliant grasping (gripper stops when hitting objects).
-print("\nConfiguring gripper joints with Mimic Joint API...")
+# The isaac_sim_bridge.py commands all joints with gear ratios:
+#   - left/right_outer_knuckle_joint: 1.0 (leaders)
+#   - left/right_inner_finger_joint: -1.0 (opposite for parallel pads)
+#   - left/right_inner_knuckle_joint: 1.0 (cosmetic, no collision)
+print("\nConfiguring gripper joints (simplified parallel-jaw)...")
 
-# Leader joint configuration (left_outer_knuckle_joint)
-LEADER_JOINT = "left_outer_knuckle_joint"
-leader_path = f"{joints_path}/{LEADER_JOINT}"
-leader_prim = get_prim(leader_path)
-
-if leader_prim.IsValid():
-    # Configure leader joint with POSITION CONTROL for ROS 2 compatibility
-    # TidyBot control architecture uses position commands (0=open, ~0.8=closed)
-    # Use LOW stiffness for compliant grasping to prevent object penetration
-    # The gripper will "give" when it contacts objects instead of pushing through
-    drive = UsdPhysics.DriveAPI.Apply(leader_prim, "angular")
-    drive.CreateTypeAttr("force")
-    drive.CreateStiffnessAttr(200.0)      # Low stiffness for compliant grasping
-    drive.CreateDampingAttr(50.0)         # Moderate damping to prevent oscillation
-    drive.CreateMaxForceAttr(10.0)        # Very limited force to prevent penetration
-    
-    # Set max velocity (130 deg/s from Robotiq datasheet)
-    physx_joint = PhysxSchema.PhysxJointAPI.Apply(leader_prim)
-    physx_joint.CreateMaxJointVelocityAttr(130.0)  # degrees per second
-    
-    print(f"  Leader: {LEADER_JOINT} (stiffness=200, damping=50, maxForce=10)")
-else:
-    print(f"  WARNING: Leader joint not found: {leader_path}")
-
-# Follower joints with Mimic Joint API
-# Gearing: positive = same direction, negative = opposite direction
-MIMIC_JOINTS = {
-    # Joint name: gearing (multiplier relative to leader)
-    "right_outer_knuckle_joint": -1.0,   # Same direction as leader
-    "left_inner_knuckle_joint": 1.0,    # Same direction as leader
-    "right_inner_knuckle_joint": 1.0,   # Same direction as leader
-    "left_inner_finger_joint": 1.0,    # Same direction
-    "right_inner_finger_joint": -1.0,   # Same direction
+# Different stiffness for different joint types
+# Outer knuckle joints need higher stiffness (main driving joints)
+# Inner finger joints need lower stiffness (passive compliance for grasping)
+OUTER_KNUCKLE_CONFIG = {
+    "stiffness": 1000.0,   # Moderate stiffness for main driving joints
+    "damping": 100.0,
+    "max_force": 180.0,
+    "max_velocity": 130.0,
 }
 
-for joint_name, gearing in MIMIC_JOINTS.items():
+INNER_FINGER_CONFIG = {
+    "stiffness": 1000.0,    # High stiffness because we omitted the joints connecting the inner knuckle and the pad
+    "damping": 100.0,
+    "max_force": 180.0,     
+    "max_velocity": 130.0,
+}
+
+INNER_KNUCKLE_CONFIG = {
+    "stiffness": 400.0,     
+    "damping": 100.0,
+    "max_force": 20.0,
+    "max_velocity": 130.0,
+}
+
+# Map joint names to their configurations
+GRIPPER_JOINT_CONFIGS = {
+    "left_outer_knuckle_joint": OUTER_KNUCKLE_CONFIG,
+    "right_outer_knuckle_joint": OUTER_KNUCKLE_CONFIG,
+    "left_inner_finger_joint": INNER_FINGER_CONFIG,
+    "right_inner_finger_joint": INNER_FINGER_CONFIG,
+    "left_inner_knuckle_joint": INNER_KNUCKLE_CONFIG,
+    "right_inner_knuckle_joint": INNER_KNUCKLE_CONFIG,
+}
+
+for joint_name in GRIPPER_JOINTS:
     joint_path = f"{joints_path}/{joint_name}"
     joint_prim = get_prim(joint_path)
     
     if not joint_prim.IsValid():
-        print(f"  WARNING: Mimic joint not found: {joint_path}")
+        print(f"  WARNING: Gripper joint not found: {joint_path}")
         continue
     
-    # Remove any existing drive (mimic joints shouldn't have their own drive)
-    # The mimic API copies drive from reference joint
-    existing_drive = UsdPhysics.DriveAPI.Get(joint_prim, "angular")
-    if existing_drive:
-        # Clear drive values
-        if existing_drive.GetStiffnessAttr():
-            existing_drive.GetStiffnessAttr().Set(0.0)
-        if existing_drive.GetDampingAttr():
-            existing_drive.GetDampingAttr().Set(0.0)
-        if existing_drive.GetMaxForceAttr():
-            existing_drive.GetMaxForceAttr().Set(0.0)
+    # Get config for this joint type
+    config = GRIPPER_JOINT_CONFIGS.get(joint_name, INNER_FINGER_CONFIG)
     
-    # Apply Mimic Joint API
-    # For revolute joints, use "rotX" axis (axis selection doesn't matter for 1-DOF joints)
-    mimic_api = PhysxSchema.PhysxMimicJointAPI.Apply(joint_prim, "rotX")
+    # Configure compliant position drive
+    drive = UsdPhysics.DriveAPI.Apply(joint_prim, "angular")
+    drive.CreateTypeAttr("force")
+    drive.CreateStiffnessAttr(config["stiffness"])
+    drive.CreateDampingAttr(config["damping"])
+    drive.CreateMaxForceAttr(config["max_force"])
     
-    # Set reference joint (the leader)
-    mimic_api.CreateReferenceJointRel().SetTargets([Sdf.Path(leader_path)])
+    # Set max velocity
+    physx_joint = PhysxSchema.PhysxJointAPI.Apply(joint_prim)
+    physx_joint.CreateMaxJointVelocityAttr(config["max_velocity"])
     
-    # Set gearing (multiplier)
-    mimic_api.CreateGearingAttr(gearing)
-    
-    # Set offset (usually 0)
-    mimic_api.CreateOffsetAttr(0.0)
-    
-    print(f"  Mimic: {joint_name} -> {LEADER_JOINT} (gearing={gearing})")
+    print(f"  Configured: {joint_name} (stiffness={config['stiffness']}, "
+          f"damping={config['damping']}, maxForce={config['max_force']})")
 
 print("Gripper configuration complete!")
 
@@ -403,8 +397,14 @@ INITIAL_JOINT_POSITIONS = {
     "joint_5": 0.0,
     "joint_6": -1.13,
     "joint_7": 1.574186,
-    # Gripper - only leader joint (others follow via Mimic Joint API)
+    # Gripper - all joints start at 0 (open position)
+    # The isaac_sim_bridge applies gear ratios when commanding
     "left_outer_knuckle_joint": 0.0,
+    "right_outer_knuckle_joint": 0.0,
+    "left_inner_finger_joint": 0.0,
+    "right_inner_finger_joint": 0.0,
+    "left_inner_knuckle_joint": 0.0,
+    "right_inner_knuckle_joint": 0.0,
 }
 
 # Find and configure each joint by traversing the stage
@@ -588,13 +588,18 @@ print("\nSave scene and press PLAY to start simulation.")
 The script above does these things:
 - Locates the robot and sets the **Articulation Root** on the first dynamic rigid body
 - Configures **joint drives** with appropriate stiffness/damping for base, arm, and gripper
+- Sets up **simplified parallel-jaw gripper** with compliant drives on all joints (no closed-loop kinematics)
 - Creates **camera prims** under the arm and base camera links with proper FOV and resolution
 - Creates a **ROS 2 Action Graph** that:
   - Publishes `/clock` and `/joint_states`
   - Subscribes to `/joint_command` for robot control
   - Publishes camera images to `/arm_camera/image_raw` and `/base_camera/image_raw`
 
-After executing the script, press the `Play` button or space to start the simulation in Isaac Sim
+**Gripper Control:** The `isaac_sim_bridge` node commands all 6 gripper joints with gear ratios
+
+3. Apply the fingertip material: Go to **Create -> Physics -> Physics Material**, select **Rigid Body Material**. This will create a **PhysicsMaterial** in the stage, rename that material to **fingertip_material**. Select the material you just created, under **Property -> Material and Shader -> Extra Properties** change both friction coefficients to 0.8 and the **Friction Combine Mode** to max. Then select the **left_inner_finger** in the stage, under the **Property** tab change the **Materials on selected models** to the fingertip material. Do the same for **right_inner_finger**.
+
+After executing all these, press the `Play` button or space to start the simulation in Isaac Sim. You can also save the scene for later use.
 
 ### Step 3: Launch ROS 2 Stack
 

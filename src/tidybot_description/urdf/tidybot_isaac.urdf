@@ -369,7 +369,7 @@
     <child link="robotiq_arg2f_base_link"/>
     <origin rpy="0.0 0.0 1.57" xyz="0.0 0.0 0.0"/>
   </joint>
-  <!-- Robotiq 2F-85 Gripper - Isaac Sim compatible model with closed-loop kinematics -->
+  <!-- Robotiq 2F-85 Gripper - Simplified parallel-jaw gripper for Isaac Sim -->
   <!-- Base link (exported from Isaac Sim) -->
   <link name="robotiq_arg2f_base_link">
     <inertial>
@@ -460,6 +460,7 @@
       </geometry>
     </collision>
   </link>
+  <!-- Inner knuckles: collision removed to break closed-loop kinematics -->
   <link name="left_inner_knuckle">
     <inertial>
       <origin xyz="0.0176393 -0.0211796 -0." rpy="0. 0. 0."/>
@@ -472,12 +473,7 @@
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
-      <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
-      </geometry>
-    </collision>
+    <!-- Collision removed - allows direct joint control without kinematic loop -->
   </link>
   <!-- Right side links -->
   <link name="right_outer_knuckle">
@@ -561,12 +557,7 @@
         <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
       </geometry>
     </visual>
-    <collision>
-      <origin xyz="0.04986 -0.1046 0." rpy="0. 0. 0."/>
-      <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
-      </geometry>
-    </collision>
+    <!-- Collision removed - allows direct joint control without kinematic loop -->
   </link>
   <!-- Left outer knuckle joint (leader) -->
   <joint name="left_outer_knuckle_joint" type="revolute">
