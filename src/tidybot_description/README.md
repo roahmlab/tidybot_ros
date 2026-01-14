@@ -133,7 +133,7 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
 │  ┌─────────────────────────────────────────────────────────────────────────┐ │
 │  │  Action Graph (OmniGraph):                                               │ │
 │  │    • PublishClock → /clock                                               │ │
-│  │    • PublishJointState → /joint_states                                   │ │
+│  │    • PublishJointState → /isaac_sim/joint_states                         │ │
 │  │    • SubscribeJointState ← /joint_command                                │ │
 │  │    • ArticulationController (applies joint commands)                     │ │
 │  └─────────────────────────────────────────────────────────────────────────┘ │
@@ -187,8 +187,8 @@ Use the setup script in Isaac Sim's Script Editor to configure physics and ROS 2
 Isaac Sim Setup Script for TidyBot++
 Run this after importing the URDF into Isaac Sim.
 
-Gripper: Uses simplified parallel-jaw approach (no closed-loop kinematics).
-All gripper joints are driven directly with compliant position control.
+Gripper: Uses spring-loaded mechanism for the outer fingers.
+Outer finger joints are revolute and driven by angular drives.
 The isaac_sim_bridge.py applies gear ratios to command all joints together.
 """
 
@@ -201,8 +201,9 @@ import math
 ROBOT_PATH = "/World/tidybot"
 BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
-GRIPPER_JOINTS = ["left_outer_knuckle_joint", "left_inner_knuckle_joint", "left_inner_finger_joint",
-                  "right_outer_knuckle_joint", "right_inner_knuckle_joint", "right_inner_finger_joint"]
+GRIPPER_JOINTS = ["finger_joint", "left_inner_finger_knuckle_joint", "left_inner_finger_joint",
+                  "right_outer_knuckle_joint", "right_inner_finger_knuckle_joint", "right_inner_finger_joint",
+                  "left_outer_finger_joint", "right_outer_finger_joint"]
 CAMERAS = {
     "arm_camera": {
         "parent_link": "bracelet_link/end_effector_link/arm_camera_link",
@@ -313,7 +314,7 @@ for name in ARM_JOINTS:
 # The isaac_sim_bridge.py commands all joints with gear ratios:
 #   - left/right_outer_knuckle_joint: 1.0 (leaders)
 #   - left/right_inner_finger_joint: -1.0 (opposite for parallel pads)
-#   - left/right_inner_knuckle_joint: 1.0 (cosmetic, no collision)
+#   - left/right_inner_finger_knuckle_joint: 1.0 (cosmetic, no collision)
 print("\nConfiguring gripper joints (simplified parallel-jaw)...")
 
 # Different stiffness for different joint types
@@ -326,6 +327,15 @@ OUTER_KNUCKLE_CONFIG = {
     "max_velocity": 130.0,
 }
 
+# Config for the new revolute outer finger joints (spring mechanism)
+# Based on Isaac Sim tutorial: Stiffness=0.05 to keep fingers parallel but allow compliance
+OUTER_FINGER_CONFIG = {
+    "stiffness": 50,
+    "damping": 20.0,        # Using low damping to complement low stiffness
+    "max_force": 180.0,
+    "max_velocity": 130.0,
+}
+
 INNER_FINGER_CONFIG = {
     "stiffness": 1000.0,    # High stiffness because we omitted the joints connecting the inner knuckle and the pad
     "damping": 100.0,
@@ -334,7 +344,7 @@ INNER_FINGER_CONFIG = {
 }
 
 INNER_KNUCKLE_CONFIG = {
-    "stiffness": 400.0,     
+    "stiffness": 1000.0,     
     "damping": 100.0,
     "max_force": 20.0,
     "max_velocity": 130.0,
@@ -342,12 +352,14 @@ INNER_KNUCKLE_CONFIG = {
 
 # Map joint names to their configurations
 GRIPPER_JOINT_CONFIGS = {
-    "left_outer_knuckle_joint": OUTER_KNUCKLE_CONFIG,
+    "finger_joint": OUTER_KNUCKLE_CONFIG,
     "right_outer_knuckle_joint": OUTER_KNUCKLE_CONFIG,
+    "left_outer_finger_joint": OUTER_FINGER_CONFIG,
+    "right_outer_finger_joint": OUTER_FINGER_CONFIG,
     "left_inner_finger_joint": INNER_FINGER_CONFIG,
     "right_inner_finger_joint": INNER_FINGER_CONFIG,
-    "left_inner_knuckle_joint": INNER_KNUCKLE_CONFIG,
-    "right_inner_knuckle_joint": INNER_KNUCKLE_CONFIG,
+    "left_inner_finger_knuckle_joint": INNER_KNUCKLE_CONFIG,
+    "right_inner_finger_knuckle_joint": INNER_KNUCKLE_CONFIG,
 }
 
 for joint_name in GRIPPER_JOINTS:
@@ -399,12 +411,12 @@ INITIAL_JOINT_POSITIONS = {
     "joint_7": 1.574186,
     # Gripper - all joints start at 0 (open position)
     # The isaac_sim_bridge applies gear ratios when commanding
-    "left_outer_knuckle_joint": 0.0,
+    "finger_joint": 0.0,
     "right_outer_knuckle_joint": 0.0,
     "left_inner_finger_joint": 0.0,
     "right_inner_finger_joint": 0.0,
-    "left_inner_knuckle_joint": 0.0,
-    "right_inner_knuckle_joint": 0.0,
+    "left_inner_finger_knuckle_joint": 0.0,
+    "right_inner_finger_knuckle_joint": 0.0,
 }
 
 # Find and configure each joint by traversing the stage
@@ -577,7 +589,7 @@ print(f"Articulation root: {artic_root_path}")
 print(f"Cameras configured: {list(camera_paths.keys())}")
 print("\nROS 2 Topics:")
 print("  /clock - Simulation clock")
-print("  /joint_states - Robot joint states")
+print("  /joint_states - Robot joint states (raw)")
 print("  /joint_command - Joint position/velocity commands")
 for cam_name in camera_paths:
     config = CAMERAS[cam_name]
@@ -597,13 +609,19 @@ The script above does these things:
 
 **Gripper Control:** The `isaac_sim_bridge` node commands all 6 gripper joints with gear ratios
 
-3. Apply the fingertip material: Go to **Create -> Physics -> Physics Material**, select **Rigid Body Material**. This will create a **PhysicsMaterial** in the stage, rename that material to **fingertip_material**. Select the material you just created, under **Property -> Material and Shader -> Extra Properties** change both friction coefficients to 0.8 and the **Friction Combine Mode** to max. Then select the **left_inner_finger** in the stage, under the **Property** tab change the **Materials on selected models** to the fingertip material. Do the same for **right_inner_finger**.
+4. Add inner knuckle joints: Because urdf and Isaac Sim do not support closed_loop articulation (which is what the Robotiq 2F 85 gripper relies on to keep its finger parallel), we need to manually add the inner knuckle joints in Isaac Sim and remove them from articulation to close the loop. First, switch the view to **Right** and zoom into the gripper. Then select **left_inner_knuckle** and **robotiq_arg2f_base_link** in the stage and right-click -> **Create** -> **Physics** -> **Joint** -> **Revolute Joint** to create a revolute joint connecting them. Make sure the axis of the joint is correct. After that, move the center of the joint to the joint connecting the inner knuckle and the pad like this:
+
+   <img width="1648" height="933" alt="Image" src="https://github.com/user-attachments/assets/d6ddc068-3420-42ee-942e-c54f91ddc327" />
+
+    Do the same for the right_inner_knuckle. Name the joints "left_inner_knuckle_joint" and "right_inner_knuckle_joint". After creating the joints, we need to exlude them from articulation so Isaac Sim won't throw errors. Go to the **Property** tab of the joints, check **Exclude From Articulation**.
+
+5. Apply the fingertip material: Go to **Create -> Physics -> Physics Material**, select **Rigid Body Material**. This will create a **PhysicsMaterial** in the stage, rename that material to **fingertip_material**. Select the material you just created, under **Property -> Material and Shader -> Extra Properties** change both friction coefficients to 0.8 and the **Friction Combine Mode** to max. Then select the **left_inner_finger** in the stage, under the **Property** tab change the **Materials on selected models** to the fingertip material. Do the same for **right_inner_finger**.
 
 After executing all these, press the `Play` button or space to start the simulation in Isaac Sim. You can also save the scene for later use.
 
 ### Step 3: Launch ROS 2 Stack
 
-In the TidyBot ROS 2 container:
+In the TidyBot ROS 2 container: 
 
 ```bash
 # Launch the Isaac Sim integration stack
@@ -618,7 +636,7 @@ After the ROS2-Isaac Sim bridge is up, you can run the policies to control the r
 
 ### Troubleshooting Isaac Sim
 
-1. **No `/joint_states` messages:**
+1. **No `/isaac_sim/joint_states` or `/joint_states` messages:**
    - Ensure Isaac Sim is in PLAY mode
    - Check that ROS 2 Bridge extension is enabled
    - Verify FastDDS configuration in both containers

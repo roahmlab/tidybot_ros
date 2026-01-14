@@ -48,10 +48,10 @@
             <!-- Mimic multipliers: based on joint frame orientations -->
             <!-- - Right outer knuckle: same value as left (mirrored frame, so same numeric value = symmetric motion) -->
             <!-- - Inner fingers: opposite direction to compensate outer knuckle rotation (keeps fingertips parallel) -->
-            <!-- - Inner knuckles: same direction as outer knuckle -->
+            <!-- - Inner finger knuckle joints: connects inner finger to inner knuckle -->
             <xacro:if value="${gripper == 'robotiq_2f_85'}">
                 <!-- Leader joint (actuated) -->
-                <joint name="left_outer_knuckle_joint">
+                <joint name="finger_joint">
                     <command_interface name="position"/>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>
@@ -60,7 +60,7 @@
                 </joint>
                 <!-- Right outer knuckle (mimic, same numeric value for symmetric closing) -->
                 <joint name="right_outer_knuckle_joint">
-                    <param name="mimic">left_outer_knuckle_joint</param>
+                    <param name="mimic">finger_joint</param>
                     <param name="multiplier">1.0</param>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>
@@ -69,7 +69,7 @@
                 </joint>
                 <!-- Left inner finger (mimic, opposite to keep fingertip parallel) -->
                 <joint name="left_inner_finger_joint">
-                    <param name="mimic">left_outer_knuckle_joint</param>
+                    <param name="mimic">finger_joint</param>
                     <param name="multiplier">-1.0</param>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>
@@ -78,25 +78,25 @@
                 </joint>
                 <!-- Right inner finger (mimic) -->
                 <joint name="right_inner_finger_joint">
-                    <param name="mimic">left_outer_knuckle_joint</param>
+                    <param name="mimic">finger_joint</param>
                     <param name="multiplier">1.0</param>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>
                     </state_interface>
                     <state_interface name="velocity"/>
                 </joint>
-                <!-- Left inner knuckle (mimic) -->
-                <joint name="left_inner_knuckle_joint">
-                    <param name="mimic">left_outer_knuckle_joint</param>
+                <!-- Left inner finger knuckle (mimic, connects inner finger to inner knuckle) -->
+                <joint name="left_inner_finger_knuckle_joint">
+                    <param name="mimic">finger_joint</param>
                     <param name="multiplier">-1.0</param>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>
                     </state_interface>
                     <state_interface name="velocity"/>
                 </joint>
-                <!-- Right inner knuckle (mimic) -->
-                <joint name="right_inner_knuckle_joint">
-                    <param name="mimic">left_outer_knuckle_joint</param>
+                <!-- Right inner finger knuckle (mimic, connects inner finger to inner knuckle) -->
+                <joint name="right_inner_finger_knuckle_joint">
+                    <param name="mimic">finger_joint</param>
                     <param name="multiplier">-1.0</param>
                     <state_interface name="position">
                         <param name="initial_value">0.0</param>

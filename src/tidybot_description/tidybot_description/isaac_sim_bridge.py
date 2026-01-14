@@ -11,7 +11,6 @@ Subscribed Topics:
     /gen3_7dof_controller/joint_trajectory (JointTrajectory) - Arm joint trajectory
     /robotiq_2f_85_controller/commands (Float64MultiArray) - Gripper position
     /tidybot/gripper/commands (Float64) - Simple gripper command
-    /joint_states (JointState) - Current joint states from Isaac Sim
 
 Published Topics:
     /joint_command (JointState) - Combined joint commands for Isaac Sim
@@ -25,7 +24,7 @@ Simulation Control:
 
 Gripper Control:
     Uses Isaac Sim's Mimic Joint API for the Robotiq 2F-85 gripper.
-    Only the leader joint (left_outer_knuckle_joint) is commanded - other
+    Only the leader joint (finger_joint) is commanded - other
     joints use PhysxMimicJointAPI to follow the leader automatically.
 
 Initial joint positions from tidybot.ros2_control.xacro:
@@ -64,7 +63,7 @@ INITIAL_JOINT_POSITIONS = {
     "joint_6": -1.13,
     "joint_7": 1.574186,
     # Gripper - only leader joint (others use Mimic Joint API)
-    "left_outer_knuckle_joint": 0.0,
+    "finger_joint": 0.0,
 }
 
 # Joint position tolerance for checking if robot reached initial state
@@ -98,12 +97,12 @@ class IsaacSimBridge(Node):
         # Inner fingers rotate opposite to keep pads parallel
         # Inner knuckles follow (no collision, mainly cosmetic)
         self.gripper_joints = {
-            'left_outer_knuckle_joint': 1.0,     
-            'right_outer_knuckle_joint': 1.0,    
-            'left_inner_finger_joint': -0.9,     
-            'right_inner_finger_joint': 0.9,    
-            'left_inner_knuckle_joint': -1.0,    
-            'right_inner_knuckle_joint': -1.0,    
+            'finger_joint': 1.0,     # Leader
+            'right_outer_knuckle_joint': 1.0,    # Mimic multiplier="1.0"
+            'left_inner_finger_joint': -1.0,     # Mimic multiplier="-1.0"
+            'right_inner_finger_joint': 1.0,     # Mimic multiplier="1.0"
+            'left_inner_finger_knuckle_joint': -1.0, # Mimic multiplier="-1.0" 
+            'right_inner_finger_knuckle_joint': -1.0,# Mimic multiplier="-1.0"
         }
         
         # Current target state (initialize to home position)
@@ -171,14 +170,6 @@ class IsaacSimBridge(Node):
             10
         )
         
-        # Subscribe to Isaac Sim joint states for feedback
-        self.joint_state_sub = self.create_subscription(
-            JointState,
-            '/joint_states',
-            self.joint_state_callback,
-            10
-        )
-        
         # Publisher
         self.joint_cmd_pub = self.create_publisher(JointState, '/joint_command', 10)
         
@@ -218,16 +209,13 @@ class IsaacSimBridge(Node):
             f'    - /gen3_7dof_controller/joint_trajectory\n'
             f'    - /robotiq_2f_85_controller/commands\n'
             f'    - /tidybot/gripper/commands\n'
-            f'  Publishing to: /joint_command\n'
+            f'  Publishing to:\n'
+            f'    - /joint_command\n'
             f'  Services:\n'
             f'    - /isaac_sim/reset_env'
         )
 
-    def joint_state_callback(self, msg: JointState):
-        """Update current positions from Isaac Sim joint states."""
-        for i, name in enumerate(msg.name):
-            if i < len(msg.position):
-                self.current_joint_states[name] = msg.position[i]
+
 
     def base_pos_callback(self, msg: Float64MultiArray):
         """Handle base position commands [x, y, theta]."""
@@ -301,7 +289,7 @@ class IsaacSimBridge(Node):
         cmd.position.extend(self.arm_positions)
         cmd.velocity.extend([0.0] * len(self.arm_joints))
         
-        # Gripper - command only leader joint (left_outer_knuckle_joint)
+        # Gripper - command only leader joint (finger_joint)
         # Other joints follow via Mimic Joint API in Isaac Sim
         for joint_name, multiplier in self.gripper_joints.items():
             cmd.name.append(joint_name)

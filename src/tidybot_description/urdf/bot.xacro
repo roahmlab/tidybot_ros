@@ -2,23 +2,23 @@
 
 <robot xmlns:xacro="http://ros.org/wiki/xacro">
 
-<xacro:macro name="load_bot" params="arm gripper vision prefix">
+    <xacro:macro name="load_bot" params="arm gripper vision prefix">
 
-    <!-- load the corresponding macros -->
-    <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_macro.xacro" />
-    <xacro:include filename="$(find tidybot_description)/urdf/grippers/${gripper}/${gripper}_macro.xacro" />
-    <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_macro.xacro" />
+        <!-- load the corresponding macros -->
+        <xacro:include filename="$(find tidybot_description)/urdf/arms/${arm}/${arm}_macro.xacro" />
+        <xacro:include filename="$(find tidybot_description)/urdf/grippers/${gripper}/${gripper}_macro.xacro" />
+        <xacro:include filename="$(find tidybot_description)/urdf/base/tidybot++/base_kinova_macro.xacro" />
 
-    <!-- load the base -->
-    <xacro:load_base parent="" prefix="${prefix}" vision="${vision}" />
+        <!-- load the base -->
+        <xacro:load_base parent="" prefix="${prefix}" vision="${vision}" />
 
-    <!-- load the arm -->
-    <xacro:load_arm parent="${last_base_link}" vision="${vision}" prefix="${prefix}">
-        <origin xyz="0.12 3.76986e-15 0.374775" rpy="0 0 0" />
-    </xacro:load_arm>
+        <!-- load the arm -->
+        <xacro:load_arm parent="${last_base_link}" vision="${vision}" prefix="${prefix}">
+            <origin xyz="0.12 3.76986e-15 0.374775" rpy="0 0 0" />
+        </xacro:load_arm>
 
-    <!-- load the gripper -->
-    <xacro:load_gripper parent="${prefix}${last_arm_link}" prefix="${prefix}" />
+        <!-- load the gripper -->
+        <xacro:load_gripper parent="${prefix}${last_arm_link}" prefix="${prefix}" />
 
     </xacro:macro>
 </robot>

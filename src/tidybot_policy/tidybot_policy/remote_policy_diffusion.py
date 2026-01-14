@@ -188,7 +188,7 @@ class RemotePolicyDiffusion(Node):
         self.gripper_pub.publish(grip_msg)
 
     def joint_states_callback(self, msg):
-        self.last_gripper_state = msg.position[msg.name.index("left_outer_knuckle_joint")]
+        self.last_gripper_state = msg.position[msg.name.index("finger_joint")]
 
     def base_image_callback(self, msg):
         self.last_base_image = msg

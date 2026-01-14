@@ -3,12 +3,15 @@
   Robotiq 2F-85 Gripper Loader
   
   Unified gripper definition compatible with both Isaac Sim and Gazebo.
-  Uses Isaac Sim kinematic structure with closed-loop kinematics.
+  Uses NVIDIA Isaac Sim coordinate system for consistency across simulators.
+  
+  For Gazebo: outer_finger_joint is fixed (can't simulate closed-loop)
+  For Isaac Sim: Uses physics constraints via setup script
 -->
-<robot name="robotiq_arg2f_85_model" xmlns:xacro="http://ros.org/wiki/xacro">
+<robot name="robotiq_arg2f_85_model"
+  xmlns:xacro="http://ros.org/wiki/xacro">
 
   <xacro:macro name="load_gripper" params="parent prefix">
-    <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_arg2f.xacro" />
     <xacro:include filename="$(find tidybot_description)/urdf/grippers/robotiq_2f_85/robotiq_arg2f_85_model_macro.xacro" />
 
     <!-- Tool frame -->
@@ -19,17 +22,13 @@
       <child link="${prefix}tool_frame"/>
       <axis xyz="0 0 0"/>
     </joint>
-    
-    <!-- Gripper base link -->
-    <xacro:robotiq_arg2f_base_link prefix="${prefix}" parent="${parent}"/>
-    
-    <!-- Left finger (reflect=1) -->
-    <xacro:finger_links prefix="${prefix}" fingerprefix="left" reflect="1"/>
-    <xacro:left_outer_knuckle_joint prefix="${prefix}"/>
-    
-    <!-- Right finger (reflect=-1) -->
-    <xacro:finger_links prefix="${prefix}" fingerprefix="right" reflect="-1"/>
-    <xacro:right_outer_knuckle_joint prefix="${prefix}"/>
+
+    <!-- Gripper assembly (matching Isaac Sim coordinate system) -->
+    <!-- The gripper uses NVIDIA's coordinate frame (X forward, Z up) -->
+    <!-- Rotation aligns gripper with robot's end effector frame -->
+    <xacro:robotiq_gripper prefix="${prefix}" parent="${parent}">
+      <origin xyz="0.0 0.0 0.0" rpy="3.1415927 -1.5707964 1.5707964"/>
+    </xacro:robotiq_gripper>
   </xacro:macro>
 
 </robot>

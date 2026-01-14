@@ -246,14 +246,14 @@ class PhonePolicy(Node):
     def get_gripper_state_from_joint_states(self) -> float:
         """Return the gripper state from buffered JointState.
 
-        Looks for the 'left_outer_knuckle_joint' in the latest JointState and
+        Looks for the 'finger_joint' in the latest JointState and
         returns its position. If not available, returns the provided default.
         """
         js = self.latest_joint_state
         if js is None:
             return float(0.0)
         try:
-            idx = js.name.index("left_outer_knuckle_joint")
+            idx = js.name.index("finger_joint")
         except ValueError:
             return float(0.0)
         # Ensure positions array has corresponding index
