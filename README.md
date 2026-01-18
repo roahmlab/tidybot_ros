@@ -21,9 +21,9 @@ A complete bill of materials and hardware setup guide is available in the [origi
 ## 🔢 Policy Deployment Demos
 Using this codebase, we have successfully trained diffusion policies and finetuned vision-language-action models. Below are demonstrations of policies deployed in our simulated environment and on hardware:
 
-| <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/abe826a9-dc3a-4d32-8665-148473e8a45c" width="530"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> |
-|:--:|:--:|:--:|
-| Diffusion policy in Gazebo Sim | Diffusion policy on hardware | VLA on hardware |
+| <img src="https://github.com/user-attachments/assets/d778a6cd-1bce-4195-b2b0-d4013957151f" width="325"/> | <img src="https://github.com/user-attachments/assets/8d7b99dc-de36-460f-b997-3077c3b44844" width="530"/> | <img src="https://github.com/user-attachments/assets/abe826a9-dc3a-4d32-8665-148473e8a45c" width="530"/> | <img src="https://github.com/user-attachments/assets/3e32cacb-5390-4ee4-98e4-95cc699a7657" width="530"/> | 
+|:--:|:--:|:--:|:--:|
+| Diffusion policy in Gazebo Sim | Diffusion policy in Isaac Sim | Diffusion policy on hardware | VLA on hardware |
 
 
 ## 🏗️ System Architecture
@@ -36,6 +36,21 @@ Robot model definition and simulation setup.
 - URDF/XACRO files for complete robot description
 - Configurations for Gazebo simulation
 - Setup for RViz visualization 
+
+## 🖥️ Isaac Sim Integration
+
+This workspace supports high-fidelity simulation using NVIDIA Isaac Sim. The integration uses a dual-container architecture:
+1.  **TidyBot Container**: Runs the ROS 2 control stack.
+2.  **Isaac Sim Container**: Runs the simulator with the ROS 2 Bridge extension.
+
+The two containers communicate over the host network using FastDDS.
+
+For detailed setup and usage instructions, please refer to:
+*   **[Docker Setup](./docker/README.md)**: Instructions for building and running the Isaac Sim container.
+*   **[Simulation Setup](./src/tidybot_description/README.md#%F0%9F%8E%AE-isaac-sim-integration)**: Detailed steps for importing the robot, configuring the ActionGraph, and running the setup
+script in Isaac Sim.
+*   **[Policy Deployment](./src/tidybot_policy/README.md#%F0%9F%8E%AE-policy-deployment)**: Detailed steps  for teleoperating the robot and deploying policies in Isaac Sim.
+
 
 #### [`tidybot_driver`](./src/tidybot_driver/README.md)
 Low-level controllers for hardware.
@@ -149,47 +164,57 @@ sudo bash ./scripts/setup_docker_can.sh
 
 ### Choose a robot environment
 
-#### 1. Simulated robot
+#### 1. Simulated robot (Gazebo)
 ```bash
-ros2 launch tidybot_description launch_sim_robot.launch.py
+ros2 launch tidybot_description launch_sim_robot.launch.py base_mode:=velocity
 ```
-- Launch the Gazebo simulation environment and publish corresponding topics for robot control and monitoring
-- Launch RViz2 for robot state visualization and camera view
 
-#### 2. Physical robot
+#### 2. Simulated robot (Isaac Sim)
+Ensure Isaac Sim is running with the robot loaded (see [Simulation Setup](#-isaac-sim-integration)).
+```bash
+ros2 launch tidybot_description launch_isaac_sim.launch.py use_velocity_control:=true
+```
+
+#### 3. Physical robot
 ```bash
 # Start hardware drivers
 ros2 launch tidybot_driver launch_hardware_robot.launch.py mode:=full
 ```
-- Launch RViz2 for robot state visualization and camera view
 
 ### Choose a control mode
 
 #### 1. Phone Teleop mode
-Publish the WebXR app for phone and tablet to connect and relay the web messages to the robot
+Publish the WebXR app for phone and tablet to connect and relay the web messages to the robot.
 ```bash
-ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false>
+# For real robot
+ros2 launch tidybot_policy launch_phone_policy.launch.py sim_mode:=hardware
+
+# For Gazebo simulation
+ros2 launch tidybot_policy launch_phone_policy.launch.py sim_mode:=gazebo
+
+# For Isaac Sim
+ros2 launch tidybot_policy launch_phone_policy.launch.py sim_mode:=isaac
 ```
 
 #### 2. Gamepad mode
-Connect to the a Xbox Series X gamepad and relay joystick messages to the robot
+Connect to an Xbox Series X gamepad and relay joystick messages to the robot.
 ```bash
-ros2 launch tidybot_policy launch_gamepad_policy.launch.py use_sim:=<true | false>
+ros2 launch tidybot_policy launch_gamepad_policy.launch.py sim_mode:=<hardware|gazebo|isaac>
 ```
 
 ### Collect demonstrations for Diffusion Policy training
 
 #### 1. Setup the data collection pipeline
-Follow the previous section on how to launch a robot. Then launch the teleop with recording enabled
+Follow the previous section on how to launch a robot. Then launch the teleop with recording enabled.
 
 ```bash
-ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=<true | false> record:=true
+ros2 launch tidybot_policy launch_phone_policy.launch.py sim_mode:=<hardware|gazebo|isaac> record:=true
 ```
 This launch file should publish a webserver that will prompt the user to save/discard the recorded episode after the episode ends. If such a window does not pop up, try to refresh the webpage.
 
 The recorded episodes will be stored in `episode_bag` folder in the current directory as ros bags.
 
-#### 3. Convert the ros bags to compatible dataset
+#### 2. Convert the ros bags to compatible dataset
 After the data collection is done. Run the converted node to convert all the rosbags into a .hdf5 tarball.
 
 ```bash
@@ -207,7 +232,7 @@ ssh -L 5555:localhost:5555 <gpu-server-hostname>
 ```
 Then launch the remote policy on the dev machine by
 ```bash
-ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py use_sim:=<true | false>
+ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py sim_mode:=<hardware|gazebo|isaac>
 ```
 This launch file will also launch a webserver that can be used to control the policy inference. By pressing the middle of the screen, the inference will be enabled. If there's no user interaction detected on the webserver, the inference will be paused.
 

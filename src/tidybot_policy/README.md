@@ -1,59 +1,58 @@
 # tidybot_policy
+
 ## 📖 Overview
-`tidybot_policy` delivers the user-facing control stack for teleoperation and policy deployment. It includes a WebXR phone interface, remote inference bridge, and gamepad teleoperation with environment reset and episode management services. The package streams user input into the low-level controllers provided by `tidybot_solver` and exposes optional recording hooks through `tidybot_episode`.
 
-## 📁 Package Layout
+`tidybot_policy` is the central control package for the TidyBot++ platform. It handles user inputs (from phone or gamepad) and policy commands (local or remote), manages the episode lifecycle, and interfaces with the robot's low-level controllers.
 
-```
-tidybot_policy/
-├── config/                         # Controller mappings and web assets
-│   ├── index.html                  # WebXR frontend served by phone_teleop_server
-│   ├── joy_node_config.yaml        # ROS joy driver configuration
-│   ├── webxr-button.js             # Frontend logic
-│   └── Xbox_SeriesX_*.yaml         # Gamepad mappings
-│   └── cyclonedds.xml              # Template for message publishing over network
-├── launch/
-│   ├── launch_gamepad_policy.launch.py             # Gamepad control launch
-│   ├── launch_remote_policy_diffusion.launch.py    # Remote inference bridge launch
-│   └── launch_phone_policy.launch.py               # WebXR phone teleop launch
-├── tidybot_policy/
-│   ├── phone_teleop_server.py      # Flask + Socket.IO bridge to ROS
-│   ├── phone_policy.py             # WebXR command processor
-│   ├── remote_policy_diffusion.py  # Policy-server driven controller
-│   ├── tidybot_openvla.py          # Policy-server driven controller
-│   ├── gamepad_policy.py           # Gamepad interface feeding MoveIt Servo
-│   ├── reset_env.py                # Environment reset service client
-│   └── state_controller.py         # Episode lifecycle manager
-└── setup.py / package.xml
-```
+Key features:
+- **Phone Teleoperation**: WebXR-based interface for extensive data collection using an iPhone/iPad.
+- **Gamepad Teleoperation**: Joystick checking for rapid testing and demonstrations.
+- **Remote Policy Inference**: Bridge to run Python-based policies (Diffusion, VLA) on external GPU servers.
+- **Episode Management**: Automated recording hooks and environment reset services.
 
-## 🚀 Launch
+## 🚀 Launch Files
 
-### `launch_phone_policy.launch.py`
-Starts the WebXR teleoperation stack. This is the primary entry point for data collection.
+### 1. Phone Teleoperation (WebXR)
+Starts the WebXR server and teleoperation node. This is the primary mode for collecting high-quality demonstrations.
+
 ```bash
-# Standard launch (simulation)
-ros2 launch tidybot_policy launch_phone_policy.launch.py
-
-# Hardware mode with recording enabled
-ros2 launch tidybot_policy launch_phone_policy.launch.py use_sim:=false record:=true
+ros2 launch tidybot_policy launch_phone_policy.launch.py [args]
 ```
 
-### `launch_remote_policy_diffusion.launch.py`
-Allows executing remote inference while keeping the WebXR interface available for human override. It launches the same Web server, the `remote_policy_diffusion` node, `state_controller`, and `tidybot_solver/moveit_ee_pose_ik`.
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `sim_mode` | `hardware` | `hardware` (real robot), `gazebo`, or `isaac` |
+| `record` | `false` | Enable rosbag recording of episodes |
+| `cameras` | `["base","arm"]` | List of cameras to record |
+
+### 2. Gamepad Teleoperation
+Controls the robot using an Xbox controller. Supports base and arm velocity control.
+
 ```bash
-# Launch remote inference bridge
-ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py use_sim:=true
+ros2 launch tidybot_policy launch_gamepad_policy.launch.py [args]
 ```
-- `remote_policy_diffusion` connects to a ZMQ policy server at `tcp://localhost:5555` (tunnel with `ssh -L 5555:localhost:5555 ...` when needed).
 
-### `launch_remote_policy_vla.launch.py`
-Loads finetuned `peft` model and initiates policy inference through published ROS messages. First ensure that the remote server and client can communicate via cycloneDDS (try `ros2 run demo_nodes_cpp talker` and `listener`). See the configs folder and external/openvla for setup instructions.
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `sim_mode` | `hardware` | `hardware`, `gazebo`, or `isaac` |
+| `controller_type` | `Xbox_SeriesX_Wire` | `Xbox_SeriesX_Wire` or `Xbox_SeriesX_Wireless` |
+| `record` | `false` | Enable recording |
+
+### 3. Remote Policy Inference
+Connects to a remote policy server (e.g., running a Diffusion Policy or OpenVLA) via ZeroMQ.
+
 ```bash
-# Launch remote inference bridge
-ros2 launch tidybot_policy launch_remote_policy_vla.launch.py
+ros2 launch tidybot_policy launch_remote_policy_diffusion.launch.py 
 ```
-- `openvla_node` loads the base openvla model, applies the finetuned peft model, listens `camera_ext` or `camera_wrist` messages and publishes inferred `/tidybot/arm/delta_commands`.
+| Argument | Default | Description |
+|----------|---------|-------------|
+| `sim_mode` | `hardware` | `hardware`, `gazebo`, or `isaac` |
 
-### `launch_gamepad_policy.launch.py`
-Couples the ROS `joy` driver, the `gamepad_policy` node, and the velocity IK bridge from `tidybot_solver`.
+**Setup:**
+1.  Start the policy server on your GPU machine.
+2.  Tunnel the port to local: `ssh -L 5555:localhost:5555 <gpu-server>`
+3.  Launch this file to bridge observations and actions.
+
+## 🛠️ Configuration
+*   **`config/*.yaml`**: Gamepad mappings.
+*   **`config/index.html`**: WebXR client frontend.

@@ -293,33 +293,16 @@ def configure_drive(joint_path, stiffness, damping, max_force, drive_type="angul
     return True
 
 print("\nConfiguring base joints...")
-# Base joints need high stiffness, moderate damping, and HIGH max force for responsive movement
-# The base is heavy (~34 kg) so it needs significant force to move quickly
 for name in BASE_JOINTS:
     drive_type = "linear" if name in ["joint_x", "joint_y"] else "angular"
-    # Stiffness: 1e6 (high for position tracking)
-    # Damping: 1e4 (moderate for smooth motion without oscillation)  
-    # MaxForce: 1e6 (very high to allow fast movement)
     configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, drive_type)
 
 print("\nConfiguring arm joints...")
 for name in ARM_JOINTS:
-    # Arm joints: high stiffness for fast tracking, moderate damping, high max force
     configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, "angular")
-
-# Configure gripper joints - Simplified Parallel-Jaw Gripper
-# All joints are driven directly with compliant position control
-# Inner knuckle collisions are removed in the URDF to break the closed-loop
-# 
-# The isaac_sim_bridge.py commands all joints with gear ratios:
-#   - left/right_outer_knuckle_joint: 1.0 (leaders)
-#   - left/right_inner_finger_joint: -1.0 (opposite for parallel pads)
-#   - left/right_inner_finger_knuckle_joint: 1.0 (cosmetic, no collision)
 print("\nConfiguring gripper joints (simplified parallel-jaw)...")
 
 # Different stiffness for different joint types
-# Outer knuckle joints need higher stiffness (main driving joints)
-# Inner finger joints need lower stiffness (passive compliance for grasping)
 OUTER_KNUCKLE_CONFIG = {
     "stiffness": 1000.0,   # Moderate stiffness for main driving joints
     "damping": 200.0,
@@ -327,8 +310,6 @@ OUTER_KNUCKLE_CONFIG = {
     "max_velocity": 130.0,
 }
 
-# Config for the new revolute outer finger joints (spring mechanism)
-# Based on Isaac Sim tutorial: Stiffness=0.05 to keep fingers parallel but allow compliance
 OUTER_FINGER_CONFIG = {
     "stiffness": 0.1,
     "damping": 0.0,        # Using low damping to complement low stiffness
@@ -389,9 +370,6 @@ for joint_name in GRIPPER_JOINTS:
 
 print("Gripper configuration complete!")
 
-# ============================================================================
-# Set initial joint positions (applied on simulation reset)
-# ============================================================================
 print("\nSetting initial joint positions...")
 
 # Initial positions in RADIANS (from tidybot.ros2_control.xacro)
