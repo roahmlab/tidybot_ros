@@ -321,7 +321,7 @@ print("\nConfiguring gripper joints (simplified parallel-jaw)...")
 # Outer knuckle joints need higher stiffness (main driving joints)
 # Inner finger joints need lower stiffness (passive compliance for grasping)
 OUTER_KNUCKLE_CONFIG = {
-    "stiffness": 500.0,   # Moderate stiffness for main driving joints
+    "stiffness": 1000.0,   # Moderate stiffness for main driving joints
     "damping": 200.0,
     "max_force": 180.0,
     "max_velocity": 130.0,
@@ -337,14 +337,14 @@ OUTER_FINGER_CONFIG = {
 }
 
 INNER_FINGER_CONFIG = {
-    "stiffness": 500.0,    
+    "stiffness": 1000.0,    
     "damping": 200.0,
     "max_force": 180.0,     
     "max_velocity": 130.0,
 }
 
 INNER_KNUCKLE_CONFIG = {
-    "stiffness": 500.0,     
+    "stiffness": 1000.0,     
     "damping": 200.0,
     "max_force": 20.0,
     "max_velocity": 130.0,
@@ -615,9 +615,13 @@ The script above does these things:
 
     Do the same for the right_inner_knuckle. Name the joints "left_inner_knuckle_joint" and "right_inner_knuckle_joint". After creating the joints, we need to exlude them from articulation so Isaac Sim won't throw errors. Go to the **Property** tab of the joints, check **Exclude From Articulation**.
 
+    **Note: Adding the inner knuckle joints may destabilize the simulation. If the gripper fingers fall apart or the simulation explodes, try reducing the stiffness and increase the damping for the finger joints. If still not working, remove the inner knuckle joints.**
+
 5. Apply the fingertip material: Go to **Create -> Physics -> Physics Material**, select **Rigid Body Material**. This will create a **PhysicsMaterial** in the stage, rename that material to **fingertip_material**. Select the material you just created, under **Property -> Material and Shader -> Extra Properties** change both friction coefficients to 0.8 and the **Friction Combine Mode** to max. Then select the **left_inner_finger** in the stage, under the **Property** tab change the **Materials on selected models** to the fingertip material. Do the same for **right_inner_finger**.
 
 After executing all these, press the `Play` button or space to start the simulation in Isaac Sim. You can also save the scene for later use.
+
+If using gamepad control, the stifness for the base should be set to 0 to allow the robot to be controlled by velocity command. 
 
 ### Step 3: Launch ROS 2 Stack
 
