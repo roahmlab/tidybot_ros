@@ -25,15 +25,17 @@ from std_srvs.srv import Empty
 class PhonePolicy(Node):
     def __init__(self):
         super().__init__("phone_policy")
-        self.declare_parameter("use_sim", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        # sim_mode: "hardware", "gazebo", or "isaac"
+        self.declare_parameter("sim_mode", "hardware")
+        self.sim_mode = self.get_parameter("sim_mode").get_parameter_value().string_value
+        self.is_sim = self.sim_mode in ["gazebo", "isaac"]
         self.get_logger().info(
-            "Teleop controller initialized with use_sim: {}".format(self.use_sim)
+            f"Teleop controller initialized with sim_mode: {self.sim_mode}"
         )
         self.base_pub = self.create_publisher(
             Float64MultiArray, "/tidybot/base/target_pose", 10
         )
-        if self.use_sim:
+        if self.is_sim:
             # Publish to the ros2 control topic for base control in simulation
             self.base_pub_sim = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_pos_controller/commands", 10
@@ -152,7 +154,7 @@ class PhonePolicy(Node):
                             yaw + self.base_ref_quat[2],
                         ]
                         self.base_pub.publish(command)
-                        if self.use_sim:
+                        if self.is_sim:
                             self.base_pub_sim.publish(command)
                         return
 
@@ -244,14 +246,14 @@ class PhonePolicy(Node):
     def get_gripper_state_from_joint_states(self) -> float:
         """Return the gripper state from buffered JointState.
 
-        Looks for the 'left_outer_knuckle_joint' in the latest JointState and
+        Looks for the 'finger_joint' in the latest JointState and
         returns its position. If not available, returns the provided default.
         """
         js = self.latest_joint_state
         if js is None:
             return float(0.0)
         try:
-            idx = js.name.index("left_outer_knuckle_joint")
+            idx = js.name.index("finger_joint")
         except ValueError:
             return float(0.0)
         # Ensure positions array has corresponding index

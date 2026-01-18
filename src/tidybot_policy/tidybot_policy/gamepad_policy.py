@@ -5,6 +5,7 @@ from geometry_msgs.msg import TwistStamped
 # ServoCommandType import removed - no longer needed with C++ API
 from sensor_msgs.msg import Joy
 from std_srvs.srv import Empty
+
 import tf2_ros
 from tf2_ros import TransformBroadcaster
 from rclpy.clock import JumpThreshold
@@ -32,8 +33,10 @@ class ArmControlFrame(Enum):
 class GamepadPolicy(Node):
     def __init__(self):
         super().__init__("gamepad_policy")
-        self.declare_parameter("use_sim", True)
-        self.use_sim = self.get_parameter("use_sim").get_parameter_value().bool_value
+        # sim_mode: "hardware", "gazebo", or "isaac"
+        self.declare_parameter("sim_mode", "hardware")
+        self.sim_mode = self.get_parameter("sim_mode").get_parameter_value().string_value
+        self.is_sim = self.sim_mode in ["gazebo", "isaac"]
         self.declare_parameter("control_frequency", 20.0)
         self.control_frequency = (
             self.get_parameter("control_frequency").get_parameter_value().double_value
@@ -94,8 +97,6 @@ class GamepadPolicy(Node):
 
         self.gripper_state = 0.0  # initial gripper state (opened)
         self.last_control_enabled = False
-        self.reset_button_pressed = False
-        self.last_reset_time = None
 
         self.joy_sub = self.create_subscription(Joy, "/joy", self.joy_callback, 10)
         
@@ -106,13 +107,13 @@ class GamepadPolicy(Node):
             Float64, "/tidybot/gripper/commands", 10
         )
         self.base_pub = self.create_publisher(Float64MultiArray, "/tidybot/base/target_vel", 10)
-        if self.use_sim:
+        if self.is_sim:
             self.base_pub_sim = self.create_publisher(
                 Float64MultiArray, "/tidybot_base_vel_controller/commands", 10
             )
 
-        self.reset_arm_cli = self.create_client(Empty, "/tidybot/hardware/arm/reset")
-        self.reset_base_cli = self.create_client(Empty, "/tidybot/hardware/base/reset")
+        # Policy reset service
+        self.reset_srv = self.create_service(Empty, "/tidybot/policy/reset", self.reset_callback)
 
         self.tf_broadcaster = TransformBroadcaster(self)
         self.tf_buffer = tf2_ros.Buffer()
@@ -163,11 +164,6 @@ class GamepadPolicy(Node):
             self.arm_control_frame = ArmControlFrame.EE
             self.get_logger().info(f"{GREEN}Switch to ARM END-EFFECTOR frame{RESET}")
 
-        reset_pressed = self._button_pressed(msg, "reset_env")
-        if reset_pressed and not self.reset_button_pressed:
-            self.handle_reset_request()
-        self.reset_button_pressed = reset_pressed
-
     def time_jump_callback(self, time: Time):
         # re-instantiate the TF listener and buffer to avoid TF_OLD_DATA warning
         self.destroy_subscription(self.tf_listener.tf_sub)
@@ -205,7 +201,7 @@ class GamepadPolicy(Node):
             if self.last_control_enabled:
                 # Send a single zero command to stop hardware safely
                 self.base_pub.publish(base_cmd)
-                if self.use_sim:
+                if self.is_sim:
                     self.base_pub_sim.publish(base_cmd)
                 self.arm_pub.publish(arm_cmd)
                 self.publish_gripper()
@@ -226,7 +222,7 @@ class GamepadPolicy(Node):
             base_cmd_msg = Float64MultiArray()
             base_cmd_msg.data = base_values
             self.base_pub.publish(base_cmd_msg)
-            if self.use_sim:
+            if self.is_sim:
                 self.base_pub_sim.publish(base_cmd_msg)
 
         elif self.control_mode == ControlMode.ARM:
@@ -253,38 +249,35 @@ class GamepadPolicy(Node):
         msg.data = float(self.gripper_state)
         self.gripper_pub.publish(msg)
 
-    def handle_reset_request(self):
-        now = self.get_clock().now()
-        if self.last_reset_time is not None:
-            elapsed_ns = (now - self.last_reset_time).nanoseconds
-            if elapsed_ns < 5_000_000_000:
-                remaining = (5_000_000_000 - elapsed_ns) / 1e9
-                self.get_logger().warn(
-                    f"{YELLOW}Reset ignored; wait {remaining:.1f}s before resetting again{RESET}"
-                )
-                return
+    def reset_callback(self, request, response):
+        self.get_logger().info(f"{GREEN}Resetting gamepad policy state...{RESET}")
+        
+        # Reset internal state
+        self.control_mode = None
+        self.arm_control_frame = ArmControlFrame.EE
+        self.control_enabled = False
+        self.gripper_state = 0.0
+        self.turbo_mode = False
+        
+        # Send zero commands to stop the robot safely
+        base_cmd = Float64MultiArray()
+        base_cmd.data = [0.0, 0.0, 0.0]
+        self.base_pub.publish(base_cmd)
+        if self.is_sim:
+            self.base_pub_sim.publish(base_cmd)
+            
+        # Stop arm
+        arm_cmd = TwistStamped()
+        arm_cmd.header.stamp = self.get_clock().now().to_msg()
+        arm_cmd.header.frame_id = "bracelet_link"
+        self.arm_pub.publish(arm_cmd)
+        
+        # Reset gripper to open
+        self.publish_gripper()
+        
+        return response
 
-        self.get_logger().info(f"{GREEN}Requesting arm and base reset...{RESET}")
-        if not self.use_sim:
-            self._call_reset_service(self.reset_arm_cli, "arm")
-            self._call_reset_service(self.reset_base_cli, "base")
-        self.last_reset_time = now
 
-    def _call_reset_service(self, client, label):
-        if not client.wait_for_service(timeout_sec=0.0):
-            self.get_logger().warn(f"{YELLOW}{label.capitalize()} reset service unavailable{RESET}")
-            return
-
-        future = client.call_async(Empty.Request())
-
-        def _done(fut, component=label):
-            try:
-                fut.result()
-                self.get_logger().info(f"{GREEN}{component.capitalize()} reset succeeded{RESET}")
-            except Exception as exc:  # pylint: disable=broad-except
-                self.get_logger().error(f"{RED}{component.capitalize()} reset failed: {exc}{RESET}")
-
-        future.add_done_callback(_done)
 
     def _get_axis(self, msg : Joy, key, default=0.0, multiplier=1.0) -> float:
         if msg is None:

@@ -6,9 +6,8 @@ from launch.actions import (
 )
 from launch_ros.actions import Node
 from launch.conditions import IfCondition, UnlessCondition
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from moveit_configs_utils.launches import generate_move_group_launch
 
 import os
 from ament_index_python.packages import get_package_share_directory
@@ -23,14 +22,21 @@ def launch_gamepad_policy(context, *args, **kwargs):
     )
     if not os.path.isfile(config_path):
         raise RuntimeError(f"Controller config not found: {config_path}")
+    
+    sim_mode = LaunchConfiguration("sim_mode")
+    # Compute use_sim_time based on sim_mode (true if gazebo or isaac)
+    use_sim_time_expr = PythonExpression([
+        "'", sim_mode, "' != 'hardware'"
+    ])
+    
     node = Node(
         package="tidybot_policy",
         executable="gamepad_policy",
         name="gamepad_policy",
         parameters=[
             config_path,
-            {"use_sim": LaunchConfiguration("use_sim")},
-            {"use_sim_time": LaunchConfiguration("use_sim")},
+            {"sim_mode": sim_mode},
+            {"use_sim_time": use_sim_time_expr},
         ],
     )
     return [node]
@@ -41,6 +47,7 @@ def generate_launch_description():
     package_dir = get_package_share_directory("tidybot_policy")
     solver_pkg_dir = get_package_share_directory("tidybot_solver")
     joy_node_config = os.path.join(package_dir, "config", "joy_node_config.yaml")
+    
     controller_arg = DeclareLaunchArgument(
         "controller_type",
         default_value="Xbox_SeriesX_Wire",
@@ -48,11 +55,24 @@ def generate_launch_description():
         choices=["Xbox_SeriesX_Wire", "Xbox_SeriesX_Wireless"],
     )
 
-    use_sim_arg = DeclareLaunchArgument(
-        "use_sim",
-        default_value="true",
-        description="Use simulation (Gazebo) if true, hardware if false",
+    sim_mode_arg = DeclareLaunchArgument(
+        "sim_mode",
+        default_value="hardware",
+        description="Simulation mode: 'hardware' for real robot, 'gazebo' for Gazebo sim, 'isaac' for Isaac Sim",
+        choices=["hardware", "gazebo", "isaac"],
     )
+
+    record_arg = DeclareLaunchArgument(
+        "record",
+        default_value="False",
+        description="Enable data recording",
+        choices=["True", "False"],
+    )
+
+    # Compute is_sim based on sim_mode (true if gazebo or isaac)
+    is_sim_expr = PythonExpression([
+        "'", LaunchConfiguration("sim_mode"), "' != 'hardware'"
+    ])
 
     joy_node = Node(
         package="joy",
@@ -72,7 +92,7 @@ def generate_launch_description():
                 "launch_moveit_vel_ik.launch.py",
             )
         ),
-        condition=IfCondition(LaunchConfiguration("use_sim")),
+        condition=IfCondition(is_sim_expr),
     )
 
     moveit_servo_hardware = IncludeLaunchDescription(
@@ -83,16 +103,39 @@ def generate_launch_description():
                 "launch_moveit_vel_ik.launch.py",
             )
         ),
-        condition=UnlessCondition(LaunchConfiguration("use_sim")),
+        condition=UnlessCondition(is_sim_expr),
+    )
+
+    phone_teleop_server = Node(
+        package="tidybot_policy",
+        executable="phone_teleop_server",
+        name="phone_teleop_server",
+        output="screen",
+        parameters=[{"record": LaunchConfiguration("record")}],
+    )
+
+    state_controller = Node(
+        package="tidybot_policy",
+        executable="state_controller",
+        name="state_controller",
+        output="screen",
+        parameters=[
+            {"sim_mode": LaunchConfiguration("sim_mode")},
+            {"use_remote": True},
+            {"record": LaunchConfiguration("record")},
+        ],
     )
 
     return LaunchDescription(
         [
-            use_sim_arg,
+            sim_mode_arg,
+            record_arg,
             controller_arg,
             joy_node,
             joystick_teleop,
             moveit_servo_sim,
             moveit_servo_hardware,
+            phone_teleop_server,
+            state_controller,
         ]
     )

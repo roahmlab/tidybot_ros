@@ -122,7 +122,7 @@ class ArmServer(Node):
 
         msg = JointState()
         msg.header.stamp = self.clock.now().to_msg()
-        msg.name = list(self.joint_bounds.keys()) + ['left_outer_knuckle_joint']
+        msg.name = list(self.joint_bounds.keys()) + ['finger_joint']
         msg.position = bounded_joint_states + [0.81 * self.arm.arm.gripper_pos]
         self.joint_state_pub.publish(msg)
 

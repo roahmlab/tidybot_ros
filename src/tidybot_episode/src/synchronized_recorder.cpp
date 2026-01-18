@@ -211,7 +211,7 @@ private:
             [this](const sensor_msgs::msg::JointState::SharedPtr msg) {
                 last_joint_state_ = msg;
                 // Update gripper state buffer immediately if possible
-                auto it = std::find(msg->name.begin(), msg->name.end(), "left_outer_knuckle_joint");
+                auto it = std::find(msg->name.begin(), msg->name.end(), "finger_joint");
                 if (it != msg->name.end())
                 {
                     size_t index = std::distance(msg->name.begin(), it);
@@ -597,7 +597,7 @@ private:
         // Gripper state already updated in joint state callback; if not available, try to compute now
         if (!have_gripper_state_ && last_joint_state_)
         {
-            auto it = std::find(last_joint_state_->name.begin(), last_joint_state_->name.end(), "left_outer_knuckle_joint");
+            auto it = std::find(last_joint_state_->name.begin(), last_joint_state_->name.end(), "finger_joint");
             if (it != last_joint_state_->name.end())
             {
                 size_t index = std::distance(last_joint_state_->name.begin(), it);

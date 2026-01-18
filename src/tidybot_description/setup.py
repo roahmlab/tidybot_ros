@@ -9,7 +9,7 @@ data_files=[
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         ('share/' + package_name + '/launch/', glob('launch/*')),
-        ('share/' + package_name + '/urdf/', ['urdf/tidybot.xacro', 'urdf/bot.xacro', 'urdf/tidybot.ros2_control.xacro', 'urdf/tidybot.gazebo.xacro', 'urdf/arm.xacro']),
+        ('share/' + package_name + '/urdf/', ['urdf/tidybot.xacro', 'urdf/bot.xacro', 'urdf/tidybot.ros2_control.xacro', 'urdf/tidybot.gazebo.xacro', 'urdf/arm.xacro', 'urdf/tidybot_isaac.urdf']),
         ('share/' + package_name + '/urdf/world/', glob('urdf/world/*')),
         ('share/' + package_name + '/urdf/base/tidybot/', glob('urdf/base/tidybot/*')),
         ('share/' + package_name + '/urdf/base/tidybot++/', glob('urdf/base/tidybot++/*')),
@@ -20,8 +20,7 @@ data_files=[
         ('share/' + package_name + '/meshes/arms/gen3_lite/', glob('meshes/arms/gen3_lite/*')),
         ('share/' + package_name + '/meshes/arms/gen3_7dof/', glob('meshes/arms/gen3_7dof/*')),
         ('share/' + package_name + '/meshes/grippers/gen3_lite_2f/', glob('meshes/grippers/gen3_lite_2f/*')),
-        ('share/' + package_name + '/meshes/grippers/robotiq_2f_85/visual', glob('meshes/grippers/robotiq_2f_85/visual/*')),
-        ('share/' + package_name + '/meshes/grippers/robotiq_2f_85/collision', glob('meshes/grippers/robotiq_2f_85/collision/*')),
+        ('share/' + package_name + '/meshes/grippers/robotiq_2f_85', glob('meshes/grippers/robotiq_2f_85/*.stl')),
         ('share/' + package_name + '/meshes/base/tidybot', glob('meshes/base/tidybot/*')),
         ('share/' + package_name + '/meshes/base/tidybot++', glob('meshes/base/tidybot++/*')),
         ('share/' + package_name + '/config/', glob('config/*')),
@@ -52,6 +51,7 @@ setup(
     entry_points={
         'console_scripts': [
             'tf_relay = tidybot_description.tf_relay:main',
+            'isaac_sim_bridge = tidybot_description.isaac_sim_bridge:main',
         ],
     },
 )

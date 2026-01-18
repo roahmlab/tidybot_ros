@@ -72,7 +72,7 @@ gen3_7dof_controller:
 robotiq_2f_85_controller:
   ros__parameters:
     joints:
-      - left_outer_knuckle_joint
+      - finger_joint
     command_interfaces:
       - position
     state_interfaces:
