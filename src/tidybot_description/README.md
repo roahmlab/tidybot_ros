@@ -321,8 +321,8 @@ print("\nConfiguring gripper joints (simplified parallel-jaw)...")
 # Outer knuckle joints need higher stiffness (main driving joints)
 # Inner finger joints need lower stiffness (passive compliance for grasping)
 OUTER_KNUCKLE_CONFIG = {
-    "stiffness": 1000.0,   # Moderate stiffness for main driving joints
-    "damping": 100.0,
+    "stiffness": 500.0,   # Moderate stiffness for main driving joints
+    "damping": 200.0,
     "max_force": 180.0,
     "max_velocity": 130.0,
 }
@@ -330,22 +330,22 @@ OUTER_KNUCKLE_CONFIG = {
 # Config for the new revolute outer finger joints (spring mechanism)
 # Based on Isaac Sim tutorial: Stiffness=0.05 to keep fingers parallel but allow compliance
 OUTER_FINGER_CONFIG = {
-    "stiffness": 50,
-    "damping": 20.0,        # Using low damping to complement low stiffness
-    "max_force": 180.0,
+    "stiffness": 0.1,
+    "damping": 0.0,        # Using low damping to complement low stiffness
+    "max_force": 10.0,
     "max_velocity": 130.0,
 }
 
 INNER_FINGER_CONFIG = {
-    "stiffness": 1000.0,    # High stiffness because we omitted the joints connecting the inner knuckle and the pad
-    "damping": 100.0,
+    "stiffness": 500.0,    
+    "damping": 200.0,
     "max_force": 180.0,     
     "max_velocity": 130.0,
 }
 
 INNER_KNUCKLE_CONFIG = {
-    "stiffness": 1000.0,     
-    "damping": 100.0,
+    "stiffness": 500.0,     
+    "damping": 200.0,
     "max_force": 20.0,
     "max_velocity": 130.0,
 }

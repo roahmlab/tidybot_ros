@@ -67,7 +67,7 @@ INITIAL_JOINT_POSITIONS = {
 }
 
 # Joint position tolerance for checking if robot reached initial state
-POSITION_TOLERANCE = 0.05  # radians/meters
+POSITION_TOLERANCE = 0.1  # radians/meters
 
 
 class IsaacSimBridge(Node):
@@ -99,8 +99,8 @@ class IsaacSimBridge(Node):
         self.gripper_joints = {
             'finger_joint': 1.0,     # Leader
             'right_outer_knuckle_joint': 1.0,    # Mimic multiplier="1.0"
-            'left_inner_finger_joint': -1.0,     # Mimic multiplier="-1.0"
-            'right_inner_finger_joint': 1.0,     # Mimic multiplier="1.0"
+            'left_inner_finger_joint': -0.8,     # Mimic multiplier="-1.0"
+            'right_inner_finger_joint': 0.8,     # Mimic multiplier="1.0"
             'left_inner_finger_knuckle_joint': -1.0, # Mimic multiplier="-1.0" 
             'right_inner_finger_knuckle_joint': -1.0,# Mimic multiplier="-1.0"
         }
