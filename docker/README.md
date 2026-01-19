@@ -12,10 +12,16 @@ docker/
 │   ├── run.sh                # Run the TidyBot container
 │   └── entrypoint.sh         # Container entrypoint script
 │
-├── isaac-sim-ros2/           # Isaac Sim + ROS 2 container
+├── isaac-sim-ros2/           # Isaac Sim + ROS 2 container (Standard Simulation)
 │   ├── Dockerfile            # Isaac Sim 5.1.0 + ROS 2 Jazzy
 │   ├── build.sh              # Build the Isaac Sim image
 │   ├── run.sh                # Run the Isaac Sim container
+│   └── entrypoint.sh         # Container entrypoint script
+│
+├── isaac-lab/                # Isaac Lab + ROS 2 container (RL Policy Training)
+│   ├── Dockerfile            # Ubuntu 24.04 (Isaac Lab Base) + ROS 2 Jazzy
+│   ├── build.sh              # Build the Isaac Lab image
+│   ├── run.sh                # Run the Isaac Lab container
 │   └── entrypoint.sh         # Container entrypoint script
 │
 ├── fastdds.xml               # Shared DDS config for cross-container ROS 2
@@ -36,7 +42,36 @@ docker/
 ./docker/tidybot/run.sh restart
 ```
 
-### Isaac Sim with ROS 2
+
+### Isaac Lab with ROS 2 (RL Training)
+
+This container provides the Isaac Lab framework for training Reinforcement Learning policies.
+
+**Prerequisite:** You must build the `isaac-lab-base` image from the official Isaac Lab repository first.
+
+1.  **Clone and build Isaac Lab Base:**
+    ```bash
+    # Clone Isaac Lab
+    git clone https://github.com/isaac-sim/IsaacLab.git
+    cd IsaacLab
+    
+    # Build the base image
+    ./docker/container.py build base
+    ```
+
+2.  **Build the TidyBot extension:**
+    Return to the `tidybot_platform` directory:
+    ```bash
+    # Build the image (depends on isaac-lab-base)
+    ./docker/isaac-lab/build.sh
+    
+    # Run the container
+    ./docker/isaac-lab/run.sh restart
+    ```
+
+### Isaac Sim with ROS 2 (Standard Simulation)
+
+This is the standard container for running TidyBot simulations with ROS 2 Bridge.
 
 ```bash
 # Pull the base image (first time only)
@@ -61,6 +96,16 @@ docker pull nvcr.io/nvidia/isaac-sim:5.1.0
 | `build.sh` | Build the TidyBot platform Docker image with ROS 2 Jazzy |
 | `run.sh restart` | Stop existing container and start fresh |
 | `run.sh` | Start or attach to existing container |
+
+
+### Isaac Lab Container (`docker/isaac-lab/`)
+
+| Script | Description |
+|--------|-------------|
+| `build.sh` | Build the Isaac Lab image (Ubuntu 24.04 + ROS 2 Jazzy) |
+| `run.sh restart` | Stop existing container and start fresh |
+| `run.sh` | Start or attach to existing container |
+| `run.sh restart shell` | Start container and enter shell immediately |
 
 ### Isaac Sim Container (`docker/isaac-sim-ros2/`)
 
