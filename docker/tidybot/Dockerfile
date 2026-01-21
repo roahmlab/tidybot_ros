@@ -117,7 +117,7 @@ RUN apt-get update && \
     apt-get update
 
 # Setup MoveIt2 
-RUN apt-get install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-moveit-servo -y
+RUN apt-get install ros-${ROS_DISTRO}-moveit ros-${ROS_DISTRO}-moveit-visual-tools ros-${ROS_DISTRO}-moveit-servo ros-${ROS_DISTRO}-trac-ik-kinematics-plugin -y
 
 # Setup Teleop
 RUN apt-get install python3-flask python3-flask-socketio -y

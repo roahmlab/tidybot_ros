@@ -16,15 +16,10 @@ CACHE_DIR=$HOME/docker/isaac-sim
 # Build custom Isaac Sim + ROS 2 image if needed
 # =============================================================================
 build_image() {
-    echo "Checking for Isaac Sim + ROS 2 image..."
     if [[ "$(docker images -q $IMAGE_NAME 2> /dev/null)" == "" ]]; then
-        echo "Building Isaac Sim + ROS 2 image (this may take a while)..."
+        echo "Building Isaac Sim + ROS 2 image..."
         $SCRIPT_DIR/build.sh
-        if [ $? -ne 0 ]; then
-            exit 1
-        fi
-    else
-        echo "Image $IMAGE_NAME already exists."
+        if [ $? -ne 0 ]; then exit 1; fi
     fi
 }
 
@@ -32,15 +27,13 @@ build_image() {
 # Setup directories and permissions
 # =============================================================================
 setup_directories() {
-    # Create cache directories
     mkdir -p $CACHE_DIR/cache/{kit,ov,pip,glcache,computecache}
     mkdir -p $CACHE_DIR/{config,data,logs,pkg,documents}
-
-    # Create Isaac Sim workspace
+    
     ISAAC_WORKSPACE=$REPO_ROOT/isaac_sim_workspace
     mkdir -p $ISAAC_WORKSPACE
 
-    # Ensure proper permissions for container access
+    # Ensure permissions (suppress errors if not owner)
     chmod -R 777 $CACHE_DIR $ISAAC_WORKSPACE 2>/dev/null || true
 }
 
@@ -48,114 +41,164 @@ setup_directories() {
 # Build Docker options
 # =============================================================================
 build_docker_options() {
-    # X11 forwarding setup
-    xhost +local: > /dev/null 2>&1
+    local RUN_MODE=$1
 
     # Resolve host group IDs
     RENDER_GID=$(getent group render 2>/dev/null | cut -d: -f3 || true)
     VIDEO_GID=$(getent group video 2>/dev/null | cut -d: -f3 || true)
 
-    DOCKER_OPTIONS=""
-    DOCKER_OPTIONS+="--name $CONTAINER_NAME "
-    DOCKER_OPTIONS+="-it "
-    DOCKER_OPTIONS+="--privileged "   
-    DOCKER_OPTIONS+="--gpus all "
-    DOCKER_OPTIONS+="--network=host "
+    local OPS=""
+    OPS+="--name $CONTAINER_NAME "
+    OPS+="-it "
+    OPS+="--privileged "   
+    OPS+="--gpus all "
+    OPS+="--network=host " # Host network required for both ROS 2 DDS and WebRTC
+    
+    # IPC Host prevents shared memory crashes in Isaac Sim
+    OPS+="--ipc=host "
 
     # Resource limits
-    DOCKER_OPTIONS+="--ulimit nofile=65535:65535 "
-    DOCKER_OPTIONS+="--ulimit memlock=-1 "
-    DOCKER_OPTIONS+="--ulimit stack=67108864 "
-    DOCKER_OPTIONS+="--shm-size=16g "
+    OPS+="--ulimit nofile=65535:65535 "
+    OPS+="--ulimit memlock=-1 "
+    OPS+="--ulimit stack=67108864 "
+    OPS+="--shm-size=16g "
 
-    # EULA acceptance and root permission
-    DOCKER_OPTIONS+="-e ACCEPT_EULA=Y "
-    DOCKER_OPTIONS+="-e PRIVACY_CONSENT=Y "
-    DOCKER_OPTIONS+="-e OMNI_KIT_ALLOW_ROOT=1 "
+    # Environment
+    OPS+="-e ACCEPT_EULA=Y "
+    OPS+="-e PRIVACY_CONSENT=Y "
+    OPS+="-e OMNI_KIT_ALLOW_ROOT=1 "
+    
+    # Must include 'video' for Headless (NVENC) and 'display' for GUI
+    OPS+="-e NVIDIA_VISIBLE_DEVICES=all "
+    OPS+="-e NVIDIA_DRIVER_CAPABILITIES=compute,video,utility,graphics,display "
+    OPS+="-e __GLX_VENDOR_LIBRARY_NAME=nvidia "
 
-    # NVIDIA environment variables
-    DOCKER_OPTIONS+="-e NVIDIA_VISIBLE_DEVICES=all "
-    DOCKER_OPTIONS+="-e NVIDIA_DRIVER_CAPABILITIES=compute,utility,graphics,display "
-    DOCKER_OPTIONS+="-e __GLX_VENDOR_LIBRARY_NAME=nvidia "
+    # Mounts
+    OPS+="--device /dev/dri:/dev/dri "
+    
+    # Group Adds
+    if [ -n "$VIDEO_GID" ]; then OPS+="--group-add $VIDEO_GID "; fi
+    if [ -n "$RENDER_GID" ]; then OPS+="--group-add $RENDER_GID "; fi
 
-    # X11 display forwarding
-    DOCKER_OPTIONS+="-e DISPLAY=$DISPLAY "
-    DOCKER_OPTIONS+="-v /tmp/.X11-unix:/tmp/.X11-unix:rw "
-    DOCKER_OPTIONS+="-v $HOME/.Xauthority:/root/.Xauthority:rw "
+    # --- Mode Specific Config ---
+    if [ "$RUN_MODE" != "headless" ]; then
+        # GUI/Shell Mode: Enable X11 Forwarding
+        xhost +local: > /dev/null 2>&1
+        OPS+="-e DISPLAY=$DISPLAY "
+        OPS+="-v /tmp/.X11-unix:/tmp/.X11-unix:rw "
+        OPS+="-v $HOME/.Xauthority:/root/.Xauthority:rw "
+    fi
+    # ----------------------------
 
-    # Device access for GPU rendering
-    DOCKER_OPTIONS+="--device /dev/dri:/dev/dri "
-
-    # Add video/render groups
-    if [ -n "$VIDEO_GID" ]; then DOCKER_OPTIONS+="--group-add $VIDEO_GID "; fi
-    if [ -n "$RENDER_GID" ]; then DOCKER_OPTIONS+="--group-add $RENDER_GID "; fi
-
-    # Mount Vulkan ICD configuration
+    # Vulkan/EGL 
     if [ -d "/usr/share/vulkan/icd.d" ]; then
-        DOCKER_OPTIONS+="-v /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro "
-        DOCKER_OPTIONS+="-e VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json "
+        OPS+="-v /usr/share/vulkan/icd.d:/usr/share/vulkan/icd.d:ro "
+        OPS+="-e VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json "
     fi
-
-    # Mount EGL vendor libraries
     if [ -d "/usr/share/glvnd/egl_vendor.d" ]; then
-        DOCKER_OPTIONS+="-v /usr/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d:ro "
-        DOCKER_OPTIONS+="-e __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json "
+        OPS+="-v /usr/share/glvnd/egl_vendor.d:/usr/share/glvnd/egl_vendor.d:ro "
+        OPS+="-e __EGL_VENDOR_LIBRARY_FILENAMES=/usr/share/glvnd/egl_vendor.d/10_nvidia.json "
     fi
 
-    # Isaac Sim cache mounts
-    DOCKER_OPTIONS+="-v $CACHE_DIR/cache/kit:/isaac-sim/kit/cache/Kit:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/cache/ov:/root/.cache/ov:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/cache/pip:/root/.cache/pip:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/cache/glcache:/root/.cache/nvidia/GLCache:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/cache/computecache:/root/.nv/ComputeCache:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/logs:/root/.nvidia-omniverse/logs:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/config:/root/.nvidia-omniverse/config:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/data:/root/.local/share/ov/data:rw "
-    DOCKER_OPTIONS+="-v $ISAAC_WORKSPACE:/isaac_workspace:rw "
-    DOCKER_OPTIONS+="-v $CACHE_DIR/documents:/root/Documents:rw "
+    # Isaac Sim Cache & Workspace
+    OPS+="-v $CACHE_DIR/cache/kit:/isaac-sim/kit/cache/Kit:rw "
+    OPS+="-v $CACHE_DIR/cache/ov:/root/.cache/ov:rw "
+    OPS+="-v $CACHE_DIR/cache/pip:/root/.cache/pip:rw "
+    OPS+="-v $CACHE_DIR/cache/glcache:/root/.cache/nvidia/GLCache:rw "
+    OPS+="-v $CACHE_DIR/cache/computecache:/root/.nv/ComputeCache:rw "
+    OPS+="-v $CACHE_DIR/logs:/root/.nvidia-omniverse/logs:rw "
+    OPS+="-v $CACHE_DIR/config:/root/.nvidia-omniverse/config:rw "
+    OPS+="-v $CACHE_DIR/data:/root/.local/share/ov/data:rw "
+    OPS+="-v $ISAAC_WORKSPACE:/isaac_workspace:rw "
+    OPS+="-v $CACHE_DIR/documents:/root/Documents:rw "
 
-    # Mount TidyBot workspace for URDF access
-    DOCKER_OPTIONS+="-v $REPO_ROOT/src/tidybot_description:/tidybot_description:rw "
+    # TidyBot Workspace
+    OPS+="-v $REPO_ROOT/src/tidybot_description:/tidybot_description:rw "
 
-    # ROS 2 DDS configuration
-    DOCKER_OPTIONS+="-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} "
-    DOCKER_OPTIONS+="-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp "
-    DOCKER_OPTIONS+="-e FASTRTPS_DEFAULT_PROFILES_FILE=/fastdds.xml "
-    DOCKER_OPTIONS+="-v $DOCKER_DIR/fastdds.xml:/fastdds.xml:ro "
+    # ROS 2 DDS
+    OPS+="-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} "
+    OPS+="-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp "
+    OPS+="-e FASTRTPS_DEFAULT_PROFILES_FILE=/fastdds.xml "
+    OPS+="-v $DOCKER_DIR/fastdds.xml:/fastdds.xml:ro "
 
-    echo "$DOCKER_OPTIONS"
+    echo "$OPS"
 }
 
 # =============================================================================
-# Main
+# Run Container Logic
+# =============================================================================
+run_container() {
+    local RUN_MODE=$1
+    local OPTS=$(build_docker_options $RUN_MODE)
+
+    if [ "$RUN_MODE" == "shell" ]; then
+        echo "Starting container in SHELL mode..."
+        echo "ROS 2 Jazzy is available. Run: ros2 topic list"
+        docker run --rm $OPTS $IMAGE_NAME bash
+
+    elif [ "$RUN_MODE" == "headless" ]; then
+        echo "Fetching Public IP for WebRTC..."
+        local PUB_IP=$(curl -s ifconfig.me)
+        
+        echo "Starting container in HEADLESS mode (WebRTC)..."
+        echo "--------------------------------------------------------"
+        echo "Public IP: $PUB_IP"
+        echo "--------------------------------------------------------"
+
+        docker run --rm \
+            $OPTS \
+            --runtime=nvidia \
+            -e LIVESTREAM=2 \
+            $IMAGE_NAME \
+            ./runheadless.sh \
+            --allow-root \
+            --no-window \
+            --ext:omni.services.streamclient.webrtc \
+            --/app/window/width=1920 \
+            --/app/window/height=1080 \
+            --/exts/omni.kit.livestream.webrtc/public_ip=$PUB_IP \
+            --/exts/omni.kit.livestream.webrtc/signaling_port=49100 \
+            --/exts/omni.kit.livestream.webrtc/udp_port=47998
+    else
+        # DEFAULT: GUI Mode
+        echo "Starting Isaac Sim GUI with ROS 2 support..."
+        docker run --rm $OPTS $IMAGE_NAME
+    fi
+}
+
+# =============================================================================
+# Main Entry Point
 # =============================================================================
 print_usage() {
     echo "Usage: $0 [command] [mode]"
     echo ""
     echo "Commands:"
-    echo "  (none)    Start or attach to container"
-    echo "  restart   Force restart the container"
-    echo "  build     Build/rebuild the Docker image"
+    echo "  (none)    Start/Attach container (Default: gui)"
+    echo "  restart   Force restart container"
+    echo "  build     Rebuild Docker image"
     echo ""
     echo "Modes:"
-    echo "  gui       Run Isaac Sim GUI (default)"
-    echo "  shell     Run bash shell only"
+    echo "  gui       Run Isaac Sim Desktop App (Default)"
+    echo "  headless  Run Isaac Sim with WebRTC streaming"
+    echo "  shell     Run bash shell only (no sim)"
     echo ""
     echo "Examples:"
-    echo "  $0                  # Start Isaac Sim GUI"
-    echo "  $0 restart shell    # Restart with shell only"
-    echo "  $0 build            # Rebuild the Docker image"
+    echo "  $0                  # Start in GUI mode"
+    echo "  $0 restart headless # Restart in Headless mode"
+    echo "  $0 run shell        # Run bash shell"
 }
 
-# Parse arguments
+# Arguments
 COMMAND="${1:-run}"
-MODE="${2:-gui}"
+MODE="${2:-gui}" # Default to GUI
 
-if [ "$COMMAND" == "-h" ] || [ "$COMMAND" == "--help" ]; then
+# Handle Help
+if [[ "$COMMAND" =~ ^(-h|--help)$ ]]; then
     print_usage
     exit 0
 fi
 
+# Handle Build
 if [ "$COMMAND" == "build" ]; then
     echo "Force rebuilding Isaac Sim + ROS 2 image..."
     docker rmi $IMAGE_NAME 2>/dev/null || true
@@ -163,42 +206,27 @@ if [ "$COMMAND" == "build" ]; then
     exit $?
 fi
 
-# Build image if needed
+# Standard Setup
 build_image
-
-# Setup directories
 setup_directories
 
-# Get Docker options
-DOCKER_OPTIONS=$(build_docker_options)
-
-# Run container
+# Execution Logic
 if [ "$COMMAND" == "restart" ]; then
+    echo "Force removing container..."
     docker rm -f $CONTAINER_NAME 2>/dev/null
-    if [ "$MODE" == "shell" ]; then
-        echo "Starting Isaac Sim container with bash shell..."
-        echo "ROS 2 Jazzy is available. Run: ros2 topic list"
-        docker run --rm $DOCKER_OPTIONS $IMAGE_NAME bash
-    else
-        echo "Starting Isaac Sim GUI with ROS 2 support..."
-        docker run --rm $DOCKER_OPTIONS $IMAGE_NAME
-    fi
+    run_container $MODE
+
 elif [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
+    # Container is not running
     if [ "$(docker ps -aq -f name=$CONTAINER_NAME)" ]; then
-        echo "Attaching to stopped container..."
+        echo "Container exists but stopped. Restarting..."
         docker start -ai $CONTAINER_NAME
     else
-        if [ "$MODE" == "shell" ]; then
-            echo "Starting Isaac Sim container with bash shell..."
-            echo "ROS 2 Jazzy is available. Run: ros2 topic list"
-            docker run --rm $DOCKER_OPTIONS $IMAGE_NAME bash
-        else
-            echo "Starting Isaac Sim GUI with ROS 2 support..."
-            docker run --rm $DOCKER_OPTIONS $IMAGE_NAME
-        fi
+        echo "Container does not exist. Creating new..."
+        run_container $MODE
     fi
 else
-    echo "Attaching to running container..."
+    # Container is running
+    echo "Attaching to running container ($CONTAINER_NAME)..."
     docker exec -it $CONTAINER_NAME /bin/bash
 fi
-

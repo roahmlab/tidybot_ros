@@ -38,7 +38,8 @@ class TeleopToMoveit : public rclcpp::Node {
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
         // Initialize last time for time-jump detection
         last_time_ = this->get_clock()->now();
-        sensitivity = 0.01; // Incoming end effector position must not be within 1cm of previous pose
+        last_delta_time_ = this->now();
+
         options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
         options.lock_redundant_joints = false;
         options.return_approximate_solution = true;
@@ -119,9 +120,6 @@ class TeleopToMoveit : public rclcpp::Node {
         }
 
         this->publish_pose_visual(pose_in_model.pose);
-        // if (pose_distance(last_pose, msg) < sensitivity) {
-        //     return;
-        // }
 
         // Get current robot state
         std::map<std::string, double> joint_position_map;
@@ -143,8 +141,6 @@ class TeleopToMoveit : public rclcpp::Node {
         }
 
         robot_state->enforceBounds();
-        last_pose = msg; // Store last pose in planning_frame coordinates
-        pose_initialized = true;
 
         // Extract joint values
         std::vector<double> joint_values;
@@ -204,150 +200,93 @@ class TeleopToMoveit : public rclcpp::Node {
     }
 
     void publish_delta_ee(const std_msgs::msg::Float64MultiArray &msg) {
-        // Handle time jump: reset TF buffer/listener if clock moved backwards
-        if (handle_time_jump_and_reset_tf()) {
-            return; // skip this callback invocation to allow TF to repopulate
-        }
-        if (!pose_initialized) {
-            // Fill RobotState from the latest joint_state message
-            std::map<std::string, double> joint_position_map;
-            for (size_t i = 0; i < last_joint_state.name.size(); ++i) {
-                joint_position_map[last_joint_state.name[i]] = last_joint_state.position[i];
-            }
-            robot_state->setVariablePositions(joint_position_map);
+        if (handle_time_jump_and_reset_tf()) return;
+
+        rclcpp::Time now = this->now();
+        double time_since_last_cmd = (now - last_delta_time_).seconds();
+        last_delta_time_ = now;
+
+        // If no command received in >0.15s, assume a new episode/chunk 
+        // is starting and snap virtual tracker to the real robot.
+        if (!valid_virtual_pose_ || time_since_last_cmd > 0.15) {
+            robot_state->setVariablePositions(last_joint_state.name, last_joint_state.position);
             robot_state->update();
-
-            // Get current pose of end-effector
-            const Eigen::Isometry3d& current_eef_pose =
-                robot_state->getGlobalLinkTransform(arm_joint_model_group->getLinkModelNames().back());
-
-            geometry_msgs::msg::Pose current_pose_msg;
-            current_pose_msg.position.x = current_eef_pose.translation().x();
-            current_pose_msg.position.y = current_eef_pose.translation().y();
-            current_pose_msg.position.z = current_eef_pose.translation().z();
-
-            Eigen::Quaterniond q(current_eef_pose.rotation());
-            current_pose_msg.orientation.x = q.x();
-            current_pose_msg.orientation.y = q.y();
-            current_pose_msg.orientation.z = q.z();
-            current_pose_msg.orientation.w = q.w();
-
-            // Transform FK pose from model_frame -> planning_frame for internal tracking
-            geometry_msgs::msg::PoseStamped fk_in_model;
-            fk_in_model.header.stamp = this->now();
-            fk_in_model.header.frame_id = model_frame;
-            fk_in_model.pose = current_pose_msg;
-
-            try {
-                if (planning_frame == model_frame) {
-                    last_pose = current_pose_msg;
-                } else {
-                    auto fk_in_planning = tf_buffer_->transform(fk_in_model, planning_frame, tf2::durationFromSec(0.2));
-                    last_pose = fk_in_planning.pose;
-                }
-            } catch (const tf2::TransformException &ex) {
-                RCLCPP_WARN(this->get_logger(), "TF transform failed (init FK) from %s to %s: %s", model_frame.c_str(), planning_frame.c_str(), ex.what());
-                last_pose = current_pose_msg; // fallback
-            }
-            pose_initialized = true;
-
-            RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Initialized last_pose from FK");
+            virtual_ee_pose_ = robot_state->getGlobalLinkTransform(arm_joint_model_group->getLinkModelNames().back());
+            valid_virtual_pose_ = true;
+            RCLCPP_INFO(this->get_logger(), "Resetting Virtual Tracker to Physical Robot Pose");
         }
 
-        geometry_msgs::msg::Pose target_pose = last_pose;
+        // APPLY DELTA TO VIRTUAL POSE
+        // Apply Translation (Global/Base Frame)
+        Eigen::Vector3d translation_delta(msg.data[0], msg.data[1], msg.data[2]);
+        virtual_ee_pose_.pretranslate(translation_delta);
 
-        target_pose.position.x += msg.data[0];
-        target_pose.position.y += msg.data[1];
-        target_pose.position.z += msg.data[2];
-
-        Eigen::Quaterniond current_q(
-            target_pose.orientation.w,
-            target_pose.orientation.x,
-            target_pose.orientation.y,
-            target_pose.orientation.z
-        );
-
-        double roll_delta  = msg.data[3];
-        double pitch_delta = msg.data[4];
-        double yaw_delta   = msg.data[5];
-
-        Eigen::AngleAxisd d_roll(roll_delta,   Eigen::Vector3d::UnitX());
-        Eigen::AngleAxisd d_pitch(pitch_delta, Eigen::Vector3d::UnitY());
-        Eigen::AngleAxisd d_yaw(yaw_delta,     Eigen::Vector3d::UnitZ());
-
-        Eigen::Quaterniond delta_q = d_yaw * d_pitch * d_roll;  
-        Eigen::Quaterniond new_q = current_q * delta_q;
-        new_q.normalize();
-
-        target_pose.orientation.w = new_q.w();
-        target_pose.orientation.x = new_q.x();
-        target_pose.orientation.y = new_q.y();
-        target_pose.orientation.z = new_q.z();
+        // Apply Rotation
+        Eigen::AngleAxisd d_roll(msg.data[3], Eigen::Vector3d::UnitX());
+        Eigen::AngleAxisd d_pitch(msg.data[4], Eigen::Vector3d::UnitY());
+        Eigen::AngleAxisd d_yaw(msg.data[5], Eigen::Vector3d::UnitZ());
+        Eigen::Quaterniond delta_q = d_yaw * d_pitch * d_roll;
         
-        // Visualize target in model frame
-        geometry_msgs::msg::PoseStamped target_in;
-        target_in.header.stamp = this->now();
-        target_in.header.frame_id = planning_frame;
-        target_in.pose = target_pose;
+        // Apply rotation to the existing virtual orientation
+        Eigen::Quaterniond current_q(virtual_ee_pose_.rotation());
+        Eigen::Quaterniond target_q = delta_q * current_q; 
+        virtual_ee_pose_.linear() = target_q.toRotationMatrix();
 
-        geometry_msgs::msg::PoseStamped target_in_model;
-        try {
-            if (planning_frame == model_frame) {
-                target_in_model = target_in;
-                target_in_model.header.frame_id = model_frame;
-            } else {
-                target_in_model = tf_buffer_->transform(target_in, model_frame, tf2::durationFromSec(0.2));
-            }
-        } catch (const tf2::TransformException &ex) {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed from %s to %s: %s", planning_frame.c_str(), model_frame.c_str(), ex.what());
-            return;
-        }
-        this->publish_pose_visual(target_in_model.pose);
+        // Convert to ROS Msg for IK
+        geometry_msgs::msg::Pose target_pose;       
+        target_pose.position.x = virtual_ee_pose_.translation().x();
+        target_pose.position.y = virtual_ee_pose_.translation().y();
+        target_pose.position.z = virtual_ee_pose_.translation().z();
 
-        // Get current robot state
-        std::map<std::string, double> joint_position_map;
-        for (size_t i = 0; i < last_joint_state.name.size(); ++i) {
-            joint_position_map[last_joint_state.name[i]] = last_joint_state.position[i];
-        }
-        robot_state->setVariablePositions(joint_position_map);
+        Eigen::Quaterniond q(virtual_ee_pose_.rotation());
+        target_pose.orientation.x = q.x();
+        target_pose.orientation.y = q.y();
+        target_pose.orientation.z = q.z();
+        target_pose.orientation.w = q.w();
+
+        // Visualize where the controller thinks it should be
+        this->publish_pose_visual(target_pose);
+
+        // Solve IK
+        // Update the MoveIt robot_state seed with current physical joints 
+        // so the IK solver picks the "closest" solution to reality.
+        robot_state->setVariablePositions(last_joint_state.name, last_joint_state.position);
         robot_state->update();
 
-        // Perform IK
+        options.return_approximate_solution = false;
         bool found_ik = robot_state->setFromIK(
-            arm_joint_model_group, target_in_model.pose, 0.1, 
-            moveit::core::GroupStateValidityCallbackFn(), options
+            arm_joint_model_group, 
+            target_pose,
+            0.1, 
+            moveit::core::GroupStateValidityCallbackFn(), 
+            options
         );
 
         if (!found_ik) {
-            RCLCPP_WARN(rclcpp::get_logger("arm_callback"), "IK solution not found");
+            RCLCPP_WARN(this->get_logger(), "IK Failed for virtual target");
+            // options.return_approximate_solution = true;
+            // robot_state->setFromIK(
+            //     arm_joint_model_group, 
+            //     target_pose,
+            //     0.1, 
+            //     moveit::core::GroupStateValidityCallbackFn(), 
+            //     options
+            // );
             return;
         }
 
         robot_state->enforceBounds();
-        last_pose = target_pose; // Keep in planning_frame
 
-        // Extract joint values
+        // Extract and Publish
         std::vector<double> joint_values;
         robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
         const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
         
-        // Now check bounds for each joint
-        for (size_t i = 0; i < joint_names.size(); ++i) {
-            const auto& jm = robot_state->getJointModel(joint_names[i]);
-            const auto& bounds = jm->getVariableBounds(joint_names[i]);
-
-            RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
-                        "Joint %s bounds: [%f, %f], current %f",
-                        joint_names[i].c_str(),
-                        bounds.min_position_, bounds.max_position_,
-                        joint_values[i]);
-        }
-
         // Create trajectory message
         trajectory_msgs::msg::JointTrajectory traj;
         traj.joint_names = joint_names;
 
-        // Start point
+        // Start point (Current Physical)
         trajectory_msgs::msg::JointTrajectoryPoint start_point;
         std::vector<double> current_positions;
         robot_state->copyJointGroupPositions(arm_joint_model_group, current_positions);
@@ -355,16 +294,14 @@ class TeleopToMoveit : public rclcpp::Node {
         start_point.time_from_start = rclcpp::Duration(0, 0);
         traj.points.push_back(start_point);
 
-        // End point
+        // End point (Virtual IK Solution)
         trajectory_msgs::msg::JointTrajectoryPoint end_point;
         end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.05);
+        end_point.time_from_start = rclcpp::Duration::from_seconds(0.1); 
         traj.points.push_back(end_point);
 
         // Publish trajectory for sim
         arm_traj_pub->publish(traj);
-        RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Trajectory sent");
-        gripper_state = msg.data[6];
 
         // Publish joint states for real hardware
         sensor_msgs::msg::JointState joint_state_msg;
@@ -451,19 +388,21 @@ class TeleopToMoveit : public rclcpp::Node {
     
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pos_pub;
     const moveit::core::JointModelGroup* arm_joint_model_group;
-    // const moveit::core::JointModelGroup* gripper_joint_model_group;
 
     rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
     rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_visual_pub;
 
-    geometry_msgs::msg::Pose last_pose;
-    bool pose_initialized = false;
     sensor_msgs::msg::JointState last_joint_state;
+
+    // This virtual command pose accumumlates deltas within an action chunk
+    // to avoid drift and resets after not receiving a delta command for 0.5s
+    Eigen::Isometry3d virtual_ee_pose_;
+    rclcpp::Time last_delta_time_;
+    bool valid_virtual_pose_ = false;
 
     // Track last callback time to detect backward time jumps and refresh TF
     rclcpp::Time last_time_;
 
-    float sensitivity;
     kinematics::KinematicsQueryOptions options;
     double gripper_state = 0.0;
     rclcpp::TimerBase::SharedPtr gripper_timer;
