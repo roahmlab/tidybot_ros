@@ -43,7 +43,7 @@ docker run -it --rm \
     -e DISPLAY=$DISPLAY \
     -e ROS_DOMAIN_ID=0 \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
-    -v $TIDYBOT_ROOT/src/tidybot_description:/workspace/src/tidybot_description \
+    -v $TIDYBOT_ROOT/isaaclab/tidybot_isaac/:/workspace/tidybot_isaac \
     -v $TIDYBOT_ROOT/docker/fastdds.xml:/fastdds.xml \
     -v $HOME/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit \
     -v $HOME/docker/isaac-sim/cache/ov:/root/.cache/ov \
