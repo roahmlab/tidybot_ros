@@ -43,7 +43,8 @@ episode_bag/
 *.parquet
 *.urdf
 !tidybot_isaac.urdf
-*usd
+*.usd
+!tidybot.usd
 
 # OS-specific junk
 .DS_Store
@@ -56,3 +57,8 @@ Thumbs.db
 
 # Ignore Isaac Sim workspace
 isaac_sim_workspace/
+
+# Ignore Isaac Lab Training Logs
+isaaclab/tidybot_isaac/logs
+isaaclab/tidybot_isaac/outputs
+

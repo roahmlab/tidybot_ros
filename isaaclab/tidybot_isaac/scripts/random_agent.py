@@ -52,12 +52,43 @@ def main():
     print(f"[INFO]: Gym action space: {env.action_space}")
     # reset environment
     env.reset()
+    step_count = 0
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
         with torch.inference_mode():
-            # sample actions from -1 to 1
-            actions = 2 * torch.rand(env.action_space.shape, device=env.unwrapped.device) - 1
+            step_count += 1
+            # initialize random actions (base and arm stay at home)
+            actions = torch.rand(env.action_space.shape, device=env.unwrapped.device)
+            
+            # Explicitly control gripper (last dimension) with a sine wave
+            # Frequency 0.05, range [0.0, 0.82] mapped to full range of joint
+            gripper_cmd = 0.41 + 0.41 * torch.sin(torch.tensor(step_count * 0.05, device=env.unwrapped.device))
+            actions[:, -1] = gripper_cmd
+            
+            # Reset base velocity
+            actions[:, 0] = 0.0
+
+            if step_count % 20 == 0:
+                # Debug print
+                # Access robot from scene
+                robot = env.unwrapped.scene["robot"]
+                
+                if step_count == 20:
+                    print(f"[INFO] Robot Joint Names: {robot.data.joint_names}")
+
+                # Try to print gripper info
+                try:
+                    leader_idx = robot.data.joint_names.index("finger_joint")
+                    follower_idx = robot.data.joint_names.index("right_outer_knuckle_joint")
+                    
+                    pos_L = robot.data.joint_pos[0, leader_idx]
+                    pos_F = robot.data.joint_pos[0, follower_idx]
+                    
+                    print(f"Step {step_count}: Cmd={gripper_cmd.item():.4f}, PosL={pos_L:.4f}, PosF={pos_F:.4f}")
+                except ValueError:
+                    pass
+
             # apply actions
             env.step(actions)
 

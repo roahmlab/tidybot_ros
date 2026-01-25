@@ -40,10 +40,16 @@ docker run -it --rm \
     --network=host \
     --privileged \
     --gpus all \
+    --ulimit nproc=-1 \
+    --ulimit nofile=100000:100000 \
+    --ulimit stack=67108864 \
+    --ulimit memlock=-1 \
+    -w /workspace/tidybot_isaac \
     -e DISPLAY=$DISPLAY \
     -e ROS_DOMAIN_ID=0 \
     -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v $TIDYBOT_ROOT/isaaclab/tidybot_isaac/:/workspace/tidybot_isaac \
+    -v $TIDYBOT_ROOT/src:/workspace/src \
     -v $TIDYBOT_ROOT/docker/fastdds.xml:/fastdds.xml \
     -v $HOME/docker/isaac-sim/cache/kit:/isaac-sim/kit/cache/Kit \
     -v $HOME/docker/isaac-sim/cache/ov:/root/.cache/ov \

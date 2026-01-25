@@ -1,8 +1,3 @@
-# Copyright (c) 2022-2025, The Isaac Lab Project Developers (https://github.com/isaac-sim/IsaacLab/blob/main/CONTRIBUTORS.md).
-# All rights reserved.
-#
-# SPDX-License-Identifier: BSD-3-Clause
-
 import math
 
 import isaaclab.sim as sim_utils
@@ -18,13 +13,7 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
 from . import mdp
-
-##
-# Pre-defined configs
-##
-
-from isaaclab_assets.robots.cartpole import CARTPOLE_CFG  # isort:skip
-
+from tidybot_isaac import assets
 
 ##
 # Scene definition
@@ -33,7 +22,7 @@ from isaaclab_assets.robots.cartpole import CARTPOLE_CFG  # isort:skip
 
 @configclass
 class TidybotIsaacSceneCfg(InteractiveSceneCfg):
-    """Configuration for a cart-pole scene."""
+    """Configuration for the TidyBot drawer opening scene."""
 
     # ground plane
     ground = AssetBaseCfg(
@@ -42,7 +31,10 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     # robot
-    robot: ArticulationCfg = CARTPOLE_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+    # cabinet
+    cabinet: ArticulationCfg = assets.CABINET_CFG.replace(prim_path="{ENV_REGEX_NS}/Cabinet")
 
     # lights
     dome_light = AssetBaseCfg(
@@ -60,7 +52,33 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    joint_effort = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["slider_to_cart"], scale=100.0)
+    # Position control for base
+    base_pos = mdp.JointPositionActionCfg(
+        asset_name="robot", 
+        joint_names=["joint_x", "joint_y", "joint_th"], 
+        scale=0.5,
+        use_default_offset=True, # Relative to initial spawn?
+    )
+    
+    # Position control for arm
+    arm_pos = mdp.JointPositionActionCfg(
+        asset_name="robot",
+        joint_names=["joint_[1-7]"],
+        scale=0.1,
+        use_default_offset=True,
+    )
+
+    # Position control for gripper (Continuous with mimic)
+    gripper = mdp.MimicGripperActionCfg(
+        asset_name="robot",
+        joint_names=["finger_joint", "right_outer_knuckle_joint"],
+        leader_joint_name="finger_joint",
+        mimic_multiplier={
+            "right_outer_knuckle_joint": 1.0,
+        },
+        open_command_expr={"finger_joint": 0.0},
+        close_command_expr={"finger_joint": 0.82},
+    )
 
 
 @configclass
@@ -72,8 +90,14 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel)
+        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        
+        # Drawer state
+        drawer_pos = ObsTerm(
+            func=mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
+        )
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -88,23 +112,23 @@ class EventCfg:
     """Configuration for events."""
 
     # reset
-    reset_cart_position = EventTerm(
+    reset_robot = EventTerm(
         func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=["slider_to_cart"]),
-            "position_range": (-1.0, 1.0),
-            "velocity_range": (-0.5, 0.5),
+            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
+            "position_range": (0.0, 0.0), # Reset to default init_state
+            "velocity_range": (0.0, 0.0),
         },
     )
 
-    reset_pole_position = EventTerm(
+    reset_cabinet = EventTerm(
         func=mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=["cart_to_pole"]),
-            "position_range": (-0.25 * math.pi, 0.25 * math.pi),
-            "velocity_range": (-0.25 * math.pi, 0.25 * math.pi),
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=".*"),
+            "position_range": (0.0, 0.0), # Reset closed
+            "velocity_range": (0.0, 0.0),
         },
     )
 
@@ -115,25 +139,20 @@ class RewardsCfg:
 
     # (1) Constant running reward
     alive = RewTerm(func=mdp.is_alive, weight=1.0)
-    # (2) Failure penalty
-    terminating = RewTerm(func=mdp.is_terminated, weight=-2.0)
-    # (3) Primary task: keep pole upright
-    pole_pos = RewTerm(
-        func=mdp.joint_pos_target_l2,
-        weight=-1.0,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["cart_to_pole"]), "target": 0.0},
-    )
-    # (4) Shaping tasks: lower cart velocity
-    cart_vel = RewTerm(
-        func=mdp.joint_vel_l1,
-        weight=-0.01,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["slider_to_cart"])},
-    )
-    # (5) Shaping tasks: lower pole angular velocity
-    pole_vel = RewTerm(
-        func=mdp.joint_vel_l1,
-        weight=-0.005,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["cart_to_pole"])},
+    
+    # (2) Penalize large joint velocities (action smoothness)
+    # joint_vel_l2 = RewTerm(func=mdp.joint_vel_l2, weight=-0.001)
+
+    # (3) Reward opening the drawer
+    # We want the drawer_top_joint to move to a positive position
+    drawer_opened = RewTerm(
+        func=mdp.joint_pos_target_l2, # This punishes distance to target
+        weight=1.0, # Positive weight means we want to minimize distance? No. 
+                    # joint_pos_target_l2 returns -error^2. So maximize this.
+        params={
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]), 
+            "target": 0.5 # Target open position
+        },
     )
 
 
@@ -143,11 +162,9 @@ class TerminationsCfg:
 
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
-    # (2) Cart out of bounds
-    cart_out_of_bounds = DoneTerm(
-        func=mdp.joint_pos_out_of_manual_limit,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=["slider_to_cart"]), "bounds": (-3.0, 3.0)},
-    )
+    
+    # (2) Success?
+    # Could define success if drawer positions > threshold
 
 
 ##
@@ -174,7 +191,8 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 2
         self.episode_length_s = 5
         # viewer settings
-        self.viewer.eye = (8.0, 0.0, 5.0)
+        self.viewer.eye = (3.0, 3.0, 2.0)
+        self.viewer.lookat = (0.0, 0.0, 0.0)
         # simulation settings
         self.sim.dt = 1 / 120
         self.sim.render_interval = self.decimation
