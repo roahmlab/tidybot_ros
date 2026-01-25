@@ -43,8 +43,9 @@ episode_bag/
 *.parquet
 *.urdf
 !tidybot_isaac.urdf
-*.usd
-!tidybot.usd
+src/tidybot_description/usd/*
+!src/tidybot_description/usd/Collected_tidybot/
+!src/tidybot_description/usd/Collected_tidybot/**
 
 # OS-specific junk
 .DS_Store

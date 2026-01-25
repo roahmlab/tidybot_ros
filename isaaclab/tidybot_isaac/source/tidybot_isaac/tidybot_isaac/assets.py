@@ -7,7 +7,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 # TidyBot Asset
 ##
 
-TIDYBOT_USD_PATH = "/workspace/src/tidybot_description/usd/tidybot.usd"
+TIDYBOT_USD_PATH = "/workspace/src/tidybot_description/usd/Collected_tidybot/tidybot.usd"
 
 TIDYBOT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(

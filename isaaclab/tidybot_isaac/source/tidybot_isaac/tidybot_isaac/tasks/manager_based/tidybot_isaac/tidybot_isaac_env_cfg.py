@@ -135,24 +135,57 @@ class EventCfg:
 
 @configclass
 class RewardsCfg:
-    """Reward terms for the MDP."""
+    """Reward terms for the MDP - Shaped rewards for drawer opening."""
 
     # (1) Constant running reward
-    alive = RewTerm(func=mdp.is_alive, weight=1.0)
+    alive = RewTerm(func=mdp.is_alive, weight=0.1)
     
-    # (2) Penalize large joint velocities (action smoothness)
-    # joint_vel_l2 = RewTerm(func=mdp.joint_vel_l2, weight=-0.001)
-
-    # (3) Reward opening the drawer
-    # We want the drawer_top_joint to move to a positive position
-    drawer_opened = RewTerm(
-        func=mdp.joint_pos_target_l2, # This punishes distance to target
-        weight=1.0, # Positive weight means we want to minimize distance? No. 
-                    # joint_pos_target_l2 returns -error^2. So maximize this.
+    # (2) Reaching: Encourage end-effector to approach drawer handle
+    reaching = RewTerm(
+        func=mdp.end_effector_to_handle_distance,
+        weight=2.0,  # Strong incentive to reach
         params={
-            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]), 
-            "target": 0.5 # Target open position
+            "robot_cfg": SceneEntityCfg("robot"),
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "ee_frame_name": "robotiq_arg2f_base_link",
         },
+    )
+    
+    # (3) Grasping: Reward closing gripper when near handle
+    grasping = RewTerm(
+        func=mdp.gripper_grasp_reward,
+        weight=1.0,
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "ee_frame_name": "robotiq_arg2f_base_link",
+            "grasp_threshold": 0.15,
+        },
+    )
+    
+    # (4) Drawer progress: Continuous reward for pulling drawer
+    drawer_progress = RewTerm(
+        func=mdp.drawer_opening_progress,
+        weight=5.0,  # Strong weight - this is the main objective
+        params={
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+        },
+    )
+    
+    # (5) Success bonus: Large reward when drawer fully opened
+    success_bonus = RewTerm(
+        func=mdp.drawer_opened_bonus,
+        weight=10.0,
+        params={
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "threshold": 0.35,
+        },
+    )
+    
+    # (6) Action regularization: Penalize large/jerky actions
+    action_smoothness = RewTerm(
+        func=mdp.action_smoothness,
+        weight=0.01,
     )
 
 
@@ -189,7 +222,7 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 5
+        self.episode_length_s = 15  # Extended from 5s for complex manipulation
         # viewer settings
         self.viewer.eye = (3.0, 3.0, 2.0)
         self.viewer.lookat = (0.0, 0.0, 0.0)
