@@ -10,13 +10,13 @@ from scipy.spatial.transform import Rotation as R
 
 import numpy as np
 import cv2
-cv2.setNumThreads(1)
+cv2.setNumThreads(1) 
 from cv_bridge import CvBridge
 import threading
 import time
 import os
 
-# --- JAX Configuration
+# --- JAX Configuration ---
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
@@ -32,15 +32,12 @@ import openpi.models.model as _model
 def convert_tensors_to_numpy(data: dict) -> dict:
     if "image" in data:
         new_images = {}
-        image_mask = {} # Initialize the mask dictionary
+        image_mask = {} 
         
         for k, v in data["image"].items():
             img = np.array(v)
-            
-            # Fix Shape and Type
             if img.dtype != np.uint8:
                 img = (img * 255).astype(np.uint8) if img.max() <= 1.01 else img.astype(np.uint8)
-            
             new_images[k] = img
             image_mask[k] = True 
             
@@ -49,13 +46,10 @@ def convert_tensors_to_numpy(data: dict) -> dict:
 
     if "state" in data:
         data["state"] = np.array(data["state"])
-        # Create state mask (True means "this state is valid")
         data["state_mask"] = np.ones(data["state"].shape[0], dtype=bool)
 
     if "right_wrist_0_rgb" not in data["image"]:
-            # Create a black 224x224 image
             data["image"]["right_wrist_0_rgb"] = np.zeros((224, 224, 3), dtype=np.uint8)
-            # Set mask to False so the model ignores this "fake" image
             data["image_mask"]["right_wrist_0_rgb"] = False
 
     return data
@@ -70,17 +64,12 @@ class OpenPiNode(Node):
         self.data_lock = threading.Lock()
         self.latest_ext = None
         self.latest_wrist = None
-        self.latest_joint_state = None
+        self.latest_gripper_state = None
         
-        # Action Data
-        self.action_lock = threading.Lock()
-        self.latest_action = np.zeros(8, dtype=np.float32)
-        self.last_target_q = None
-
-        # TF Setup for action chunk visualization
+        # TF Setup 
         self.tf_buffer = Buffer()
         self.tf_listener = TransformListener(self.tf_buffer, self)
-        self.base_frame = "base" 
+        self.base_frame = "arm_base_link" 
         self.ee_frame = "bracelet_link"
 
         # ----------------------------------------------
@@ -88,7 +77,7 @@ class OpenPiNode(Node):
         # ----------------------------------------------
         self.get_logger().info("Loading JAX model...")
         config = _config.get_config("pi0_tidybot")
-        ckpt_dir = "/home/yuandi/openpi/checkpoints/pi0_tidybot/pi0_tidybot_1/9999"
+        ckpt_dir = "/home/yuandi/openpi/checkpoints/pi0_tidybot/pi0_tidybot_1/24000"
         self.policy = policy_config.create_trained_policy(config, ckpt_dir)
         
         # ----------------------------------------------
@@ -102,7 +91,7 @@ class OpenPiNode(Node):
 
         viz_qos = QoSProfile(
             reliability=ReliabilityPolicy.RELIABLE,
-            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL, 
             history=HistoryPolicy.KEEP_LAST,
             depth=1
         )
@@ -122,15 +111,10 @@ class OpenPiNode(Node):
         self.arm_pub = self.create_publisher(
             Float64MultiArray, "/tidybot/arm/delta_commands", 10)
 
-        self.gripper_pub = self.create_publisher(
-            Float64, "/tidybot/hardware/gripper/commands", 10)
-
         self.viz_pub = self.create_publisher(
             PoseArray, "/visual_trajectory", viz_qos)
 
         self._running = True
-
-        # Publisher Thread
         self.publisher_thread = threading.Thread(target=self.control_loop)
         self.publisher_thread.daemon = True
         self.publisher_thread.start()
@@ -147,8 +131,11 @@ class OpenPiNode(Node):
             self.get_logger().warn(f"Image decode failed: {e}")
         return None
 
-    def get_current_ee_pose_matrix(self):
-        """Helper to get 4x4 matrix of current EE pose from TF"""
+    def get_current_ee_pose(self):
+        """
+        Returns (matrix_4x4, vector_7d) or (None, None)
+        Vector 8D format: [x, y, z, w, x, y, z]
+        """
         try:
             # Look up transform from base to EE
             t = self.tf_buffer.lookup_transform(
@@ -156,45 +143,51 @@ class OpenPiNode(Node):
                 self.ee_frame, 
                 rclpy.time.Time())
             
-            # Convert translation to vector
-            trans = [t.transform.translation.x, t.transform.translation.y, t.transform.translation.z]
+            # Extract Translation
+            tx = t.transform.translation.x
+            ty = t.transform.translation.y
+            tz = t.transform.translation.z
             
-            # Convert quaternion to rotation matrix
-            quat = [t.transform.rotation.x, t.transform.rotation.y, t.transform.rotation.z, t.transform.rotation.w]
-            rot_mat = R.from_quat(quat).as_matrix()
+            # Extract Quaternion
+            rx = t.transform.rotation.x
+            ry = t.transform.rotation.y
+            rz = t.transform.rotation.z
+            rw = t.transform.rotation.w
             
-            # Build 4x4 matrix
+            # Build 4x4 Matrix
+            rot_mat = R.from_quat([rx, ry, rz, rw]).as_matrix()
             mat = np.eye(4)
             mat[:3, :3] = rot_mat
-            mat[:3, 3] = trans
-            return mat
+            mat[:3, 3] = [tx, ty, tz]
+            
+            # Build 7D Pose Vector (XYZ + WXYZ)
+            pose_vec = [tx, ty, tz, rw, rx, ry, rz]
+            
+            return mat, pose_vec
         
         except Exception as e:
-            self.get_logger().warn(f"TF Lookup failed: {e}")
-            return None
+            return None, None
     
     def publish_trajectory_viz(self, start_matrix, action_chunk):
         """
         Generates and publishes a PoseArray from the action chunk.
+        Using Global Translation + Global Rotation logic.
         """
         pose_array = PoseArray()
-        pose_array.header.frame_id = self.base_frame
+        pose_array.header.frame_id = "arm_base_link"
         pose_array.header.stamp = self.get_clock().now().to_msg()
         
         current_matrix = start_matrix.copy()
 
         for action in action_chunk:
             deltas = action[:6]
-            delta_mat = np.eye(4)
-            delta_mat[:3, 3] = deltas[:3] # Translation
             
-            # Rotation (Euler -> Matrix)
+            # Rotation Delta (Global)
             r_delta = R.from_euler('xyz', deltas[3:6], degrees=False)
-            delta_mat[:3, :3] = r_delta.as_matrix()
-
-            # Apply Delta
-            current_matrix[:3, 3] += deltas[:3]
             current_matrix[:3, :3] = r_delta.as_matrix() @ current_matrix[:3, :3]
+
+            # Translation Delta (Global)
+            current_matrix[:3, 3] += deltas[:3]
 
             # Convert back to Pose msg
             pose = Pose()
@@ -209,7 +202,7 @@ class OpenPiNode(Node):
             pose.orientation.w = q[3]
             
             pose_array.poses.append(pose)
-
+            
         self.viz_pub.publish(pose_array)
 
     # ============================================================
@@ -229,44 +222,51 @@ class OpenPiNode(Node):
 
     def joint_cb(self, msg: JointState):
         with self.data_lock:
-            self.latest_joint_state = msg
+            self.latest_gripper_state = msg.position[7]
 
     def control_loop(self):
         control_dt = 1.0 / 10.0 
 
         while self._running and rclpy.ok():
-            img_ext, img_wrist, joint_state = None, None, None
+            img_ext, img_wrist, gripper_val = None, None, None
+            
+            # Wait for images and gripper state
             while img_ext is None and self._running:
                 with self.data_lock:
-                    if self.latest_ext is not None and self.latest_joint_state is not None:
+                    if self.latest_ext is not None and self.latest_gripper_state is not None:
                         img_ext = self.latest_ext
                         img_wrist = self.latest_wrist
-                        joint_state = self.latest_joint_state
-                if img_ext is None or img_wrist is None or joint_state is None:
+                        gripper_val = self.latest_gripper_state
+                if img_ext is None or img_wrist is None:
                     time.sleep(0.01)
 
+            # Get EE Pose (TF Lookup)
+            start_pose_mat, start_pose_vec = self.get_current_ee_pose()
+            
+            if start_pose_mat is None:
+                self.get_logger().warn("Waiting for TF transform (Base -> EE)...")
+                time.sleep(0.5)
+                continue
+
             try:
-                # Prepare State
-                joint_pos = np.array(joint_state.position[:7], dtype=np.float32)
-                gripper = np.array([joint_state.position[7]], dtype=np.float32)
-                state = np.concatenate([joint_pos, gripper], axis=0)
+                # Combine EE Pose + Gripper into 8D Proprioceptive State
+                # State: [x, y, z, w, x, y, z, gripper]
+                state = np.array(start_pose_vec + [gripper_val], dtype=np.float32)
                 
-                start_pose_mat = self.get_current_ee_pose_matrix()
- 
                 example = {
                     "image": {
                         "base_0_rgb": img_ext,        
                         "left_wrist_0_rgb": img_wrist,
                     },
                     "state": state,                    
-                    "prompt": "What action should the robot take to pick up the black cube?",
+                    "prompt": "What action should the robot take to pick up the stuffed panda?",
                 }
                 example = convert_tensors_to_numpy(example)
 
                 # Inference
                 self.get_logger().info("Running inference...")
                 out = self.policy.infer(example)
-                action_chunk = out["actions"] # Shape: [Chunk, 50]
+                action_chunk = out["actions"] 
                 
             except Exception as e:
                 self.get_logger().error(f"Inference failed: {e}")
@@ -274,36 +274,24 @@ class OpenPiNode(Node):
                 continue
 
             # Execution Loop
-            for action in action_chunk[:15]:
+            for action in action_chunk[:10]:
                 if not self._running or not rclpy.ok(): break
 
                 # Publish trajectory visual
-                if start_pose_mat is not None:
-                    self.publish_trajectory_viz(start_pose_mat, action_chunk)
+                self.publish_trajectory_viz(start_pose_mat, action_chunk)
 
                 step_start = time.time()
 
-                # EXTRACT DELTAS
-                ee_deltas = action[:6].astype(np.float64)
-                
-                # EXTRACT GRIPPER
-                gripper_val = float(action[6])
-
                 # PUBLISH DELTAS
                 delta_msg = Float64MultiArray()
-                delta_msg.data = ee_deltas.tolist()
+                delta_msg.data = action.tolist()
                 self.arm_pub.publish(delta_msg)
-
-                # PUBLISH GRIPPER
-                gripper_msg = Float64()
-                gripper_msg.data = gripper_val
-                self.gripper_pub.publish(gripper_msg)
 
                 # Maintain control frequency
                 elapsed = time.time() - step_start
                 time.sleep(max(0.0, control_dt - elapsed))
             
-            time.sleep(0.5)
+            time.sleep(0.25)
 
 def main():
     rclpy.init()
