@@ -164,6 +164,111 @@ This implements **Hybrid Passive Control** where:
 
 ---
 
+## Training
+
+### Local Training (with Display)
+
+```bash
+./docker/isaac-lab/run.sh restart python.sh scripts/rsl_rl/train.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 4096
+```
+
+### SSH/Remote Training (Headless)
+
+```bash
+# Use the ssh mode for headless training
+./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/train.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 4096 \
+    --headless
+
+# Select specific GPU (if multiple GPUs available)
+CUDA_VISIBLE_DEVICES=1 ./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/train.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 4096 \
+    --headless
+```
+
+### Training Options
+
+| Option | Description |
+|--------|-------------|
+| `--num_envs N` | Number of parallel environments (default: 4096) |
+| `--headless` | Disable rendering (faster, required for SSH) |
+| `--video` | Record training videos |
+| `--seed N` | Random seed for reproducibility |
+
+### Checkpoints
+
+Checkpoints are saved to `logs/rsl_rl/tidybot_drawer/<timestamp>/`:
+- `model_<iter>.pt` - Policy checkpoints (every 50 iterations)
+- `events.out.tfevents.*` - TensorBoard logs
+
+---
+
+## Policy Evaluation
+
+### Run Latest Checkpoint (Local with Display)
+
+```bash
+./docker/isaac-lab/run.sh restart python.sh scripts/rsl_rl/play.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 1 \
+    --checkpoint logs/rsl_rl/tidybot_drawer/<timestamp>/model_400.pt
+```
+
+### Evaluate While Training (Separate Terminal)
+
+Use `docker exec` to run play script without stopping training:
+
+```bash
+# In a new terminal
+docker exec -it isaac-lab-tidybot python.sh scripts/rsl_rl/play.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 1 \
+    --checkpoint /workspace/tidybot_isaac/logs/rsl_rl/tidybot_drawer/<timestamp>/model_400.pt
+```
+
+### Record Video (Headless)
+
+```bash
+CUDA_VISIBLE_DEVICES=0 ./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/play.py \
+    --task Isaac-TidyBot-Drawer-v0 \
+    --num_envs 1 \
+    --headless \
+    --video \
+    --checkpoint logs/rsl_rl/tidybot_drawer/<timestamp>/model_400.pt
+```
+
+Videos are saved to `videos/` folder.
+
+---
+
+## Monitoring Training
+
+### TensorBoard
+
+```bash
+# Inside container
+tensorboard --logdir=/workspace/tidybot_isaac/logs/rsl_rl/ --port=6006 --bind_all
+
+# SSH tunnel from local machine
+ssh -L 6006:localhost:6006 user@server
+# Then open http://localhost:6006 in browser
+```
+
+### Key Metrics
+
+| Metric | What to Watch |
+|--------|---------------|
+| `Train/mean_reward` | Should increase over time |
+| `Loss/value_function` | Critic loss (should decrease) |
+| `Loss/surrogate` | Policy loss |
+| `Policy/mean_noise_std` | Exploration noise (should decrease) |
+
+---
+
 ## Troubleshooting
 
 ### Gripper Not Moving
@@ -173,9 +278,22 @@ This implements **Hybrid Passive Control** where:
 ### "Not all actuators configured" Warning
 This warning is expected when using Hybrid Passive Control. The passive gripper joints intentionally have 0 stiffness.
 
+### Slow Training Progress
+- Increase `num_envs` to 8192+ if GPU memory allows
+- Check if rewards are properly scaled (use TensorBoard to monitor individual reward components)
+- Consider adjusting `entropy_coef` in agent config (default 0.01, try 0.02-0.05 for more exploration)
+
 ### Container Issues
 ```bash
 # Force remove and restart container
 docker rm -f isaac-lab-tidybot
 ./docker/isaac-lab/run.sh restart python.sh scripts/random_agent.py --task Isaac-TidyBot-Drawer-v0
+```
+
+### USD File Not Found (Server)
+Ensure the collected USD assets are committed:
+```bash
+git add src/tidybot_description/usd/Collected_tidybot/
+git commit -m "Add collected USD assets"
+git push
 ```

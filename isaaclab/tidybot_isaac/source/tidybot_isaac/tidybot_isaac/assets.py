@@ -31,7 +31,7 @@ TIDYBOT_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.0),
+        pos=(0.0, 0.0, -0.08),
         rot=(1.0, 0.0, 0.0, 0.0),
         joint_pos={
             # Base (Prismatic x, y, Revolute yaw)
@@ -92,8 +92,8 @@ CABINET_CFG = ArticulationCfg(
         usd_path=CABINET_USD_URL,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(1.5, 0.0, 0.39), # Place it in front of the robot
-        rot=(0.0, 0.0, 0.0, 1.0), # Rotate 180 deg z
+        pos=(1.5, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
+        rot=(0.0, 0.0, 0.0, 1.0),  # Original verified rotation
     ),
     actuators={
         "drawer": ImplicitActuatorCfg(

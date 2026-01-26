@@ -8,6 +8,10 @@ from isaaclab.managers import ObservationGroupCfg as ObsGroup
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.sensors import FrameTransformerCfg, OffsetCfg
+from isaaclab.markers.config import FRAME_MARKER_CFG
+
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
@@ -20,9 +24,16 @@ from tidybot_isaac import assets
 ##
 
 
+# Define Marker Configs (Standalone)
+FRAME_MARKER_SMALL_CFG = FRAME_MARKER_CFG.copy()
+FRAME_MARKER_SMALL_CFG.markers["frame"].scale = (0.10, 0.10, 0.10)
+
+
 @configclass
 class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     """Configuration for the TidyBot drawer opening scene."""
+    
+    # ... assets ...
 
     # ground plane
     ground = AssetBaseCfg(
@@ -33,14 +44,50 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     # robot
     robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
+    # End-effector Frame
+    ee_frame = FrameTransformerCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
+        debug_vis=True,
+        visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/EEFrameTransformer"),
+        target_frames=[
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
+                name="ee_tcp",
+                offset=OffsetCfg(
+                    pos=(0.0, 0.0, -0.1815),
+                    rot=(0.0, 1.0, 0.0, 0.0), # w, x, y, z
+                ),
+            ),
+        ],
+    )
+
     # cabinet
     cabinet: ArticulationCfg = assets.CABINET_CFG.replace(prim_path="{ENV_REGEX_NS}/Cabinet")
+    
+    # Cabinet Frame (Handle Target)
+    cabinet_frame = FrameTransformerCfg(
+        prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
+        debug_vis=True,
+        visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
+        target_frames=[
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Cabinet/drawer_handle_top",
+                name="handle", # simplified name
+                offset=OffsetCfg(
+                    pos=(0.305, 0.0, 0.01),
+                    rot=(0.5, 0.5, -0.5, -0.5),  # align with end-effector frame
+                ),
+            ),
+        ],
+    )
 
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
+    
+
 
 
 ##
@@ -89,11 +136,40 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
 
-        # observation terms (order preserved)
+        # Robot proprioception
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         
-        # Drawer state
+        # End-effector position (3D) - where the gripper is
+        ee_pos = ObsTerm(
+            func=mdp.end_effector_pos,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "ee_body_name": "robotiq_arg2f_base_link",
+            },
+        )
+        
+        # EE to handle vector (3D) - CRITICAL: tells policy where to go
+        ee_to_handle = ObsTerm(
+            func=mdp.ee_to_handle_vector,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "cabinet_cfg": SceneEntityCfg("cabinet"),
+                "ee_body_name": "robotiq_arg2f_base_link",
+                "handle_offset": (0.0, 0.3, 0.0),
+            },
+        )
+        
+        # Gripper state (1D) - how open/closed the gripper is
+        gripper_pos = ObsTerm(
+            func=mdp.gripper_open_amount,
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "gripper_joint_name": "finger_joint",
+            },
+        )
+        
+        # Drawer state (1D) - how open the drawer is
         drawer_pos = ObsTerm(
             func=mdp.joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
@@ -133,59 +209,65 @@ class EventCfg:
     )
 
 
+
 @configclass
 class RewardsCfg:
-    """Reward terms for the MDP - Shaped rewards for drawer opening."""
+    """Reward terms for the MDP - Based on IsaacLab cabinet example."""
 
-    # (1) Constant running reward
-    alive = RewTerm(func=mdp.is_alive, weight=0.1)
-    
-    # (2) Reaching: Encourage end-effector to approach drawer handle
-    reaching = RewTerm(
-        func=mdp.end_effector_to_handle_distance,
-        weight=2.0,  # Strong incentive to reach
+    # (1) Approach: Inverse-square reward for reaching handle (smoother gradient)
+    approach = RewTerm(
+        func=mdp.approach_ee_handle,
+        weight=2.0,
         params={
+            "threshold": 0.1,
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_frame_name": "robotiq_arg2f_base_link",
+            "ee_body_name": "robotiq_arg2f_base_link",
         },
     )
     
-    # (3) Grasping: Reward closing gripper when near handle
-    grasping = RewTerm(
-        func=mdp.gripper_grasp_reward,
-        weight=1.0,
+    # (2) Grasp: Reward closing gripper when near handle
+    grasp = RewTerm(
+        func=mdp.grasp_handle,
+        weight=2.0,
         params={
+            "threshold": 0.1,  # Only reward grasping when within 10cm
+            "open_joint_pos": 0.82,  # Max gripper opening
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_frame_name": "robotiq_arg2f_base_link",
-            "grasp_threshold": 0.15,
+            "ee_body_name": "robotiq_arg2f_base_link",
+            "gripper_joint_name": "finger_joint",
         },
     )
     
-    # (4) Drawer progress: Continuous reward for pulling drawer
+    # (3) Drawer progress: Direct reward for drawer position
     drawer_progress = RewTerm(
-        func=mdp.drawer_opening_progress,
-        weight=5.0,  # Strong weight - this is the main objective
+        func=mdp.open_drawer_bonus,
+        weight=10.0,  # Strong weight - main objective
         params={
             "cabinet_cfg": SceneEntityCfg("cabinet"),
         },
     )
     
-    # (5) Success bonus: Large reward when drawer fully opened
-    success_bonus = RewTerm(
-        func=mdp.drawer_opened_bonus,
-        weight=10.0,
+    # (4) Multi-stage bonus: Progressive rewards for opening stages
+    multi_stage = RewTerm(
+        func=mdp.multi_stage_open_drawer,
+        weight=5.0,
         params={
             "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "threshold": 0.35,
         },
     )
     
-    # (6) Action regularization: Penalize large/jerky actions
-    action_smoothness = RewTerm(
-        func=mdp.action_smoothness,
-        weight=0.01,
+    # (5) Action regularization: Small penalty for jerky actions
+    action_rate = RewTerm(
+        func=mdp.action_rate_penalty,
+        weight=0.005,
+    )
+    
+    # (6) Alignment: Align tool frame with handle frame
+    align_handle = RewTerm(
+        func=mdp.align_ee_handle,
+        weight=0.5,
     )
 
 
