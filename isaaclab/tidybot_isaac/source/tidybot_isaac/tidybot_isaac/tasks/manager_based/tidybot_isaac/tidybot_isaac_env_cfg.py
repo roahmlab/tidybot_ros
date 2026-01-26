@@ -217,9 +217,9 @@ class RewardsCfg:
     # (1) Approach: Inverse-square reward for reaching handle (smoother gradient)
     approach = RewTerm(
         func=mdp.approach_ee_handle,
-        weight=2.0,
+        weight=3.0,
         params={
-            "threshold": 0.1,
+            "threshold": 0.5,
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
             "ee_body_name": "robotiq_arg2f_base_link",
@@ -229,9 +229,8 @@ class RewardsCfg:
     # (2) Grasp: Reward closing gripper when near handle
     grasp = RewTerm(
         func=mdp.grasp_handle,
-        weight=2.0,
+        weight=10.0,
         params={
-            "threshold": 0.1,  # Only reward grasping when within 10cm
             "open_joint_pos": 0.82,  # Max gripper opening
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
@@ -252,7 +251,7 @@ class RewardsCfg:
     # (4) Multi-stage bonus: Progressive rewards for opening stages
     multi_stage = RewTerm(
         func=mdp.multi_stage_open_drawer,
-        weight=5.0,
+        weight=10.0,
         params={
             "cabinet_cfg": SceneEntityCfg("cabinet"),
         },
@@ -267,7 +266,17 @@ class RewardsCfg:
     # (6) Alignment: Align tool frame with handle frame
     align_handle = RewTerm(
         func=mdp.align_ee_handle,
-        weight=0.5,
+        weight=2.0,
+    )
+
+    # (7) Penalty: Avoid closing gripper early
+    early_close_penalty = RewTerm(
+        func=mdp.avoid_early_close,
+        weight=-0.5,
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "finger_joint",
+        },
     )
 
 
@@ -278,8 +287,14 @@ class TerminationsCfg:
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     
-    # (2) Success?
-    # Could define success if drawer positions > threshold
+    # (2) Success: Drawer opened
+    success = DoneTerm(
+        func=mdp.drawer_opened,
+        params={
+            "threshold": 0.35,
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+        },
+    )
 
 
 ##
@@ -304,7 +319,7 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
         """Post initialization."""
         # general settings
         self.decimation = 2
-        self.episode_length_s = 15  # Extended from 5s for complex manipulation
+        self.episode_length_s = 5  # Extended from 5s for complex manipulation
         # viewer settings
         self.viewer.eye = (3.0, 3.0, 2.0)
         self.viewer.lookat = (0.0, 0.0, 0.0)
