@@ -11,6 +11,7 @@ def generate_launch_description():
 
     tidybot_description_pkg = FindPackageShare("tidybot_description")
     tidybot_driver_pkg = FindPackageShare("tidybot_driver")
+    kinova_vision_pkg = FindPackageShare("kinova_vision")
     orbbec_launch_pkg = FindPackageShare("orbbec_camera")
 
     mode = DeclareLaunchArgument(
@@ -67,16 +68,33 @@ def generate_launch_description():
         ]))
     )
     
-    camera_wrist_streamer = Node(
+    kinova_vision_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([kinova_vision_pkg, "launch", "kinova_vision.launch.py"])
+        ),
+        launch_arguments={
+            "device": "192.168.1.10",  # Standard Gen3 IP
+            "color_fps": "30",
+            "depth_fps": "30",
+        }.items(),
+        condition=IfCondition(PythonExpression([
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
+        ]))
+    )
+
+    camera_wrist_republisher = Node(
         package="tidybot_driver",
         executable="camera_wrist",
         name="camera_wrist",
         condition=IfCondition(PythonExpression([
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'"
         ])),
-        parameters=[{"fps": 30}],
+        parameters=[
+            {"target_size": 224},
+            {"crop_scale": 1.0}
+        ],
     )
-
+    
     camera_base_streamer = GroupAction(
         actions=[
             SetRemap(src='/camera/color/image_raw', dst='/tidybot/camera_base/color/raw'),
@@ -136,7 +154,8 @@ def generate_launch_description():
         rviz_node,
         tf_relay,
         arm_server,
-        camera_wrist_streamer,
+        kinova_vision_launch,
+        camera_wrist_republisher,
         camera_base_streamer,
         camera_ext_streamer,
         base_server,
