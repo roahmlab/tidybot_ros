@@ -229,7 +229,7 @@ class RewardsCfg:
     # (2) Grasp: Reward closing gripper when near handle
     grasp = RewTerm(
         func=mdp.grasp_handle,
-        weight=10.0,
+        weight=15.0,
         params={
             "open_joint_pos": 0.82,  # Max gripper opening
             "robot_cfg": SceneEntityCfg("robot"),
@@ -318,11 +318,11 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self) -> None:
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 4
         self.episode_length_s = 5  # Extended from 5s for complex manipulation
         # viewer settings
         self.viewer.eye = (3.0, 3.0, 2.0)
         self.viewer.lookat = (0.0, 0.0, 0.0)
         # simulation settings
-        self.sim.dt = 1 / 120
+        self.sim.dt = 1 / 240
         self.sim.render_interval = self.decimation

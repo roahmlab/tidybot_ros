@@ -167,8 +167,8 @@ def grasp_handle(
     # Compute distance
     distance = torch.norm(handle_pos - ee_pos, dim=-1, p=2)
     
-    # Continuous Proximity (Sharp falloff)
-    proximity = 2.0 / (1.0 + (distance / 0.01)**2)
+    # Continuous Proximity (Smoother falloff, wider basin ~2.5cm)
+    proximity = 1.0 / (1.0 + (distance / 0.025)**2)
     
     # Get gripper joint position
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
