@@ -9,8 +9,11 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.sensors import FrameTransformerCfg, OffsetCfg
+from isaaclab.sensors import ContactSensorCfg, FrameTransformerCfg, OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
+from isaaclab.markers import VisualizationMarkersCfg
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
+import isaaclab.sim as sim_utils
 
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
@@ -28,6 +31,15 @@ from tidybot_isaac import assets
 FRAME_MARKER_SMALL_CFG = FRAME_MARKER_CFG.copy()
 FRAME_MARKER_SMALL_CFG.markers["frame"].scale = (0.10, 0.10, 0.10)
 
+FORCE_MARKER_CFG = VisualizationMarkersCfg(
+    markers={
+        "arrow": sim_utils.UsdFileCfg(
+            usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/arrow_x.usd",
+            scale=(0.02, 0.02, 0.02),  # Scale down the arrow
+            visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
+        )
+    }
+)
 
 @configclass
 class TidybotIsaacSceneCfg(InteractiveSceneCfg):
@@ -44,10 +56,21 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     # robot
     robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
+    # contact sensors
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/.*_inner_finger.*", 
+        update_period=0.0,
+        history_length=3,
+        track_air_time=False,
+        debug_vis=True,
+        # filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_top/handle"],
+        visualizer_cfg=FORCE_MARKER_CFG.replace(prim_path="/Visuals/ContactForceArrows"),
+    )
+
     # End-effector Frame
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
-        debug_vis=True,
+        # debug_vis=True,
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/EEFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
@@ -67,7 +90,7 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     # Cabinet Frame (Handle Target)
     cabinet_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
-        debug_vis=True,
+        # debug_vis=True,
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
