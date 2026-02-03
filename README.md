@@ -40,16 +40,15 @@ Robot model definition and simulation setup.
 ## 🖥️ Isaac Sim Integration
 
 This workspace supports high-fidelity simulation using NVIDIA Isaac Sim. The integration uses a dual-container architecture:
-1.  **TidyBot Container**: Runs the ROS 2 control stack.
-2.  **Isaac Sim Container**: Runs the simulator with the ROS 2 Bridge extension.
+1.  **TidyBot Container** (`docker/tidybot`): Runs the ROS 2 control stack.
+2.  **Isaac Container** (`docker/isaac`): Runs Isaac Sim and Isaac Lab with ROS 2 Bridge.
 
 The two containers communicate over the host network using FastDDS.
 
 For detailed setup and usage instructions, please refer to:
-*   **[Docker Setup](./docker/README.md)**: Instructions for building and running the Isaac Sim container.
-*   **[Simulation Setup](./src/tidybot_description/README.md#%F0%9F%8E%AE-isaac-sim-integration)**: Detailed steps for importing the robot, configuring the ActionGraph, and running the setup
-script in Isaac Sim.
-*   **[Policy Deployment](./src/tidybot_policy/README.md#%F0%9F%8E%AE-policy-deployment)**: Detailed steps  for teleoperating the robot and deploying policies in Isaac Sim.
+*   **[Docker Setup](./docker/README.md)**: Instructions for building and running the containers.
+*   **[Simulation Setup](./src/tidybot_description/README.md#%F0%9F%8E%AE-isaac-sim-integration)**: Detailed steps for importing the robot, configuring the ActionGraph, and running the setup script in Isaac Sim.
+*   **[Policy Deployment](./src/tidybot_policy/README.md#%F0%9F%8E%AE-policy-deployment)**: Detailed steps for teleoperating the robot and deploying policies in Isaac Sim.
 
 
 #### [`tidybot_driver`](./src/tidybot_driver/README.md)

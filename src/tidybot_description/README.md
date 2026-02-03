@@ -156,26 +156,78 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Step 1: Import Robot into Isaac Sim and Load Exntensions
+### Step 1: Import Robot URDF into Isaac Sim and Prepare the Robot USD
 
 1. **Start Isaac Sim** (via Docker or native installation)
 
 2. **Import the URDF:**
    - Go to `File` → `Import`
-   - Select `/tidybot_description/urdf/tidybot_isaac.urdf` (a pre-configured URDF for Isaac Sim)
+   - Select `/workspace/src/tidybot_description/urdf/tidybot_isaac.urdf` (a pre-configured URDF for Isaac Sim)
    - **Important settings:**
      - ✅ Static Base (checked)
-     - Output directory: `/isaac_workspace/` or similar writable path
+     - Output directory: `/tmp` or similar writable path
      - Leave other configurations as default
    - Click "Import"
 
 3. **Verify the robot** appears in the stage at `/World/tidybot`
-4. **Load Simulation Control Extension** 
+4. **Add inner knuckle joints** (for closed-loop gripper kinematics):
+   - Switch to **Right** view and zoom into the gripper
+   - Select `left_inner_knuckle` + `robotiq_arg2f_base_link` → Right-click → **Create > Physics > Joint > Revolute Joint**
+   - Position joint center at the knuckle-pad connection (see image below)
+   - Repeat for `right_inner_knuckle`
+   - Name joints `left_inner_knuckle_joint` and `right_inner_knuckle_joint`
+   - For both joints: **Property > Exclude From Articulation** ✅
+   - Select both → **Property > Add > Physics > Angular Drive**
+
+   <img width="1648" height="933" alt="Inner knuckle joint placement" src="https://github.com/user-attachments/assets/d6ddc068-3420-42ee-942e-c54f91ddc327" />
+
+5. **Configure gripper joint drives** (Property > Physics > Angular Drive):
+   | Joints | Stiffness | Damping | Max Force | Max Velocity |
+   |--------|-----------|---------|-----------|--------------|
+   | `finger_joint`, `right_outer_knuckle_joint` | 10000 | 100 | 180 | 130 |
+   | `left_outer_finger_joint`, `right_outer_finger_joint` | 0.05 | 5000 | 180 | 130 |
+   | `*_inner_finger_joint`, `*_inner_finger_knuckle_joint` | 0.00 | 5000 | 180 | 130 |
+
+   **Configure base joint drives** (Property > Physics > Linear/Angular Drive):
+   | Joints | Type | Stiffness | Damping | Max Force |
+   |--------|------|-----------|---------|-----------|
+   | `joint_x`, `joint_y` | Linear | 1e7 | 1e4 | 1e7 |
+   | `joint_th` | Angular | 1e7 | 1e4 | 1e7 |
+
+   **Configure arm joint drives** (Property > Physics > Angular Drive):
+   | Joints | Stiffness | Damping | Max Force |
+   |--------|-----------|---------|-----------|
+   | `joint_1` through `joint_7` | 1e7 | 1e4 | 1e7 |
+
+6. **Apply fingertip material**:
+   - **Create > Physics > Physics Material > Rigid Body Material** → rename to `fingertip_material`
+   - Set friction coefficients to `0.8`, Friction Combine Mode to `max`
+   - Apply to `left_inner_finger` and `right_inner_finger` and choose `Strength` to `Stronger than Descendants`
+
+7. **Add fingertip colliders**:
+   - Select `left_inner_finger/collisions` → uncheck **Instanceable**
+   - Navigate to `collisions/robotiq_arg2f_85_inner_finger/node_STL_BINARY_/mesh`
+   - **Add > Physics > Collider**, set Rest Offset=`0.0`, Contact Offset=`0.005`
+   - Repeat for `robotiq_arg2f_85_pad` mesh and for `right_inner_finger`
+
+8. **Save the USD**: `File → Collect and Save As...` to a mounted directory
+
+Now you have the USD file ready to be used in the simulation.
+
+### Step 2: Create a Simulation Scene with the robot
+
+1. Open Isaac Sim
+2. In the stage, select `/World`, right-click and select `Create -> Xform`, rename it to `Robot`
+3. Right-click the `Robot` xform, select `Add -> Reference`, select the USD file you just saved
+4. Now the robot is in the stage under `/World/Robot/tidybot`
+
+5. Load Simulation Control Extension 
     - Go to `Window` → `Extensions`
     - Search for `isaacsim.ros2.sim_control`
     - Enable the extension
+    - (Do this if you did not enable the extension when launching Isaac Sim)
 
-### Step 2: Configure the Robot
+### Step 3: Configure the Joint Home Positions, Cameras and ROS 2 Integration
 
 Use the setup script in Isaac Sim's Script Editor to configure physics and ROS 2 integration:
 
@@ -198,7 +250,7 @@ import omni.graph.core as og
 import math
 
 # Configuration
-ROBOT_PATH = "/World/tidybot"
+ROBOT_PATH = "/World/Robot/tidybot"
 BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
 GRIPPER_JOINTS = ["finger_joint", "left_inner_finger_knuckle_joint", "left_inner_finger_joint",
@@ -233,142 +285,6 @@ stage = omni.usd.get_context().get_stage()
 # Helper function to get prim at path (handles string to Sdf.Path conversion)
 def get_prim(path_str):
     return stage.GetPrimAtPath(Sdf.Path(path_str))
-
-# Find robot
-robot_prim = get_prim(ROBOT_PATH)
-if not robot_prim.IsValid():
-    for prim in stage.Traverse():
-        if prim.GetName() == "tidybot":
-            ROBOT_PATH = str(prim.GetPath())
-            robot_prim = prim
-            break
-
-print(f"Robot path: {ROBOT_PATH}")
-
-if not robot_prim.IsValid():
-    raise Exception("Robot not found! Check the path.")
-
-# Find articulation root (first rigid body under robot)
-artic_root_path = None
-for child in robot_prim.GetAllChildren():
-    if child.HasAPI(UsdPhysics.RigidBodyAPI):
-        artic_root_path = str(child.GetPath())
-        if not child.HasAPI(UsdPhysics.ArticulationRootAPI):
-            UsdPhysics.ArticulationRootAPI.Apply(child)
-        print(f"Articulation root: {artic_root_path}")
-        break
-
-if not artic_root_path:
-    for name in ["joint_x_jointbody", "base_link", "base"]:
-        path = f"{ROBOT_PATH}/{name}"
-        prim = get_prim(path)
-        if prim.IsValid():
-            artic_root_path = path
-            if not prim.HasAPI(UsdPhysics.ArticulationRootAPI):
-                UsdPhysics.ArticulationRootAPI.Apply(prim)
-            print(f"Articulation root: {artic_root_path}")
-            break
-
-if not artic_root_path:
-    raise Exception("Could not find articulation root!")
-
-# Find joints path
-joints_path = f"{ROBOT_PATH}/joints"
-if not get_prim(joints_path).IsValid():
-    joints_path = ROBOT_PATH
-print(f"Joints path: {joints_path}")
-
-# Configure joint drives
-def configure_drive(joint_path, stiffness, damping, max_force, drive_type="angular"):
-    prim = get_prim(joint_path)
-    if not prim.IsValid():
-        print(f"  WARNING: Joint not found: {joint_path}")
-        return False
-    drive = UsdPhysics.DriveAPI.Apply(prim, drive_type)
-    drive.CreateTypeAttr("force")
-    drive.CreateStiffnessAttr(stiffness)
-    drive.CreateDampingAttr(damping)
-    drive.CreateMaxForceAttr(max_force)
-    print(f"  Configured: {joint_path} (stiffness={stiffness}, damping={damping}, maxForce={max_force})")
-    return True
-
-print("\nConfiguring base joints...")
-for name in BASE_JOINTS:
-    drive_type = "linear" if name in ["joint_x", "joint_y"] else "angular"
-    configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, drive_type)
-
-print("\nConfiguring arm joints...")
-for name in ARM_JOINTS:
-    configure_drive(f"{joints_path}/{name}", 1e7, 1e4, 1e7, "angular")
-print("\nConfiguring gripper joints (simplified parallel-jaw)...")
-
-# Different stiffness for different joint types
-OUTER_KNUCKLE_CONFIG = {
-    "stiffness": 1000.0,   # Moderate stiffness for main driving joints
-    "damping": 200.0,
-    "max_force": 180.0,
-    "max_velocity": 130.0,
-}
-
-OUTER_FINGER_CONFIG = {
-    "stiffness": 0.1,
-    "damping": 0.0,        # Using low damping to complement low stiffness
-    "max_force": 10.0,
-    "max_velocity": 130.0,
-}
-
-INNER_FINGER_CONFIG = {
-    "stiffness": 1000.0,    
-    "damping": 200.0,
-    "max_force": 180.0,     
-    "max_velocity": 130.0,
-}
-
-INNER_KNUCKLE_CONFIG = {
-    "stiffness": 1000.0,     
-    "damping": 200.0,
-    "max_force": 20.0,
-    "max_velocity": 130.0,
-}
-
-# Map joint names to their configurations
-GRIPPER_JOINT_CONFIGS = {
-    "finger_joint": OUTER_KNUCKLE_CONFIG,
-    "right_outer_knuckle_joint": OUTER_KNUCKLE_CONFIG,
-    "left_outer_finger_joint": OUTER_FINGER_CONFIG,
-    "right_outer_finger_joint": OUTER_FINGER_CONFIG,
-    "left_inner_finger_joint": INNER_FINGER_CONFIG,
-    "right_inner_finger_joint": INNER_FINGER_CONFIG,
-    "left_inner_finger_knuckle_joint": INNER_KNUCKLE_CONFIG,
-    "right_inner_finger_knuckle_joint": INNER_KNUCKLE_CONFIG,
-}
-
-for joint_name in GRIPPER_JOINTS:
-    joint_path = f"{joints_path}/{joint_name}"
-    joint_prim = get_prim(joint_path)
-    
-    if not joint_prim.IsValid():
-        print(f"  WARNING: Gripper joint not found: {joint_path}")
-        continue
-    
-    # Get config for this joint type
-    config = GRIPPER_JOINT_CONFIGS.get(joint_name, INNER_FINGER_CONFIG)
-    
-    # Configure compliant position drive
-    drive = UsdPhysics.DriveAPI.Apply(joint_prim, "angular")
-    drive.CreateTypeAttr("force")
-    drive.CreateStiffnessAttr(config["stiffness"])
-    drive.CreateDampingAttr(config["damping"])
-    drive.CreateMaxForceAttr(config["max_force"])
-    
-    # Set max velocity
-    physx_joint = PhysxSchema.PhysxJointAPI.Apply(joint_prim)
-    physx_joint.CreateMaxJointVelocityAttr(config["max_velocity"])
-    
-    print(f"  Configured: {joint_name} (stiffness={config['stiffness']}, "
-          f"damping={config['damping']}, maxForce={config['max_force']})")
-
-print("Gripper configuration complete!")
 
 print("\nSetting initial joint positions...")
 
@@ -559,49 +475,19 @@ og.Controller.edit(
         og.Controller.Keys.CONNECT: connections,
     }
 )
-
-print("\n" + "="*50)
-print("SETUP COMPLETE!")
-print("="*50)
-print(f"Articulation root: {artic_root_path}")
-print(f"Cameras configured: {list(camera_paths.keys())}")
-print("\nROS 2 Topics:")
-print("  /clock - Simulation clock")
-print("  /joint_states - Robot joint states (raw)")
-print("  /joint_command - Joint position/velocity commands")
-for cam_name in camera_paths:
-    config = CAMERAS[cam_name]
-    print(f"  {config['topic']}/image_raw - {cam_name} RGB image")
-print("\nSave scene and press PLAY to start simulation.")
 ```
 
 The script above does these things:
-- Locates the robot and sets the **Articulation Root** on the first dynamic rigid body
-- Configures **joint drives** with appropriate stiffness/damping for base, arm, and gripper
-- Sets up **simplified parallel-jaw gripper** with compliant drives on all joints (no closed-loop kinematics)
+- Sets **initial joint positions** (home pose) for the arm and gripper
 - Creates **camera prims** under the arm and base camera links with proper FOV and resolution
 - Creates a **ROS 2 Action Graph** that:
   - Publishes `/clock` and `/joint_states`
   - Subscribes to `/joint_command` for robot control
-  - Publishes camera images to `/arm_camera/image_raw` and `/base_camera/image_raw`
+  - Publishes camera images to `/tidybot/camera_wrist/color/raw` and `/tidybot/camera_base/color/raw`
 
-**Gripper Control:** The `isaac_sim_bridge` node commands all 6 gripper joints with gear ratios
+After executing, press **Play** to start the simulation. Or you can save the scene for later use.
 
-4. Add inner knuckle joints: Because urdf and Isaac Sim do not support closed_loop articulation (which is what the Robotiq 2F 85 gripper relies on to keep its finger parallel), we need to manually add the inner knuckle joints in Isaac Sim and remove them from articulation to close the loop. First, switch the view to **Right** and zoom into the gripper. Then select **left_inner_knuckle** and **robotiq_arg2f_base_link** in the stage and right-click -> **Create** -> **Physics** -> **Joint** -> **Revolute Joint** to create a revolute joint connecting them. Make sure the axis of the joint is correct. After that, move the center of the joint to the joint connecting the inner knuckle and the pad like this:
-
-   <img width="1648" height="933" alt="Image" src="https://github.com/user-attachments/assets/d6ddc068-3420-42ee-942e-c54f91ddc327" />
-
-    Do the same for the right_inner_knuckle. Name the joints "left_inner_knuckle_joint" and "right_inner_knuckle_joint". After creating the joints, we need to exlude them from articulation so Isaac Sim won't throw errors. Go to the **Property** tab of the joints, check **Exclude From Articulation**.
-
-    **Note: Adding the inner knuckle joints may destabilize the simulation. If the gripper fingers fall apart or the simulation explodes, try reducing the stiffness and increase the damping for the finger joints. If still not working, remove the inner knuckle joints.**
-
-5. Apply the fingertip material: Go to **Create -> Physics -> Physics Material**, select **Rigid Body Material**. This will create a **PhysicsMaterial** in the stage, rename that material to **fingertip_material**. Select the material you just created, under **Property -> Material and Shader -> Extra Properties** change both friction coefficients to 0.8 and the **Friction Combine Mode** to max. Then select the **left_inner_finger** in the stage, under the **Property** tab change the **Materials on selected models** to the fingertip material. Do the same for **right_inner_finger**.
-
-After executing all these, press the `Play` button or space to start the simulation in Isaac Sim. You can also save the scene for later use.
-
-If using gamepad control, the stifness for the base should be set to 0 to allow the robot to be controlled by velocity command. 
-
-### Step 3: Launch ROS 2 Stack
+### Step 4: Launch ROS 2 Stack
 
 In the TidyBot ROS 2 container: 
 
@@ -615,6 +501,30 @@ ros2 topic echo /clock         # Should show simulation time
 ```
 
 After the ROS2-Isaac Sim bridge is up, you can run the policies to control the robot in Isaac Sim
+
+### Alternative: Programmatic Setup via Isaac Lab
+
+Instead of manually configuring Isaac Sim, you can use the `run_ros2_sim.py` script which programmatically creates the simulation environment using Isaac Lab APIs. This method is **more stable** and uses the same physics configuration as the RL training environment.
+
+**Benefits:**
+- Uses `assets.py` physics configuration (stable solver settings, correct articulation properties)
+- Programmatically creates the ROS 2 action graph (no manual OmniGraph setup)
+- Avoids physics explosions from incorrect joint drive configuration
+
+**Usage:**
+```bash
+# Inside docker/isaac container (lab mode)
+./isaaclab.sh -p isaaclab/tidybot_isaac/scripts/run_ros2_sim.py --task TidyBot-v0
+
+# Headless mode (no GUI)
+./isaaclab.sh -p isaaclab/tidybot_isaac/scripts/run_ros2_sim.py --task TidyBot-v0 --headless
+```
+
+The script will:
+1. Spawn the TidyBot with correct physics properties
+2. Create ROS 2 action graph for `/joint_states` (publisher) and `/joint_command` (subscriber)
+3. Keep the robot at its initial position while allowing ROS 2 control
+
 
 ### Troubleshooting Isaac Sim
 

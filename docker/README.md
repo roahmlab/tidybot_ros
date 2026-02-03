@@ -12,16 +12,10 @@ docker/
 │   ├── run.sh                # Run the TidyBot container
 │   └── entrypoint.sh         # Container entrypoint script
 │
-├── isaac-sim-ros2/           # Isaac Sim + ROS 2 container (Standard Simulation)
-│   ├── Dockerfile            # Isaac Sim 5.1.0 + ROS 2 Jazzy
-│   ├── build.sh              # Build the Isaac Sim image
-│   ├── run.sh                # Run the Isaac Sim container
-│   └── entrypoint.sh         # Container entrypoint script
-│
-├── isaac-lab/                # Isaac Lab + ROS 2 container (RL Policy Training)
-│   ├── Dockerfile            # Ubuntu 24.04 (Isaac Lab Base) + ROS 2 Jazzy
-│   ├── build.sh              # Build the Isaac Lab image
-│   ├── run.sh                # Run the Isaac Lab container
+├── isaac/                    # Isaac Sim + Isaac Lab + ROS 2 container
+│   ├── Dockerfile            # Isaac Lab Base + ROS 2 Jazzy
+│   ├── build.sh              # Build the Isaac image
+│   ├── run.sh                # Run the Isaac container
 │   └── entrypoint.sh         # Container entrypoint script
 │
 ├── fastdds.xml               # Shared DDS config for cross-container ROS 2
@@ -42,47 +36,30 @@ docker/
 ./docker/tidybot/run.sh restart
 ```
 
+### Isaac Sim + Isaac Lab (Simulation & RL Training)
 
-### Isaac Lab with ROS 2 (RL Training)
+This container combines Isaac Sim for simulation and Isaac Lab for RL training.
 
-This container provides the Isaac Lab framework for training Reinforcement Learning policies.
-
-**Prerequisite:** You must build the `isaac-lab-base` image from the official Isaac Lab repository first.
-
-1.  **Clone and build Isaac Lab Base:**
-    ```bash
-    # Clone Isaac Lab
-    git clone https://github.com/isaac-sim/IsaacLab.git
-    cd IsaacLab
-    
-    # Build the base image
-    ./docker/container.py build base
-    ```
-
-2.  **Build the TidyBot extension:**
-    Return to the `tidybot_platform` directory:
-    ```bash
-    # Build the image (depends on isaac-lab-base)
-    ./docker/isaac-lab/build.sh
-    
-    # Run the container
-    ./docker/isaac-lab/run.sh restart
-    ```
-
-### Isaac Sim with ROS 2 (Standard Simulation)
-
-This is the standard container for running TidyBot simulations with ROS 2 Bridge.
-
+**Prerequisites:** Build the `isaac-lab-base` image from the official Isaac Lab repository first:
 ```bash
-# Pull the base image (first time only)
-docker pull nvcr.io/nvidia/isaac-sim:5.1.0
+git clone https://github.com/isaac-sim/IsaacLab.git
+cd IsaacLab
+./docker/container.py build base
+```
 
-# Build and run (image is built automatically if not present)
-./docker/isaac-sim-ros2/run.sh restart
+Then build and run the TidyBot Isaac container:
+```bash
+# Build the image
+./docker/isaac/build.sh
 
-# Or build manually first
-./docker/isaac-sim-ros2/build.sh
-./docker/isaac-sim-ros2/run.sh restart
+# Run with Isaac Sim GUI (starts in /isaac-sim)
+./docker/isaac/run.sh sim
+
+# Run in Isaac Lab workspace (starts in /workspace/tidybot_isaac)
+./docker/isaac/run.sh lab
+
+# Run headlessly (for training)
+./docker/isaac/run.sh headless python scripts/train.py
 ```
 
 ---
@@ -97,24 +74,15 @@ docker pull nvcr.io/nvidia/isaac-sim:5.1.0
 | `run.sh restart` | Stop existing container and start fresh |
 | `run.sh` | Start or attach to existing container |
 
-
-### Isaac Lab Container (`docker/isaac-lab/`)
-
-| Script | Description |
-|--------|-------------|
-| `build.sh` | Build the Isaac Lab image (Ubuntu 24.04 + ROS 2 Jazzy) |
-| `run.sh restart` | Stop existing container and start fresh |
-| `run.sh` | Start or attach to existing container |
-| `run.sh restart shell` | Start container and enter shell immediately |
-
-### Isaac Sim Container (`docker/isaac-sim-ros2/`)
+### Isaac Container (`docker/isaac/`)
 
 | Script | Description |
 |--------|-------------|
-| `build.sh` | Build the Isaac Sim + ROS 2 Jazzy image |
-| `run.sh restart` | Start the container with Isaac Sim GUI |
-| `run.sh restart shell` | Start container with bash shell only |
-| `run.sh build` | Force rebuild the Docker image |
+| `build.sh` | Build the image (requires `isaac-lab-base` as base) |
+| `run.sh sim` | Start shell in `/isaac-sim` directory (run `./isaac-sim.sh` to launch GUI) |
+| `run.sh lab` | Start shell in `/workspace/tidybot_isaac` (Isaac Lab workspace) |
+| `run.sh shell` | Alias for `lab` |
+| `run.sh headless [CMD]` | Run without X11 forwarding, optionally with a command |
 
 ---
 
@@ -129,17 +97,15 @@ docker pull nvcr.io/nvidia/isaac-sim:5.1.0
    sudo nvidia-ctk runtime configure --runtime=docker
    sudo systemctl restart docker
    ```
-3. **Base Docker image** pulled:
-   ```bash
-   docker pull nvcr.io/nvidia/isaac-sim:5.1.0
-   ```
+3. **Isaac Lab Base Image** built from [IsaacLab repository](https://github.com/isaac-sim/IsaacLab)
 
 ### Container Mounts
 
 | Host Path | Container Path | Description |
 |-----------|----------------|-------------|
-| `src/tidybot_description/` | `/tidybot_description` | Robot URDF and meshes |
-| `isaac_sim_workspace/` | `/isaac_workspace` | USD output directory |
+| `isaaclab/tidybot_isaac/` | `/workspace/tidybot_isaac` | Isaac Lab extensions |
+| `src/` | `/workspace/src` | ROS 2 packages (URDF, meshes) |
+| `docker/fastdds.xml` | `/fastdds.xml` | DDS configuration |
 | `~/docker/isaac-sim/` | Various cache paths | Persistent cache |
 
 ---
@@ -166,7 +132,7 @@ Both containers are configured to communicate via ROS 2 DDS using the shared `fa
 
 2. **Check X11 permissions:**
    ```bash
-   xhost +local:
+   xhost +local:root
    ```
 
 3. **On Wayland:** Switch to X11 session or set:
@@ -177,8 +143,7 @@ Both containers are configured to communicate via ROS 2 DDS using the shared `fa
 ### Container Can't Write to Mounted Directories
 
 ```bash
-# Fix permissions for Isaac Sim workspace
-chmod -R 777 ~/Documents/tidybot_platform/isaac_sim_workspace/
+# Fix permissions
 chmod -R 777 ~/docker/isaac-sim/
 ```
 
@@ -215,6 +180,5 @@ chmod -R 777 ~/docker/isaac-sim/
 ## 📚 Additional Resources
 
 - [Isaac Sim Documentation](https://docs.isaacsim.omniverse.nvidia.com/)
-- [Isaac Sim ROS 2 Installation](https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html)
-- [Isaac Sim ROS 2 Tutorials](https://docs.isaacsim.omniverse.nvidia.com/latest/ros2_tutorials/index.html)
+- [Isaac Lab Documentation](https://isaac-sim.github.io/IsaacLab/)
 - [TidyBot++ Project](https://tidybot2.github.io/)

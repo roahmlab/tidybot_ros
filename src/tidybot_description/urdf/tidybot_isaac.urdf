@@ -11,7 +11,7 @@
     <visual>
       <origin rpy="0 -0 0" xyz="-0.3066 0.06523 0.085"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
+        <mesh filename="package://tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
       </geometry>
       <material name="grey">
         <color rgba="0.5 0.5 0.5 1"/>
@@ -20,7 +20,7 @@
     <collision>
       <origin rpy="0 -0 0" xyz="-0.3066 0.06523 0.085"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
+        <mesh filename="package://tidybot_description/meshes/base/tidybot++/Kinova.stl"/>
       </geometry>
     </collision>
   </link>
@@ -108,7 +108,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -117,7 +117,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/base_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -130,7 +130,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -139,7 +139,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/shoulder_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -162,7 +162,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -171,7 +171,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/half_arm_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -191,7 +191,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -200,7 +200,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/half_arm_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -220,7 +220,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -229,7 +229,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/forearm_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -249,7 +249,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -258,7 +258,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_1_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -278,7 +278,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -287,7 +287,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/spherical_wrist_2_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -307,7 +307,7 @@
     <visual>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
       <material name="">
         <color rgba="0.75294 0.75294 0.75294 1"/>
@@ -316,7 +316,7 @@
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
+        <mesh filename="package://tidybot_description/meshes/arms/gen3_7dof/bracelet_with_vision_link.STL"/>
       </geometry>
     </collision>
   </link>
@@ -380,13 +380,13 @@
     <visual>
       <origin xyz="-0.000242 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_base_link.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_base_link.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="-0.000242 0. 0." rpy="0. 0. -1.5707964"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_base_link.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_base_link.stl"/>
       </geometry>
     </collision>
   </link>
@@ -400,13 +400,13 @@
     <visual>
       <origin xyz="0.0292492 -0.0556365 0." rpy="0. 0. -0.0244589"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0.0292492 -0.0556365 0." rpy="0. 0. -0.0244589"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
       </geometry>
     </collision>
   </link>
@@ -419,13 +419,13 @@
     <visual>
       <origin xyz="0.062026 0.0503723 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0.062026 0.0503723 0." rpy="-3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
       </geometry>
     </collision>
   </link>
@@ -438,25 +438,25 @@
     <visual>
       <origin xyz="0.071171 0.0956936 -0.0133" rpy="3.1415927 0. -0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="0.071171 0.0956936 -0.0133" rpy="3.1415927 0. -0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0.071171 0.0956936 -0.0133" rpy="3.1415927 0. -0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
       </geometry>
     </collision>
     <collision>
       <origin xyz="0.071171 0.0956936 -0.0133" rpy="3.1415927 0. -0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
       </geometry>
     </collision>
   </link>
@@ -470,7 +470,7 @@
     <visual>
       <origin xyz="0.0483511 -0.1051343 0." rpy="0. 0. -0.0244597"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
       </geometry>
     </visual>
     <!-- Collision removed - allows direct joint control without kinematic loop -->
@@ -485,13 +485,13 @@
     <visual>
       <origin xyz="-0.0292492 0.0556365 0." rpy="0. 0. 3.1171339"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="-0.0292492 0.0556365 0." rpy="0. 0. 3.1171339"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_knuckle.stl"/>
       </geometry>
     </collision>
   </link>
@@ -504,13 +504,13 @@
     <visual>
       <origin xyz="0.062026 0.0503723 0." rpy="3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0.062026 0.0503723 0." rpy="3.1415927 0. 0."/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_outer_finger.stl"/>
       </geometry>
     </collision>
   </link>
@@ -523,25 +523,25 @@
     <visual>
       <origin xyz="0.071171 -0.0956936 -0.0133" rpy="0. 0. 0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
       </geometry>
     </visual>
     <visual>
       <origin xyz="0.071171 -0.0956936 -0.0133" rpy="0. 0. 0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
       </geometry>
     </visual>
     <collision>
       <origin xyz="0.071171 -0.0956936 -0.0133" rpy="0. 0. 0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_finger.stl"/>
       </geometry>
     </collision>
     <collision>
       <origin xyz="0.071171 -0.0956936 -0.0133" rpy="0. 0. 0.0244594"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_pad.stl"/>
       </geometry>
     </collision>
   </link>
@@ -554,7 +554,7 @@
     <visual>
       <origin xyz="0.0483511 -0.1051343 0." rpy="0. 0. -0.0244597"/>
       <geometry>
-        <mesh filename="file:///tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
+        <mesh filename="package://tidybot_description/meshes/grippers/robotiq_2f_85/robotiq_arg2f_85_inner_knuckle.stl"/>
       </geometry>
     </visual>
     <!-- Collision removed - allows direct joint control without kinematic loop -->
