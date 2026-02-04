@@ -58,7 +58,7 @@ class ArmServer(Node):
         )
 
         self.target_gripper_pos = 0.0
-        self.target_joint_state = np.zeros(7, dtype=np.float64)
+        self.target_joint_state = None
         self.target_ee_pose = self.arm.get_state()
         self.clock = self.get_clock()
         self.jsp_timer = self.create_timer(0.01, self.publish_joint_states)  # 1k Hz
@@ -85,6 +85,7 @@ class ArmServer(Node):
     def handle_reset_request(self, request, response):
         self.get_logger().info(f"{GREEN}Resetting arm...{RESET}")
         self.arm.reset()
+        self.target_joint_state = None
         self.get_logger().info(f"{GREEN}Arm reset complete{RESET}")
         return response
 
@@ -93,15 +94,17 @@ class ArmServer(Node):
         joint_order = [f"joint_{i}" for i in range(1, 8)]
         joint_dict = dict(zip(msg.name, msg.position))
 
-        target_joint_state = np.array([joint_dict[j] for j in joint_order], dtype=np.float64)
+        self.target_joint_state = np.array([joint_dict[j] for j in joint_order], dtype=np.float64)
         # self.get_logger().info(f'Received command: {np.concatenate([target_joint_state, [self.arm.arm.gripper_pos]]).tolist()}')
 
         # Put the command in the queue for the controller to pick up
-        self.arm.execute_action(np.concatenate([target_joint_state, [self.target_gripper_pos]]).tolist())
+        self.arm.execute_action(np.concatenate([self.target_joint_state, [self.target_gripper_pos]]).tolist())
         
     def gripper_cmd_callback(self, msg):
         # Buffer the target gripper position
         self.target_gripper_pos = msg.data
+        if (self.target_joint_state is None): return
+        self.arm.execute_action(np.concatenate([self.target_joint_state, [self.target_gripper_pos]]).tolist())
         # self.get_logger().info(f"Target gripper pos: {self.target_gripper_pos}")
 
     def publish_joint_states(self): 

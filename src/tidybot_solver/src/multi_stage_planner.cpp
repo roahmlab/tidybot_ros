@@ -27,7 +27,10 @@
 #include <moveit/kinematics_base/kinematics_base.hpp>
 
 #include <trajectory_msgs/msg/joint_trajectory.hpp>
+#include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
+#include <sensor_msgs/msg/joint_state.hpp>
+
 #include <thread>
 #include <cmath>
 
@@ -97,6 +100,10 @@ public:
             "/gen3_7dof_controller/joint_trajectory", 10);
         gripper_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/robotiq_2f_85_controller/commands", 10);
+        arm_traj_hardware_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
+            "/tidybot/hardware/arm/commands", 10);
+        gripper_hardware_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+            "/tidybot/hardware/gripper/commands", 10);
         
         
         RCLCPP_INFO(this->get_logger(), "Trajectory execution publishers initialized");
@@ -113,7 +120,8 @@ private:
 
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pub_;
-
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_traj_hardware_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_hardware_pub_;
 
     rclcpp_action::GoalResponse handle_goal(
         const rclcpp_action::GoalUUID& uuid,
@@ -264,7 +272,11 @@ private:
                      const std::string& tip_link)
     {
         RCLCPP_INFO(this->get_logger(), "PTP motion to target");
-        
+
+        // Capture current joint state at start of this action stage (for interpolation)
+        std::vector<double> start_positions;
+        robot_state->copyJointGroupPositions(joint_model_group, start_positions);
+
         // Solve IK with tight tolerance
         kinematics::KinematicsQueryOptions ik_options;
         ik_options.return_approximate_solution = false;  // Require exact solution
@@ -287,9 +299,9 @@ private:
         std::vector<double> joint_values;
         robot_state->copyJointGroupPositions(joint_model_group, joint_values);
         
-        // Publish trajectory
+        // Publish trajectory (interpolate from start to target over duration)
         double duration = stage.duration > 0.0 ? stage.duration : 2.0;
-        publish_trajectory(joint_model_group, joint_values, duration);
+        publish_trajectory(joint_model_group, start_positions, joint_values, duration);
         
         // Wait for execution
         std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -407,11 +419,11 @@ private:
                     "Large joint jump detected at waypoint %d (%.2f rad)", i, max_jump);
             }
             
+            // Publish trajectory for this waypoint (interpolate from prev to current over duration)
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, duration_per_waypoint);
+
             // Update previous values for next iteration
             prev_joint_values = joint_values;
-            
-            // Publish trajectory for this waypoint
-            publish_trajectory(joint_model_group, joint_values, duration_per_waypoint);
             
             // Wait for execution (shorter wait for more waypoints)
             std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -434,7 +446,11 @@ private:
         // Note: right_outer_knuckle_joint axis is flipped, so we send negative command
         std_msgs::msg::Float64MultiArray msg;
         msg.data = {scaled_position, -scaled_position};
+        std_msgs::msg::Float64 msg_f64;
+        msg_f64.data = scaled_position;
+
         gripper_pub_->publish(msg);
+        gripper_hardware_pub_->publish(msg_f64);
 
         // Publish command multiple times to ensure controller processes it
         double duration = stage.duration > 0.0 ? stage.duration : 1.0;
@@ -443,6 +459,7 @@ private:
         
         for (int i = 0; i < num_publishes; ++i) {
             gripper_pub_->publish(msg);
+            gripper_hardware_pub_->publish(msg_f64);
             std::this_thread::sleep_for(std::chrono::milliseconds(interval_ms));
         }
         
@@ -452,21 +469,82 @@ private:
         return true;
     }
 
+    // Hardcoded continuous joints: wrap at ±π, use shortest path interpolation
+    static bool is_continuous_joint(const std::string& joint_name)
+    {
+        return joint_name == "joint_1" ||
+               joint_name == "joint_3" ||
+               joint_name == "joint_5" ||
+               joint_name == "joint_7";
+    }
+
+    double interpolate_joint_angle(double start, double target, double alpha,
+                                   const std::string& joint_name)
+    {
+        if (!is_continuous_joint(joint_name)) {
+            return (1.0 - alpha) * start + alpha * target;
+        }
+        // Normalize to [-π, π] and interpolate along shortest path
+        auto normalize_angle = [](double angle) {
+            angle = std::fmod(angle, 2.0 * M_PI);
+            if (angle > M_PI) angle -= 2.0 * M_PI;
+            if (angle < -M_PI) angle += 2.0 * M_PI;
+            return angle;
+        };
+        double start_norm = normalize_angle(start);
+        double target_norm = normalize_angle(target);
+        double diff = target_norm - start_norm;
+        if (diff > M_PI) diff -= 2.0 * M_PI;
+        else if (diff < -M_PI) diff += 2.0 * M_PI;
+        return normalize_angle(start_norm + alpha * diff);
+    }
+
     void publish_trajectory(const moveit::core::JointModelGroup* joint_model_group,
-                           const std::vector<double>& joint_values,
+                           const std::vector<double>& start_positions,
+                           const std::vector<double>& target_positions,
                            double duration)
     {
+        const auto& joint_names = joint_model_group->getVariableNames();
         trajectory_msgs::msg::JointTrajectory traj;
-        traj.joint_names = joint_model_group->getVariableNames();
-        
-        trajectory_msgs::msg::JointTrajectoryPoint point;
-        point.positions = joint_values;
-        point.time_from_start = rclcpp::Duration::from_seconds(duration);
-        traj.points.push_back(point);
-        
+        traj.joint_names = joint_names;
+
+        trajectory_msgs::msg::JointTrajectoryPoint start_pt;
+        start_pt.positions = start_positions;
+        start_pt.time_from_start = rclcpp::Duration::from_seconds(0.0);
+        traj.points.push_back(start_pt);
+
+        trajectory_msgs::msg::JointTrajectoryPoint end_pt;
+        end_pt.positions = target_positions;
+        end_pt.time_from_start = rclcpp::Duration::from_seconds(duration);
+        traj.points.push_back(end_pt);
+
         arm_traj_pub_->publish(traj);
-        RCLCPP_INFO(this->get_logger(), "Published trajectory with %zu joints, duration=%.2fs",
-                    joint_values.size(), duration);
+
+        // Hardware: linearly interpolate with angle wrapping for continuous joints
+        const double publish_rate_hz = 30.0;
+        const int num_points = std::max(1, static_cast<int>(std::round(duration * publish_rate_hz)));
+        const double dt = duration / num_points;
+
+        sensor_msgs::msg::JointState joint_state_msg;
+        joint_state_msg.name = joint_names;
+
+        for (int i = 0; i <= num_points; ++i) {
+            const double alpha = (num_points > 0) ? static_cast<double>(i) / num_points : 1.0;
+            joint_state_msg.header.stamp = this->get_clock()->now();
+            joint_state_msg.position.resize(target_positions.size());
+            for (size_t j = 0; j < target_positions.size(); ++j) {
+                joint_state_msg.position[j] = interpolate_joint_angle(
+                    start_positions[j], target_positions[j], alpha, joint_names[j]);
+            }
+            arm_traj_hardware_pub_->publish(joint_state_msg);
+            if (i < num_points) {
+                std::this_thread::sleep_for(
+                    std::chrono::microseconds(static_cast<int64_t>(dt * 1e6)));
+            }
+        }
+
+        RCLCPP_INFO(this->get_logger(), "Published trajectory with %zu joints, duration=%.2fs (%d points)",
+                    target_positions.size(), duration, num_points + 1);
     }
 };
 
