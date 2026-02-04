@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.22)
 project(tidybot_utils)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -11,6 +11,8 @@ find_package(ament_cmake REQUIRED)
 # further dependencies manually.
 find_package(rosidl_default_generators REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
+find_package(action_msgs REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
@@ -27,7 +29,11 @@ endif()
 # generate messages
 rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/TeleopMsg.msg"
+  "msg/MotionStage.msg"
   "srv/ResetEnv.srv"
-  DEPENDENCIES std_msgs
+  "srv/OpenDrawerTask.srv"
+  "action/OpenDrawer.action"
+  "action/ExecuteStages.action"
+  DEPENDENCIES std_msgs geometry_msgs action_msgs
 )
 ament_package()

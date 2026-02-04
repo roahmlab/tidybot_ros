@@ -73,6 +73,8 @@ robotiq_2f_85_controller:
   ros__parameters:
     joints:
       - finger_joint
+      - right_outer_knuckle_joint
+
     command_interfaces:
       - position
     state_interfaces:
@@ -80,4 +82,4 @@ robotiq_2f_85_controller:
       - velocity
     state_publish_rate: 100
     action_monitor_rate: 100.0
-    allow_partial_joints_goal: false
+    allow_partial_joints_goal: true

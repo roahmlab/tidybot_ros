@@ -20,12 +20,13 @@ find_package(moveit_msgs REQUIRED) # Was in original, not in snippet, but likely
 find_package(control_msgs REQUIRED) # Was in original, not in snippet, but likely needed
 find_package(tidybot_utils REQUIRED) # Was in original, not in snippet, but likely needed
 
-# Try finding common_interfaces explicitly to help if needed, though usually not direct
+find_package(moveit_task_constructor_core REQUIRED)
 # find_package(common_interfaces REQUIRED)
 
 add_executable(moveit_ee_pose_ik src/moveit_ee_pose_ik.cpp)
 add_executable(moveit_ee_vel_ik src/moveit_ee_vel_ik.cpp)
 add_executable(keyboard_input src/keyboard_input.cpp)
+add_executable(multi_stage_planner src/multi_stage_planner.cpp)
 
 ament_target_dependencies(moveit_ee_pose_ik
   "rclcpp"
@@ -59,7 +60,23 @@ ament_target_dependencies(keyboard_input
   "control_msgs"
   "moveit_msgs")
 
-install(TARGETS moveit_ee_pose_ik moveit_ee_vel_ik keyboard_input
+
+
+ament_target_dependencies(multi_stage_planner
+  rclcpp
+  rclcpp_action
+  moveit_task_constructor_core
+  moveit_core
+  moveit_ros_planning_interface
+  moveit_ros_planning
+  moveit_msgs
+  trajectory_msgs
+  std_msgs
+  tf2_eigen
+  tidybot_utils
+)
+
+install(TARGETS moveit_ee_pose_ik moveit_ee_vel_ik keyboard_input multi_stage_planner
 DESTINATION lib/${PROJECT_NAME}
 )
 

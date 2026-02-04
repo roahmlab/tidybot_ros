@@ -264,7 +264,8 @@ private:
     void publish_gripper_sim(double state) {
         if (!gripper_pos_pub_) return;
         std_msgs::msg::Float64MultiArray msg;
-        msg.data = {state * 0.8}; // Scale constraint for Robotiq
+        // Send command to both finger_joint and right_outer_knuckle_joint
+        msg.data = {state * 0.8, state * 0.8}; // Scale constraint for Robotiq
         gripper_pos_pub_->publish(msg);
     }
 

@@ -2,28 +2,59 @@
 
 ## 📖 Overview
 
-This package provides motion planning and trajectory optimization using MoveIt2. It includes a velocity-based kinematics solver for real-time joystick control and position-based kinematics solver for phone teleoperation or remote inference.
+This package provides motion planning and trajectory optimization using MoveIt2. It includes a velocity-based kinematics solver for real-time joystick control, position-based kinematics solver for phone teleoperation, and a multi-stage motion planner for task execution.
 
 ## 📁 Package Structure
 
 ```
 tidybot_solver/
 ├── config/
-│   ├── demo_servo_config.yaml      #  MoveIt Servo config parameters for keyboard input demo
+│   ├── demo_servo_config.yaml      # MoveIt Servo config for keyboard demo
 │   ├── servo_parameters.yaml       # General MoveIt Servo settings
 │   └── tidybot_servo_config.yaml   # TidyBot-specific MoveIt Servo config
 ├── launch/
 │   ├── demo_twist.launch.py        # Demo servo control for arm
-│   ├── launch_moveit_pose_ik.launch.py # Position based solver bridge launch file
-│   └── launch_moveit_vel_ik.launch.py # Velocity based solver bridge launch file
+│   ├── launch_moveit_pose_ik.launch.py  # Position-based solver launch
+│   └── launch_moveit_vel_ik.launch.py   # Velocity-based solver launch
 ├── src/
-│   ├── keyboard_input.cpp          # Keyboard control interface for velocity control demonstration
-│   ├── moveit_ee_pose_ik.cpp       # Kinematics solver bridge for position based commands using MoveIt ik solver
-│   └── moveit_ee_vel_ik.cpp        # Kinematics solver bridge for velocity based commands using Moveit Servo
+│   ├── keyboard_input.cpp          # Keyboard control for velocity demo
+│   ├── moveit_ee_pose_ik.cpp       # Position-based IK solver bridge
+│   ├── moveit_ee_vel_ik.cpp        # Velocity-based IK solver (Servo)
+│   └── multi_stage_planner.cpp     # Multi-stage motion execution server
 ├── include/
 │   └── tidybot_solver/             # C++ header files
 └── CMakeLists.txt
 ```
+
+## 🤖 Multi-Stage Planner
+
+Task-agnostic motion executor that receives sequences of `MotionStage` messages and executes them in order. Supports multiple motion primitives without knowing about specific tasks.
+
+**Action Server:** `/execute_stages` (`tidybot_utils/action/ExecuteStages`)
+
+**Supported Stage Types:**
+| Type | Description |
+|------|-------------|
+| `STAGE_PTP` | Point-to-point motion (free-space, uses Pilz PTP) |
+| `STAGE_LIN` | Linear Cartesian motion (straight line) |
+| `STAGE_CIRC` | Circular motion around an axis |
+| `STAGE_GRIPPER` | Gripper open/close action |
+
+**Launch:**
+```bash
+# Usually launched via tidybot_policy
+ros2 launch tidybot_policy launch_drawer_policy.launch.py
+
+# Or standalone
+ros2 run tidybot_solver multi_stage_planner
+```
+
+**Parameters:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `arm_group` | `gen3_7dof` | MoveIt planning group name |
+| `tip_link` | `tool_frame` | End-effector link for IK |
+
 
 ## 🚀 Keyboard Teleoperation Demo in Gazebo
 

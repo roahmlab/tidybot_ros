@@ -502,30 +502,6 @@ ros2 topic echo /clock         # Should show simulation time
 
 After the ROS2-Isaac Sim bridge is up, you can run the policies to control the robot in Isaac Sim
 
-### Alternative: Programmatic Setup via Isaac Lab
-
-Instead of manually configuring Isaac Sim, you can use the `run_ros2_sim.py` script which programmatically creates the simulation environment using Isaac Lab APIs. This method is **more stable** and uses the same physics configuration as the RL training environment.
-
-**Benefits:**
-- Uses `assets.py` physics configuration (stable solver settings, correct articulation properties)
-- Programmatically creates the ROS 2 action graph (no manual OmniGraph setup)
-- Avoids physics explosions from incorrect joint drive configuration
-
-**Usage:**
-```bash
-# Inside docker/isaac container (lab mode)
-./isaaclab.sh -p isaaclab/tidybot_isaac/scripts/run_ros2_sim.py --task TidyBot-v0
-
-# Headless mode (no GUI)
-./isaaclab.sh -p isaaclab/tidybot_isaac/scripts/run_ros2_sim.py --task TidyBot-v0 --headless
-```
-
-The script will:
-1. Spawn the TidyBot with correct physics properties
-2. Create ROS 2 action graph for `/joint_states` (publisher) and `/joint_command` (subscriber)
-3. Keep the robot at its initial position while allowing ROS 2 control
-
-
 ### Troubleshooting Isaac Sim
 
 1. **No `/isaac_sim/joint_states` or `/joint_states` messages:**

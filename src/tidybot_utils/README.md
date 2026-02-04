@@ -2,7 +2,7 @@
 
 ## 📖 Overview
 
-This package defines custom message and service types for the tidybot_policy package.
+This package defines custom message, service, and action types for the TidyBot++ platform.
 
 ## 📦 Package Structure
 
@@ -10,8 +10,13 @@ This package defines custom message and service types for the tidybot_policy pac
 tidybot_utils/
 ├── msg/
 │   ├── TeleopMsg.msg               # Phone teleoperation message
+│   └── MotionStage.msg             # Multi-stage motion primitive
 ├── srv/
 │   ├── ResetEnv.srv                # Environment reset service
+│   └── OpenDrawerTask.srv          # Drawer task specification service
+├── action/
+│   ├── OpenDrawer.action           # Legacy drawer action (deprecated)
+│   └── ExecuteStages.action        # Multi-stage motion execution action
 ├── include/
 │   └── tidybot_utils/              # C++ header files
 └── CMakeLists.txt
@@ -58,11 +63,79 @@ Service for resetting the robot environment to initial conditions.
 ```
 # Request
 bool reset                     # True to reset environment
-
 ---
-
 # Response  
 bool success                   # True if reset completed successfully
+```
+
+### **MotionStage**
+Single motion primitive for multi-stage task execution.
+
+**File**: `msg/MotionStage.msg`
+
+```
+# Stage type constants
+uint8 STAGE_PTP = 0      # Point-to-point (free-space)
+uint8 STAGE_LIN = 1      # Linear Cartesian motion
+uint8 STAGE_CIRC = 2     # Circular motion (arc)
+uint8 STAGE_GRIPPER = 3  # Gripper open/close
+uint8 stage_type
+
+# Target pose (for PTP, LIN, CIRC endpoint)
+geometry_msgs/Pose target_pose
+
+# For CIRC: arc center and axis
+geometry_msgs/Point arc_center
+geometry_msgs/Vector3 arc_axis
+float64 arc_angle              # radians, CCW around axis
+
+# For GRIPPER
+float64 gripper_position       # 0.0=open, 1.0=closed
+
+# Motion parameters
+float64 velocity_scaling
+float64 duration               # seconds
+string description             # for feedback
+```
+
+## 🎬 Action Types
+
+### **ExecuteStages**
+Multi-stage motion execution action.
+
+**File**: `action/ExecuteStages.action`
+
+```
+# Goal
+MotionStage[] stages           # Ordered stages to execute
+---
+# Result
+bool success
+string message
+int32 stages_completed
+---
+# Feedback
+int32 current_stage_index
+string current_stage_description
+float32 stage_progress         # 0.0 to 1.0
+```
+
+### **OpenDrawerTask**
+Service for specifying drawer manipulation tasks.
+
+**File**: `srv/OpenDrawerTask.srv`
+
+```
+# Request
+string joint_type              # "prismatic" or "revolute"
+geometry_msgs/Pose handle_pose # Handle position and grasp orientation
+geometry_msgs/Point joint_axis_origin  # Pivot for revolute
+geometry_msgs/Vector3 joint_axis       # Unit vector
+float64 pull_amount            # meters (prismatic) or radians (revolute)
+---
+# Response
+bool accepted
+string message
 ```
 
 ## 🔗 Dependencies

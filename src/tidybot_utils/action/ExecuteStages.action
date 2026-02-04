@@ -1,0 +1,12 @@
+# Goal
+tidybot_utils/MotionStage[] stages    # Ordered list of stages to execute
+---
+# Result
+bool success
+string message
+int32 stages_completed
+---
+# Feedback
+int32 current_stage_index
+string current_stage_description
+float32 stage_progress                # 0.0 to 1.0

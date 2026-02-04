@@ -1,0 +1,14 @@
+# Goal
+geometry_msgs/PoseStamped handle_pose
+string joint_type  # "prismatic" or "revolute"
+geometry_msgs/Point joint_axis_origin  # For revolute
+geometry_msgs/Vector3 joint_axis_direction
+float64 open_distance  # For prismatic
+float64 open_angle     # For revolute (radians)
+---
+# Result
+bool success
+string message
+---
+# Feedback
+string current_stage
