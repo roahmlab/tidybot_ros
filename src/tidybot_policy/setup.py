@@ -36,6 +36,7 @@ setup(
             'remote_policy_diffusion = tidybot_policy.remote_policy_diffusion:main',
             'remote_policy_vla = tidybot_policy.remote_policy_vla:main',
             'gamepad_policy = tidybot_policy.gamepad_policy:main',
+            'drawer_policy = tidybot_policy.drawer_policy:main',
         ],
     },
 )

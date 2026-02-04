@@ -3,7 +3,6 @@
 #include <algorithm>
 
 #include <rclcpp/rclcpp.hpp>
-#include <moveit/move_group_interface/move_group_interface.hpp>
 #include <geometry_msgs/msg/pose.hpp>
 #include "std_msgs/msg/float64.hpp"
 #include <std_msgs/msg/float64_multi_array.hpp>
@@ -14,352 +13,295 @@
 
 #include <moveit/robot_model_loader/robot_model_loader.hpp>
 #include <moveit/robot_state/robot_state.hpp>
-#include <moveit/planning_scene/planning_scene.hpp>
 #include <moveit/kinematics_base/kinematics_base.hpp>
-#include <moveit/kinematics_plugin_loader/kinematics_plugin_loader.hpp>
 
-// TF2 for frame transforms between planning_frame and model_frame
+// TF2 for frame transforms
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
-
-using moveit::planning_interface::MoveGroupInterface;
 #include "sensor_msgs/msg/joint_state.hpp"
 
-class TeleopToMoveit : public rclcpp::Node {
-    public:
-    TeleopToMoveit() : Node("teleop_to_moveit") {
+class PoseToJointsNode : public rclcpp::Node {
+public:
+    PoseToJointsNode() : Node("pose_to_joints_node") {
         // Parameters
         this->declare_parameter<std::string>("planning_frame", "arm_base_link");
-        this->get_parameter("planning_frame", planning_frame);
+        this->get_parameter("planning_frame", planning_frame_);
+        this->declare_parameter<std::string>("planning_group", "gen3_7dof");
+        this->get_parameter("planning_group", planning_group_name_);
 
         // TF setup
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
-        // Initialize last time for time-jump detection
         last_time_ = this->get_clock()->now();
         last_delta_time_ = this->now();
 
-        options.discretization_method = kinematics::DiscretizationMethod::ALL_DISCRETIZED;
-        options.lock_redundant_joints = false;
-        options.return_approximate_solution = true;
-
-        // Listen to global tidybot commands (end effector pose)
+        // Subscribers
         arm_subscriber_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/tidybot/arm/target_pose", 1,
-            std::bind(&TeleopToMoveit::publish_arm, this, std::placeholders::_1));
+            std::bind(&PoseToJointsNode::target_pose_callback, this, std::placeholders::_1));
+
         delta_ee_subscriber_ = this->create_subscription<std_msgs::msg::Float64MultiArray>(
             "/tidybot/arm/delta_commands", 1,
-            std::bind(&TeleopToMoveit::publish_delta_ee, this, std::placeholders::_1));
+            std::bind(&PoseToJointsNode::delta_cmd_callback, this, std::placeholders::_1));
+            
         gripper_subscriber_ = this->create_subscription<std_msgs::msg::Float64>(
             "/tidybot/gripper/commands", 1,
-            std::bind(&TeleopToMoveit::publish_gripper, this, std::placeholders::_1));
+            std::bind(&PoseToJointsNode::gripper_cmd_callback, this, std::placeholders::_1));
 
-        // Publish to ros2_control controllers
-        arm_traj_pub = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
+        joint_state_sub_ = this->create_subscription<sensor_msgs::msg::JointState>(
+            "/joint_states", 1,
+            std::bind(&PoseToJointsNode::joint_state_callback, this, std::placeholders::_1));
+
+        // Publishers
+        arm_traj_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
-        gripper_pos_pub = this->create_publisher<std_msgs::msg::Float64MultiArray>(
+            
+        gripper_pos_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
             "/robotiq_2f_85_controller/commands", 10);
-        // Publish to real hardware
-        arm_command_pub = this->create_publisher<sensor_msgs::msg::JointState>(
+            
+        arm_command_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
             "/tidybot/hardware/arm/commands", 10);
-        gripper_command_pub = this->create_publisher<std_msgs::msg::Float64>(
+            
+        gripper_command_pub_ = this->create_publisher<std_msgs::msg::Float64>(
             "/tidybot/hardware/gripper/commands", 10);
 
-        // Debugging
-        pose_visual_pub = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
-        joint_state_sub = this->create_subscription<sensor_msgs::msg::JointState>(
-            "/joint_states", 1,
-        std::bind(&TeleopToMoveit::joint_state_callback, this, std::placeholders::_1));
+        pose_visual_pub_ = this->create_publisher<geometry_msgs::msg::PoseStamped>("/visual_pose", 10);
 
-        // Need to periodically publish gripper state to force ros2_control to update in the simulation mode
-        gripper_timer = this->create_wall_timer(
-            std::chrono::milliseconds(50),
-            [this]() {
-                std_msgs::msg::Float64MultiArray gripper_msg;
-                gripper_msg.data = {gripper_state * 0.8}; // Scale to match ros2_control gripper limits
-                gripper_pos_pub->publish(gripper_msg);
-            });
+
     }
     
     void initialize_moveit() {
-        robot_model_loader::RobotModelLoader robot_model_loader(shared_from_this(), "robot_description");
-        robot_model = robot_model_loader.getModel();
-        robot_state = std::make_shared<moveit::core::RobotState>(robot_model);
-        arm_joint_model_group = robot_model->getJointModelGroup("gen3_7dof");
-        // gripper_joint_model_group = robot_model->getJointModelGroup("gen3_lite_2f");
-
-        // Determine the model/world frame used by MoveIt/RobotModel
-        model_frame = robot_model->getModelFrame();
-        // If user hasn't overridden planning_frame, keep what was declared; otherwise ensure it's set
-        this->get_parameter("planning_frame", planning_frame);
-    }
-
-    void publish_arm(const geometry_msgs::msg::Pose &msg) {
-        // Handle time jump: reset TF buffer/listener if clock moved backwards
-        if (handle_time_jump_and_reset_tf()) {
-            return; // skip this callback invocation to allow TF to repopulate
-        }
-        // Incoming pose is interpreted in the configured planning_frame
-        geometry_msgs::msg::PoseStamped pose_in;
-        pose_in.header.stamp = this->now();
-        pose_in.header.frame_id = planning_frame;
-        pose_in.pose = msg;
-
-        geometry_msgs::msg::PoseStamped pose_in_model;
-        try {
-            if (planning_frame == model_frame) {
-                pose_in_model = pose_in;
-                pose_in_model.header.frame_id = model_frame;
-            } else {
-                pose_in_model = tf_buffer_->transform(pose_in, model_frame, tf2::durationFromSec(0.2));
-            }
-        } catch (const tf2::TransformException &ex) {
-            RCLCPP_WARN(this->get_logger(), "TF transform failed from %s to %s: %s", planning_frame.c_str(), model_frame.c_str(), ex.what());
-            return;
-        }
-
-        this->publish_pose_visual(pose_in_model.pose);
-
-        // Get current robot state
-        std::map<std::string, double> joint_position_map;
-        for (size_t i = 0; i < last_joint_state.name.size(); ++i) {
-            joint_position_map[last_joint_state.name[i]] = last_joint_state.position[i];
-        }
-        robot_state->setVariablePositions(joint_position_map);
-        robot_state->update();
-
-        // Perform IK
-        bool found_ik = robot_state->setFromIK(
-            arm_joint_model_group, pose_in_model.pose, 0.1, 
-            moveit::core::GroupStateValidityCallbackFn(), options
-        );
-
-        if (!found_ik) {
-            RCLCPP_WARN(rclcpp::get_logger("arm_callback"), "IK solution not found");
-            return;
-        }
-
-        robot_state->enforceBounds();
-
-        // Extract joint values
-        std::vector<double> joint_values;
-        robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
-        const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
+        // Load the robot model
+        robot_model_loader_ = std::make_shared<robot_model_loader::RobotModelLoader>(shared_from_this(), "robot_description");
+        robot_model_ = robot_model_loader_->getModel();
+        robot_state_ = std::make_shared<moveit::core::RobotState>(robot_model_);
+        joint_model_group_ = robot_model_->getJointModelGroup(planning_group_name_);
         
-        // RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
-        //     "IK input pose: pos=(%.3f, %.3f, %.3f), quat=(%.3f, %.3f, %.3f, %.3f), norm=%.6f",
-        //     msg.position.x, msg.position.y, msg.position.z,
-        //     msg.orientation.x, msg.orientation.y,
-        //     msg.orientation.z, msg.orientation.w,
-        //     std::sqrt(msg.orientation.x*msg.orientation.x +
-        //               msg.orientation.y*msg.orientation.y +
-        //               msg.orientation.z*msg.orientation.z +
-        //               msg.orientation.w*msg.orientation.w));
-
-        // Now check bounds for each joint
-        for (size_t i = 0; i < joint_names.size(); ++i) {
-            const auto& jm = robot_state->getJointModel(joint_names[i]);
-            const auto& bounds = jm->getVariableBounds(joint_names[i]);
-
-            // RCLCPP_INFO(rclcpp::get_logger("arm_callback"),
-            //             "Joint %s bounds: [%f, %f], current %f",
-            //             joint_names[i].c_str(),
-            //             bounds.min_position_, bounds.max_position_,
-            //             joint_values[i]);
+        if (!joint_model_group_) {
+            RCLCPP_ERROR(this->get_logger(), "Joint model group '%s' not found!", planning_group_name_.c_str());
+            return;
         }
 
-        // Create trajectory message
-        trajectory_msgs::msg::JointTrajectory traj;
-        traj.joint_names = joint_names;
-
-        // Start point
-        trajectory_msgs::msg::JointTrajectoryPoint start_point;
-        std::vector<double> current_positions;
-        robot_state->copyJointGroupPositions(arm_joint_model_group, current_positions);
-        start_point.positions = current_positions;
-        start_point.time_from_start = rclcpp::Duration(0, 0);
-        traj.points.push_back(start_point);
-
-        // End point
-        trajectory_msgs::msg::JointTrajectoryPoint end_point;
-        end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.05);
-        traj.points.push_back(end_point);
-
-        // Publish trajectory for sim
-        arm_traj_pub->publish(traj);
-        // RCLCPP_INFO(rclcpp::get_logger("arm_callback"), "Trajectory sent");
-
-        // Publish joint states for real hardware
-        sensor_msgs::msg::JointState joint_state_msg;
-        joint_state_msg.header.stamp = this->now(); 
-        joint_state_msg.name = joint_names;
-        joint_state_msg.position = joint_values;
-        arm_command_pub->publish(joint_state_msg);
+        model_frame_ = robot_model_->getModelFrame();
+        RCLCPP_INFO(this->get_logger(), "MoveIt Initialized. Model Frame: %s, Planning Frame: %s", 
+                    model_frame_.c_str(), planning_frame_.c_str());
     }
 
-    void publish_delta_ee(const std_msgs::msg::Float64MultiArray &msg) {
-        if (handle_time_jump_and_reset_tf()) return;
+private:
+    void target_pose_callback(const geometry_msgs::msg::Pose &msg) {
+        if (handle_time_jump()) return;
+
+        // Transform incoming pose (in planning_frame) to model_frame
+        geometry_msgs::msg::PoseStamped pose_in;
+        pose_in.header = ros2_header(planning_frame_);
+        pose_in.pose = msg;
+        
+        geometry_msgs::msg::PoseStamped pose_model;
+        
+        if (!transform_pose(pose_in, pose_model, model_frame_)) {
+            return;
+        }
+
+        publish_pose_visual(pose_model.pose);
+        solve_and_publish_ik(pose_model.pose);
+    }
+
+    void delta_cmd_callback(const std_msgs::msg::Float64MultiArray &msg) {
+        if (handle_time_jump()) return;
+        
+        if (msg.data.size() < 7) {
+            RCLCPP_WARN(this->get_logger(), "Received invalid delta command size.");
+            return;
+        }
 
         rclcpp::Time now = this->now();
         double time_since_last_cmd = (now - last_delta_time_).seconds();
         last_delta_time_ = now;
 
-        // If no command received in >0.15s, assume a new episode/chunk 
+        // If no command received in >0.5s, assume a new episode/chunk 
         // is starting and snap virtual tracker to the real robot.
-        if (!valid_virtual_pose_ || time_since_last_cmd > 0.15) {
-            robot_state->setVariablePositions(last_joint_state.name, last_joint_state.position);
-            robot_state->update();
-            virtual_ee_pose_ = robot_state->getGlobalLinkTransform(arm_joint_model_group->getLinkModelNames().back());
+        if (!valid_virtual_pose_ || time_since_last_cmd > 0.5) {
+            update_robot_state_from_feedback();
+            virtual_ee_pose_ = robot_state_->getGlobalLinkTransform(joint_model_group_->getLinkModelNames().back());
             valid_virtual_pose_ = true;
             RCLCPP_INFO(this->get_logger(), "Resetting Virtual Tracker to Physical Robot Pose");
         }
 
-        // APPLY DELTA TO VIRTUAL POSE
-        // Apply Translation (Global/Base Frame)
-        Eigen::Vector3d translation_delta(msg.data[0], msg.data[1], msg.data[2]);
-        virtual_ee_pose_.pretranslate(translation_delta);
+        // Get current EE pose in model frame
+        const Eigen::Isometry3d& current_tf = robot_state_->getGlobalLinkTransform(joint_model_group_->getLinkModelNames().back());
+        
+        // Convert Eigen to Pose msg manually to avoid toMsg issues without tf2_eigen header
+        geometry_msgs::msg::Pose current_pose;
+        Eigen::Quaterniond q_eigen(current_tf.rotation());
+        current_pose.position.x = current_tf.translation().x();
+        current_pose.position.y = current_tf.translation().y();
+        current_pose.position.z = current_tf.translation().z();
+        current_pose.orientation.w = q_eigen.w();
+        current_pose.orientation.x = q_eigen.x();
+        current_pose.orientation.y = q_eigen.y();
+        current_pose.orientation.z = q_eigen.z();
 
-        // Apply Rotation
+        geometry_msgs::msg::PoseStamped current_pose_stamped;
+        current_pose_stamped.header = ros2_header(model_frame_);
+        current_pose_stamped.pose = current_pose;
+
+        geometry_msgs::msg::PoseStamped current_pose_planning;
+        
+        if (!transform_pose(current_pose_stamped, current_pose_planning, planning_frame_)) {
+            return; // Failed to transform to planning frame
+        }
+        
+        // Apply Delta in Planning Frame
+        geometry_msgs::msg::Pose target_pose = current_pose_planning.pose;
+        target_pose.position.x += msg.data[0];
+        target_pose.position.y += msg.data[1];
+        target_pose.position.z += msg.data[2];
+
+        // Apply Rotation Delta
+        Eigen::Quaterniond q_curr(target_pose.orientation.w, target_pose.orientation.x, target_pose.orientation.y, target_pose.orientation.z);
         Eigen::AngleAxisd d_roll(msg.data[3], Eigen::Vector3d::UnitX());
         Eigen::AngleAxisd d_pitch(msg.data[4], Eigen::Vector3d::UnitY());
         Eigen::AngleAxisd d_yaw(msg.data[5], Eigen::Vector3d::UnitZ());
-        Eigen::Quaterniond delta_q = d_yaw * d_pitch * d_roll;
+        Eigen::Quaterniond q_new = q_curr * d_yaw * d_pitch * d_roll;
         
-        // Apply rotation to the existing virtual orientation
-        Eigen::Quaterniond current_q(virtual_ee_pose_.rotation());
-        Eigen::Quaterniond target_q = delta_q * current_q; 
-        virtual_ee_pose_.linear() = target_q.toRotationMatrix();
+        target_pose.orientation.w = q_new.w();
+        target_pose.orientation.x = q_new.x();
+        target_pose.orientation.y = q_new.y();
+        target_pose.orientation.z = q_new.z();
 
-        // Convert to ROS Msg for IK
-        geometry_msgs::msg::Pose target_pose;       
-        target_pose.position.x = virtual_ee_pose_.translation().x();
-        target_pose.position.y = virtual_ee_pose_.translation().y();
-        target_pose.position.z = virtual_ee_pose_.translation().z();
+        // Transform back to model frame for IK
+        geometry_msgs::msg::PoseStamped target_pose_planning;
+        target_pose_planning.header = ros2_header(planning_frame_);
+        target_pose_planning.pose = target_pose;
+        
+        geometry_msgs::msg::PoseStamped target_pose_model;
+        
+        if (!transform_pose(target_pose_planning, target_pose_model, model_frame_)) {
+            return;
+        }        
 
-        Eigen::Quaterniond q(virtual_ee_pose_.rotation());
-        target_pose.orientation.x = q.x();
-        target_pose.orientation.y = q.y();
-        target_pose.orientation.z = q.z();
-        target_pose.orientation.w = q.w();
-
-        // Visualize where the controller thinks it should be
-        this->publish_pose_visual(target_pose);
-
+        publish_pose_visual(target_pose_model.pose);
+        
         // Solve IK
-        // Update the MoveIt robot_state seed with current physical joints 
-        // so the IK solver picks the "closest" solution to reality.
-        robot_state->setVariablePositions(last_joint_state.name, last_joint_state.position);
-        robot_state->update();
+        if (solve_and_publish_ik(target_pose_model.pose)) {
+            gripper_state_ = std::clamp(msg.data[6], 0.0, 1.0);
+            publish_gripper_hardware(gripper_state_);
+            publish_gripper_sim(gripper_state_); // Added sim publisher call
+        }
+    }
 
-        options.return_approximate_solution = false;
-        bool found_ik = robot_state->setFromIK(
-            arm_joint_model_group, 
-            target_pose,
-            0.1, 
+    void gripper_cmd_callback(const std_msgs::msg::Float64 &msg) {
+        gripper_state_ = std::clamp(msg.data, 0.0, 1.0);
+        publish_gripper_hardware(gripper_state_);
+        publish_gripper_sim(gripper_state_);
+    }
+
+    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
+        last_joint_state_ = *msg;
+    }
+
+
+    
+    // Core Logic Helpers
+
+    void update_robot_state_from_feedback() {
+        if (last_joint_state_.name.empty()) return;
+
+        std::map<std::string, double> joint_map;
+        for (size_t i = 0; i < last_joint_state_.name.size(); ++i) {
+            joint_map[last_joint_state_.name[i]] = last_joint_state_.position[i];
+        }
+        robot_state_->setVariablePositions(joint_map);
+        robot_state_->update(); // Update transforms
+    }
+
+    bool solve_and_publish_ik(const geometry_msgs::msg::Pose &target_pose_model_frame) {
+        update_robot_state_from_feedback();
+
+        // IK Options
+        kinematics::KinematicsQueryOptions options;
+        options.return_approximate_solution = true; 
+
+        bool found_ik = robot_state_->setFromIK(
+            joint_model_group_, 
+            target_pose_model_frame, 
+            0.1,    // Timeout
             moveit::core::GroupStateValidityCallbackFn(), 
             options
         );
 
-        if (!found_ik) {
-            RCLCPP_WARN(this->get_logger(), "IK Failed for virtual target");
-            // options.return_approximate_solution = true;
-            // robot_state->setFromIK(
-            //     arm_joint_model_group, 
-            //     target_pose,
-            //     0.1, 
-            //     moveit::core::GroupStateValidityCallbackFn(), 
-            //     options
-            // );
-            return;
+        if (found_ik) {
+            robot_state_->enforceBounds();
+            std::vector<double> joint_values;
+            robot_state_->copyJointGroupPositions(joint_model_group_, joint_values);
+            
+            publish_trajectory(joint_values);
+            publish_hardware_command(joint_values);
+            return true;
+        } else {
+            RCLCPP_WARN(this->get_logger(), "IK solution not found");
+            return false;
         }
+    }
 
-        robot_state->enforceBounds();
-
-        // Extract and Publish
-        std::vector<double> joint_values;
-        robot_state->copyJointGroupPositions(arm_joint_model_group, joint_values);
-        const std::vector<std::string>& joint_names = arm_joint_model_group->getVariableNames();
+    void publish_trajectory(const std::vector<double>& joint_positions) {
+        if (!arm_traj_pub_) return;
         
-        // Create trajectory message
         trajectory_msgs::msg::JointTrajectory traj;
-        traj.joint_names = joint_names;
-
-        // Start point (Current Physical)
-        trajectory_msgs::msg::JointTrajectoryPoint start_point;
-        std::vector<double> current_positions;
-        robot_state->copyJointGroupPositions(arm_joint_model_group, current_positions);
-        start_point.positions = current_positions;
-        start_point.time_from_start = rclcpp::Duration(0, 0);
-        traj.points.push_back(start_point);
-
-        // End point (Virtual IK Solution)
-        trajectory_msgs::msg::JointTrajectoryPoint end_point;
-        end_point.positions = joint_values;
-        end_point.time_from_start = rclcpp::Duration::from_seconds(0.1); 
-        traj.points.push_back(end_point);
-
-        // Publish trajectory for sim
-        arm_traj_pub->publish(traj);
-
-        // Publish joint states for real hardware
-        sensor_msgs::msg::JointState joint_state_msg;
-        joint_state_msg.header.stamp = this->now(); 
-        joint_state_msg.name = joint_names;
-        joint_state_msg.position = joint_values;
-        arm_command_pub->publish(joint_state_msg);
-
-        std_msgs::msg::Float64 gripper_msg;
-        gripper_msg.data = gripper_state;
-        gripper_command_pub->publish(gripper_msg);
+        traj.joint_names = joint_model_group_->getVariableNames();
+        
+        trajectory_msgs::msg::JointTrajectoryPoint point;
+        point.positions = joint_positions;
+        point.time_from_start = rclcpp::Duration::from_seconds(0.05); // Fast execution target
+        
+        traj.points.push_back(point);
+        arm_traj_pub_->publish(traj);
     }
 
-    void publish_gripper(const std_msgs::msg::Float64 gripper_delta) {
-        // Update gripper state
-        gripper_state = std::clamp(gripper_delta.data, 0.0, 1.0);
-        std_msgs::msg::Float64 gripper_msg;
-        gripper_msg.data = gripper_state;
-        gripper_command_pub->publish(gripper_msg);
+    void publish_hardware_command(const std::vector<double>& joint_positions) {
+        sensor_msgs::msg::JointState js;
+        js.header.stamp = this->now();
+        js.name = joint_model_group_->getVariableNames();
+        js.position = joint_positions;
+        arm_command_pub_->publish(js);
     }
 
-    void publish_pose_visual(const geometry_msgs::msg::Pose &pose)
-    {
-        auto msg = geometry_msgs::msg::PoseStamped();
-
-        msg.header.stamp = this->get_clock()->now();
-        msg.header.frame_id = model_frame;
-
-        msg.pose.position.x = pose.position.x;
-        msg.pose.position.y = pose.position.y;
-        msg.pose.position.z = pose.position.z;
-
-        msg.pose.orientation.x = pose.orientation.x;
-        msg.pose.orientation.y = pose.orientation.y;
-        msg.pose.orientation.z = pose.orientation.z;
-        msg.pose.orientation.w = pose.orientation.w;
-
-        pose_visual_pub->publish(msg);
+    void publish_gripper_hardware(double state) {
+        std_msgs::msg::Float64 msg;
+        msg.data = state;
+        gripper_command_pub_->publish(msg);
     }
 
-    float pose_distance(const geometry_msgs::msg::Pose &pose1, const geometry_msgs::msg::Pose &pose2) {
-        return sqrt(pow(pose1.position.x - pose2.position.x, 2) + 
-                    pow(pose1.position.y - pose2.position.y, 2) + 
-                    pow(pose1.position.z - pose2.position.z, 2));
+    void publish_gripper_sim(double state) {
+        if (!gripper_pos_pub_) return;
+        std_msgs::msg::Float64MultiArray msg;
+        // Send command to both finger_joint and right_outer_knuckle_joint
+        msg.data = {state * 0.8, state * 0.8}; // Scale constraint for Robotiq
+        gripper_pos_pub_->publish(msg);
     }
 
-    void joint_state_callback(const sensor_msgs::msg::JointState::SharedPtr msg) {
-        last_joint_state = *msg;
+    // Utilities
+
+    bool transform_pose(const geometry_msgs::msg::PoseStamped& in, geometry_msgs::msg::PoseStamped& out, const std::string& target_frame) {
+        if (in.header.frame_id == target_frame) {
+            out = in;
+            return true;
+        }
+        try {
+            out = tf_buffer_->transform(in, target_frame, tf2::durationFromSec(0.1));
+            return true;
+        } catch (const tf2::TransformException &ex) {
+            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
+                "TF Error %s -> %s: %s", in.header.frame_id.c_str(), target_frame.c_str(), ex.what());
+            return false;
+        }
     }
 
-    private:
-    // Returns true if a time jump backward was detected and TF was reset
-    bool handle_time_jump_and_reset_tf() {
+    bool handle_time_jump() {
         auto now = this->get_clock()->now();
         if (last_time_.nanoseconds() > now.nanoseconds()) {
-            RCLCPP_WARN(this->get_logger(), "Time jump detected, resetting TF buffer and listener...");
-            tf_listener_.reset();
-            tf_buffer_.reset();
+            RCLCPP_WARN(this->get_logger(), "Time jump detected. Resetting TF.");
             tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
             tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
             last_time_ = now;
@@ -369,48 +311,59 @@ class TeleopToMoveit : public rclcpp::Node {
         return false;
     }
 
-    moveit::core::RobotModelPtr robot_model;
-    moveit::core::RobotStatePtr robot_state;
-    rclcpp::Logger logger = rclcpp::get_logger("web_server_moveit");
+    std_msgs::msg::Header ros2_header(const std::string& frame_id) {
+        std_msgs::msg::Header h;
+        h.stamp = this->now();
+        h.frame_id = frame_id;
+        return h;
+    }
 
-    // TF & frame configuration
+    void publish_pose_visual(const geometry_msgs::msg::Pose &pose) {
+        geometry_msgs::msg::PoseStamped msg;
+        msg.header.stamp = this->now();
+        msg.header.frame_id = model_frame_;
+        msg.pose = pose;
+        pose_visual_pub_->publish(msg);
+    }
+
+    // Members
+    std::shared_ptr<robot_model_loader::RobotModelLoader> robot_model_loader_;
+    moveit::core::RobotModelPtr robot_model_;
+    moveit::core::RobotStatePtr robot_state_;
+    const moveit::core::JointModelGroup* joint_model_group_;
+
+    std::string planning_frame_;
+    std::string planning_group_name_;
+    std::string model_frame_;
+
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-    std::string planning_frame;
-    std::string model_frame;
+    rclcpp::Time last_time_;
 
     rclcpp::Subscription<geometry_msgs::msg::Pose>::SharedPtr arm_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr delta_ee_subscriber_;
     rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr gripper_subscriber_;
-    rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub;
-    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_command_pub;
-    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_command_pub;
-    
-    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pos_pub;
-    const moveit::core::JointModelGroup* arm_joint_model_group;
+    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub_;
 
-    rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_sub;
-    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_visual_pub;
+    rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pos_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_command_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_command_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PoseStamped>::SharedPtr pose_visual_pub_;
 
-    sensor_msgs::msg::JointState last_joint_state;
-
+    sensor_msgs::msg::JointState last_joint_state_;
     // This virtual command pose accumumlates deltas within an action chunk
     // to avoid drift and resets after not receiving a delta command for 0.5s
     Eigen::Isometry3d virtual_ee_pose_;
     rclcpp::Time last_delta_time_;
     bool valid_virtual_pose_ = false;
 
-    // Track last callback time to detect backward time jumps and refresh TF
-    rclcpp::Time last_time_;
-
-    kinematics::KinematicsQueryOptions options;
-    double gripper_state = 0.0;
-    rclcpp::TimerBase::SharedPtr gripper_timer;
+    double gripper_state_ = 0.0;
 };
 
 int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<TeleopToMoveit>();
+    auto node = std::make_shared<PoseToJointsNode>();
     node->initialize_moveit();
     rclcpp::spin(node);
     rclcpp::shutdown();

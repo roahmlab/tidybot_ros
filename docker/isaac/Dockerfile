@@ -1,9 +1,7 @@
-# Isaac Sim 5.1.0 with ROS 2 Jazzy (Ubuntu 24.04)
-# Based on: https://docs.isaacsim.omniverse.nvidia.com/latest/installation/install_ros.html
+ARG BASE_IMAGE=isaac-lab-base
+FROM ${BASE_IMAGE}
 
-FROM nvcr.io/nvidia/isaac-sim:5.1.0
-
-# Switch to root for package installation
+# Start as root
 USER root
 
 # Avoid interactive prompts during installation
@@ -24,10 +22,10 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
 ENV LANG=en_US.UTF-8
 
 # Add ROS 2 apt repository
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
-RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu noble main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null
 
-# Install ROS 2 Jazzy base + required packages
+# Install ROS 2 Jazzy Base and Dependencies (Combined List)
 RUN apt-get update && apt-get install -y \
     ros-jazzy-ros-base \
     ros-jazzy-rmw-fastrtps-cpp \
@@ -36,6 +34,9 @@ RUN apt-get update && apt-get install -y \
     ros-jazzy-geometry-msgs \
     ros-jazzy-trajectory-msgs \
     ros-jazzy-control-msgs \
+    ros-jazzy-nav-msgs \
+    ros-jazzy-tf2-msgs \
+    ros-jazzy-action-msgs \
     python3-colcon-common-extensions \
     && rm -rf /var/lib/apt/lists/*
 
@@ -47,10 +48,9 @@ ENV RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-# Default working directory
+# Default working directory (can be overridden)
 WORKDIR /isaac-sim
 
-# Use our ROS-enabled entrypoint
+# Entrypoint setup
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["./isaac-sim.sh"]
-
+CMD ["/bin/bash"]

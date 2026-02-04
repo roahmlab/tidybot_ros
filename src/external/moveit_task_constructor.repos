@@ -1,0 +1,9 @@
+repositories:
+  moveit_task_constructor:
+    type: git
+    url: https://github.com/moveit/moveit_task_constructor.git
+    version: jazzy
+  py_binding_tools:
+    type: git
+    url: https://github.com/moveit/py_binding_tools.git
+    version: ros2

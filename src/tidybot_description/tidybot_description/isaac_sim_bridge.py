@@ -91,18 +91,12 @@ class IsaacSimBridge(Node):
         self.arm_joints = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 
                           'joint_5', 'joint_6', 'joint_7']
         
-        # Gripper configuration: all joints driven directly with gear ratios
-        # Simplified parallel-jaw gripper (no closed-loop kinematics)
-        # Outer knuckles are symmetric leaders
-        # Inner fingers rotate opposite to keep pads parallel
-        # Inner knuckles follow (no collision, mainly cosmetic)
+        # Gripper configuration: Drive only active joints (finger_joint and right_outer_knuckle_joint)
+        # Other joints (inner fingers/knuckles) are passive and driven by 
+        # mechanical constraints (PhysX 4-bar linkage) in Isaac Sim, matching Isaac Lab assets.py strategy.
         self.gripper_joints = {
-            'finger_joint': 1.0,     # Leader
-            'right_outer_knuckle_joint': 1.0,    # Mimic multiplier="1.0"
-            'left_inner_finger_joint': -0.8,     # Mimic multiplier="-1.0"
-            'right_inner_finger_joint': 0.8,     # Mimic multiplier="1.0"
-            'left_inner_finger_knuckle_joint': -1.0, # Mimic multiplier="-1.0" 
-            'right_inner_finger_knuckle_joint': -1.0,# Mimic multiplier="-1.0"
+            'finger_joint': 1.0,               # Leader
+            'right_outer_knuckle_joint': 1.0,  # Active Mimic
         }
         
         # Current target state (initialize to home position)

@@ -16,17 +16,17 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 # Basic utilities and development tools
 RUN apt-get -y update \
     && apt-get -y install \
-      apt-transport-https \
-      ca-certificates \
-      gnupg \
-      lsb-release \
-      udev \
-      unzip \
-      zip \
-      cmake python3-pip python3-venv sudo vim wget \
-      curl software-properties-common \
-      doxygen git tmux dialog dialog \
-      && rm -rf /var/lib/apt/lists/*
+    apt-transport-https \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    udev \
+    unzip \
+    zip \
+    cmake python3-pip python3-venv sudo vim wget \
+    curl software-properties-common \
+    doxygen git tmux dialog dialog \
+    && rm -rf /var/lib/apt/lists/*
 
 # Graphics and robotics dependencies
 RUN apt-get -y update \
@@ -44,16 +44,16 @@ RUN apt-get -y update \
 # ROS and Orbbec SDK runtime dependencies
 RUN apt-get -y update \
     && apt-get -y install \
-        libgflags-dev nlohmann-json3-dev libdw-dev \
-        libssl-dev libusb-1.0-0-dev libudev-dev \
+    libgflags-dev nlohmann-json3-dev libdw-dev \
+    libssl-dev libusb-1.0-0-dev libudev-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
     # find the username for TARGET_UID (empty if none)
     USERNAME="$(getent passwd "${USER_ID}" | cut -d: -f1)"; \
     if [ -n "$USERNAME" ]; then \
-      # delete user and their home directory
-      userdel -r "$USERNAME"; \
+    # delete user and their home directory
+    userdel -r "$USERNAME"; \
     fi
 
 # Avoid shipping driver packages in the image
@@ -78,31 +78,31 @@ RUN apt-get update && apt-get install -y curl && \
 
 # Additional ros packages
 RUN apt-get update && apt-get install -y \
-        ros-dev-tools \
-        ros-${ROS_DISTRO}-desktop \
-        python3-colcon-common-extensions \
-        python3-rosdep \
-        python3-vcstool \
-        ros-${ROS_DISTRO}-tf-transformations \
-        ros-${ROS_DISTRO}-ros2-control \
-        ros-${ROS_DISTRO}-ros2-controllers \
-        ros-${ROS_DISTRO}-joint-state-broadcaster \
-        ros-${ROS_DISTRO}-joint-state-publisher \
-        ros-${ROS_DISTRO}-joint-state-publisher-gui \
-        ros-${ROS_DISTRO}-joint-trajectory-controller \
-        ros-${ROS_DISTRO}-rqt-controller-manager \
-        ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
-        ros-${ROS_DISTRO}-pinocchio \
-        ros-${ROS_DISTRO}-image-transport \
-        ros-${ROS_DISTRO}-image-transport-plugins \
-        ros-${ROS_DISTRO}-compressed-image-transport \
-        ros-${ROS_DISTRO}-image-publisher \
-        ros-${ROS_DISTRO}-camera-info-manager \
-        ros-${ROS_DISTRO}-diagnostic-updater \
-        ros-${ROS_DISTRO}-diagnostic-msgs \
-        ros-${ROS_DISTRO}-statistics-msgs \
-        ros-${ROS_DISTRO}-backward-ros \
-        ros-${ROS_DISTRO}-simulation-interfaces && \
+    ros-dev-tools \
+    ros-${ROS_DISTRO}-desktop \
+    python3-colcon-common-extensions \
+    python3-rosdep \
+    python3-vcstool \
+    ros-${ROS_DISTRO}-tf-transformations \
+    ros-${ROS_DISTRO}-ros2-control \
+    ros-${ROS_DISTRO}-ros2-controllers \
+    ros-${ROS_DISTRO}-joint-state-broadcaster \
+    ros-${ROS_DISTRO}-joint-state-publisher \
+    ros-${ROS_DISTRO}-joint-state-publisher-gui \
+    ros-${ROS_DISTRO}-joint-trajectory-controller \
+    ros-${ROS_DISTRO}-rqt-controller-manager \
+    ros-${ROS_DISTRO}-rqt-joint-trajectory-controller \
+    ros-${ROS_DISTRO}-pinocchio \
+    ros-${ROS_DISTRO}-image-transport \
+    ros-${ROS_DISTRO}-image-transport-plugins \
+    ros-${ROS_DISTRO}-compressed-image-transport \
+    ros-${ROS_DISTRO}-image-publisher \
+    ros-${ROS_DISTRO}-camera-info-manager \
+    ros-${ROS_DISTRO}-diagnostic-updater \
+    ros-${ROS_DISTRO}-diagnostic-msgs \
+    ros-${ROS_DISTRO}-statistics-msgs \
+    ros-${ROS_DISTRO}-backward-ros \
+    ros-${ROS_DISTRO}-simulation-interfaces && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Setup Gazebo
@@ -111,9 +111,9 @@ RUN apt-get update && apt-get install -y ros-${ROS_DISTRO}-ros-gz ros-${ROS_DIST
 # Setup Gazebo sensors
 RUN apt-get update && \
     echo "deb [arch=$(dpkg --print-architecture)] \
-      http://packages.osrfoundation.org/gazebo/ubuntu-stable \
-      $(lsb_release -cs) main" \
-      > /etc/apt/sources.list.d/gazebo-stable.list && \
+    http://packages.osrfoundation.org/gazebo/ubuntu-stable \
+    $(lsb_release -cs) main" \
+    > /etc/apt/sources.list.d/gazebo-stable.list && \
     wget http://packages.osrfoundation.org/gazebo.key -O - | apt-key add - && \
     apt-get update
 
@@ -125,14 +125,14 @@ RUN apt-get install python3-flask python3-flask-socketio -y
 
 # Episode converters: Apache Arrow/Parquet and HDF5 dev libs for tidybot_episode
 RUN apt-get update && apt-get install -y ca-certificates lsb-release wget && \
-        wget -q https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
-        apt-get install -y ./apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
-        rm -f apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
-        apt-get update && apt-get install -y \
-            libarrow-dev \
-            libparquet-dev \
-            libhdf5-dev \
-        && rm -rf /var/lib/apt/lists/*
+    wget -q https://apache.jfrog.io/artifactory/arrow/ubuntu/apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+    apt-get install -y ./apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+    rm -f apache-arrow-apt-source-latest-$(lsb_release -cs).deb && \
+    apt-get update && apt-get install -y \
+    libarrow-dev \
+    libparquet-dev \
+    libhdf5-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 # Setup Phoenix6 and CANivore for base control
 RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-electronics.com/ctr-pubkey.gpg" && \
@@ -148,7 +148,8 @@ COPY ./requirements.txt ./requirements.txt
 
 # Fetch external dependencies via vcstool (as root during build)
 RUN cd /home/${USER_NAME}/tidybot_platform/src/external && \
-    vcs import . < orbbec.repos || true
+    vcs import . < orbbec.repos || true && \
+    vcs import . < moveit_task_constructor.repos || true
 
 # Install Orbbec udev rules (reload may fail in build env; ignore non-zero exit)
 RUN bash /home/${USER_NAME}/tidybot_platform/src/external/OrbbecSDK_ROS2/orbbec_camera/scripts/install_udev_rules.sh || true
@@ -166,7 +167,10 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     rosdep install --from-paths src --ignore-src -r -y --skip-keys \
     "arrow parquet warehouse_ros_mongo ament_python glog joint_state_publisher \
     joint_state_publisher_gui opencv opencv4 threadpoolctl setuptools numpy \
-    libgoogle-glog-dev flask flask_socketio" && \
+    libgoogle-glog-dev flask flask_socketio phoenix6 \
+    libgoogle-glog-dev flask flask_socketio phoenix6 \
+    moveit_resources_panda_moveit_config moveit_resources_fanuc_moveit_config \
+    py_binding_tools moveit_py" && \
     colcon build --symlink-install
 
 # Upgrade all packages

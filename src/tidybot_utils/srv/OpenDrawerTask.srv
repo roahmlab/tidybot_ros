@@ -1,0 +1,10 @@
+# Request
+string joint_type                     # "prismatic" or "revolute"
+geometry_msgs/Pose handle_pose        # Handle position and grasp orientation
+geometry_msgs/Point joint_axis_origin # For revolute pivot point
+geometry_msgs/Vector3 joint_axis      # Unit vector for joint axis
+float64 pull_amount                   # distance (m) for prismatic, angle (rad) for revolute
+---
+# Response
+bool accepted
+string message
