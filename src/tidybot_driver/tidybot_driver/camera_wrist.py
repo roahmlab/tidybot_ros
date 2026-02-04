@@ -29,6 +29,12 @@ class Camera(Node):
             depth=1
         )
 
+        subscriber_qos = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=1
+        )
+
         # Parameters
         self.declare_parameter('target_size', 224)
         self.target_size = self.get_parameter('target_size').get_parameter_value().integer_value
@@ -47,13 +53,13 @@ class Camera(Node):
             Image, 
             '/camera/color/image_raw', 
             self.color_callback, 
-            qos_policy
+            subscriber_qos
         )
         self.sub_depth = self.create_subscription(
             Image, 
             '/camera/depth/image_raw', 
             self.depth_callback, 
-            qos_policy
+            subscriber_qos
         )
         
         self.get_logger().info("Republisher Node Started. Waiting for /camera/ streams...")

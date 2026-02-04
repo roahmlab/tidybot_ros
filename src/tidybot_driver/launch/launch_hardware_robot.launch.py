@@ -1,5 +1,5 @@
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, GroupAction, SetEnvironmentVariable
 from launch_ros.actions import Node
 from launch_ros.actions import SetRemap
 from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoinSubstitution
@@ -30,6 +30,12 @@ def generate_launch_description():
         "ext_camera", 
         default_value="false", 
         description="Use external camera"
+    )
+
+    enable_tactile = DeclareLaunchArgument(
+        "enable_tactile",
+        default_value="false",
+        description="Enable PapillArray tactile sensors"
     )
 
     rsp_launch = IncludeLaunchDescription(
@@ -82,6 +88,11 @@ def generate_launch_description():
         ]))
     )
 
+    local_kinova_vision = GroupAction([
+        SetEnvironmentVariable('ROS_LOCALHOST_ONLY', '1'),
+        kinova_vision_launch
+    ])
+
     camera_wrist_republisher = Node(
         package="tidybot_driver",
         executable="camera_wrist",
@@ -93,6 +104,28 @@ def generate_launch_description():
             {"target_size": 224},
             {"crop_scale": 1.0}
         ],
+    )
+
+    papillarray_node = Node(
+        package='papillarray_ros2_v2',
+        executable='papillarray_ros2_node',
+        name='papillarray_ros2_node',
+        output='screen',
+        condition=IfCondition(PythonExpression([
+            "(",
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'",
+            ") and '", LaunchConfiguration("enable_tactile"), "' == 'true'"
+        ])),
+        parameters=[
+            {'hub_id': 0},
+            {'n_sensors': 2},
+            {'com_port': '/dev/ttyACM0'},
+            {'baud_rate': 9600},
+            {'parity': 0},
+            {'byte_size': 8},
+            {'is_flush': True},
+            {'sampling_rate': 500}
+        ]
     )
     
     camera_base_streamer = GroupAction(
@@ -150,12 +183,14 @@ def generate_launch_description():
         mode,
         base_mode,
         ext_camera,
+        enable_tactile,
         rsp_launch,
         rviz_node,
         tf_relay,
         arm_server,
-        kinova_vision_launch,
+        local_kinova_vision,
         camera_wrist_republisher,
+        papillarray_node,
         camera_base_streamer,
         camera_ext_streamer,
         base_server,

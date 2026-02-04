@@ -38,6 +38,7 @@ DOCKER_OPTIONS+="--shm-size 32G "
 DOCKER_OPTIONS+="-m 32g "
 DOCKER_OPTIONS+="--cap-add SYS_MODULE "
 DOCKER_OPTIONS+="--device /dev/dri:/dev/dri "
+DOCKER_OPTIONS+="-v $DOCKER_DIR/tidybot/entrypoint.sh:/entrypoint.sh:ro "
 if [ -n "$VIDEO_GID" ]; then DOCKER_OPTIONS+="--group-add $VIDEO_GID "; fi
 if [ -n "$RENDER_GID" ]; then DOCKER_OPTIONS+="--group-add $RENDER_GID "; fi
 

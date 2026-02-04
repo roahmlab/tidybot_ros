@@ -38,6 +38,7 @@ RUN apt-get -y update \
         libgl1-mesa-dri libegl1 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools \
         gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
         gstreamer1.0-plugins-ugly gstreamer1.0-libav libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
     && rm -rf /var/lib/apt/lists/*
 
 # ROS and Orbbec SDK runtime dependencies
@@ -167,6 +168,11 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     joint_state_publisher_gui opencv opencv4 threadpoolctl setuptools numpy \
     libgoogle-glog-dev flask flask_socketio" && \
     colcon build --symlink-install
+
+# Upgrade all packages
+RUN apt-get -y update \
+    && apt-get -y upgrade \   
+    && apt-get -y install
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USER_NAME}/.bashrc
 

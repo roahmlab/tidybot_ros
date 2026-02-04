@@ -679,7 +679,7 @@ _CONFIGS = [
         name="pi0_tidybot",
         model=pi0_config.Pi0Config(
             paligemma_variant="gemma_2b_lora", 
-            action_expert_variant="gemma_300m_lora"
+            action_expert_variant="gemma_300m_lora",
         ),
         data=SimpleDataConfig(
             repo_id="/home/yuandi/tidybot_lerobot/tidybot_vla_1.0.0_lerobot",
@@ -711,11 +711,60 @@ _CONFIGS = [
             ),
         ),
         weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi0_base/params"),
-        num_train_steps=10_000,
+        num_train_steps=30_000,
+        log_interval=10,
         batch_size=32,
         freeze_filter=pi0_config.Pi0Config(
             paligemma_variant="gemma_2b_lora", 
             action_expert_variant="gemma_300m_lora"
+        ).get_freeze_filter(),
+        ema_decay=None,
+    ),
+    TrainConfig(
+        name="pi05_tidybot",
+        model=pi0_config.Pi0Config(
+            paligemma_variant="gemma_2b_lora", 
+            action_expert_variant="gemma_300m_lora",
+            pi05=True
+        ),
+        data=SimpleDataConfig(
+            repo_id="/home/yuandi/tidybot_lerobot/tidybot_vla_1.0.0_lerobot",
+            assets=AssetsConfig(
+                assets_dir="/home/yuandi/tidybot_lerobot/assets", 
+                asset_id="tidybot",
+            ),
+            data_transforms=get_empty_group, 
+            model_transforms=ModelTransformFactory(),
+            base_config=DataConfig(
+                action_sequence_keys=("action",),
+                repack_transforms=_transforms.Group(
+                    inputs=[
+                        _transforms.RepackTransform(
+                            {
+                                "image": {
+                                    "base_0_rgb": "observation.images.image",
+                                    "left_wrist_0_rgb": "observation.images.wrist_image",
+                                },
+                                "state": "observation.state",
+                                "actions": "action",
+                                "prompt": "task",
+                            }
+                        ),
+                        convert_tensors_to_numpy,
+                        _transforms.PadStatesAndActions(model_action_dim=32),
+                    ]
+                ),
+            ),
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+        num_train_steps=30_000,
+        log_interval=10,
+        batch_size=32,
+        checkpoint_base_dir="/mnt/hostmnt/ws-frb/users/yuandi/pi0_tidybot/pi05_tidybot_1",
+        freeze_filter=pi0_config.Pi0Config(
+            paligemma_variant="gemma_2b_lora", 
+            action_expert_variant="gemma_300m_lora",
+            pi05=True
         ).get_freeze_filter(),
         ema_decay=None,
     ),
