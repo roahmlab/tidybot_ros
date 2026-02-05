@@ -317,9 +317,89 @@ private:
     {
         RCLCPP_INFO(this->get_logger(), "LIN motion to target");
         
-        // For now, use IK-based approach similar to PTP
-        // TODO: Use Pilz LIN planner for true Cartesian linear motion
-        return execute_ptp(stage, robot_state, joint_model_group, tip_link);
+        // Cartesian Linear Interpolation
+        // 1. Get start and end poses
+        const Eigen::Isometry3d& start_pose = robot_state->getGlobalLinkTransform(tip_link);
+        Eigen::Vector3d start_pos = start_pose.translation();
+        Eigen::Quaterniond start_quat(start_pose.rotation());
+        
+        Eigen::Vector3d target_pos(stage.target_pose.position.x, 
+                                 stage.target_pose.position.y, 
+                                 stage.target_pose.position.z);
+        Eigen::Quaterniond target_quat(stage.target_pose.orientation.w,
+                                     stage.target_pose.orientation.x,
+                                     stage.target_pose.orientation.y,
+                                     stage.target_pose.orientation.z);
+                                     
+        // 2. Generate waypoints using interpolation
+        // Standardize on 20Hz (50ms) control loop for smooth streaming
+        double control_rate = 20.0;
+        double dt = 1.0 / control_rate;
+        double total_duration = stage.duration > 0.0 ? stage.duration : 2.0;
+        int num_waypoints = static_cast<int>(total_duration * control_rate);
+        
+        if (num_waypoints < 10) num_waypoints = 10; // Minimum points
+        
+        RCLCPP_INFO(this->get_logger(), "Generating %d waypoints for LIN motion (%.2fs @ %.1fHz)", 
+                    num_waypoints, total_duration, control_rate);
+
+        // Re-use IK options
+        kinematics::KinematicsQueryOptions ik_options;
+        ik_options.return_approximate_solution = false;
+
+        std::vector<double> prev_joint_values;
+        robot_state->copyJointGroupPositions(joint_model_group, prev_joint_values);
+
+        // Execute waypoints sequentially
+        for (int i = 1; i <= num_waypoints; ++i) {
+            double fraction = static_cast<double>(i) / num_waypoints;
+            
+            // Interpolate Position (Linear)
+            Eigen::Vector3d interp_pos = start_pos + (target_pos - start_pos) * fraction;
+            // Interpolate Orientation (SLERP)
+            Eigen::Quaterniond interp_quat = start_quat.slerp(fraction, target_quat);
+            
+            geometry_msgs::msg::Pose waypoint_pose;
+            waypoint_pose.position.x = interp_pos.x();
+            waypoint_pose.position.y = interp_pos.y();
+            waypoint_pose.position.z = interp_pos.z();
+            waypoint_pose.orientation.x = interp_quat.x();
+            waypoint_pose.orientation.y = interp_quat.y();
+            waypoint_pose.orientation.z = interp_quat.z();
+            waypoint_pose.orientation.w = interp_quat.w();
+            
+            // Solve IK
+            bool found_ik = robot_state->setFromIK(joint_model_group, waypoint_pose, tip_link, 0.1, 
+                                                 moveit::core::GroupStateValidityCallbackFn(), ik_options);
+            
+            if (!found_ik) {
+                RCLCPP_ERROR(this->get_logger(), "IK failed at LIN waypoint %d/%d", i, num_waypoints);
+                return false;
+            }
+            
+            robot_state->enforceBounds();
+            std::vector<double> joint_values;
+            robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+
+            // Discontinuity check logic...
+             double max_jump = 0.0;
+            for (size_t j = 0; j < joint_values.size(); ++j) {
+                double jump = std::abs(joint_values[j] - prev_joint_values[j]);
+                if (jump > max_jump) max_jump = jump;
+            }
+            if (max_jump > 0.52) { 
+                 RCLCPP_WARN(this->get_logger(), "Large joint jump detected (%.2f rad)", max_jump);
+            }
+            prev_joint_values = joint_values;
+            
+            // Publish with exact duration
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, dt);
+            
+            // Wait for exact dt (no buffer) to maintain stream rate
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(dt * 1000)));
+        }
+        
+        return true;
     }
 
     bool execute_circ(const MotionStage& stage, 
@@ -352,13 +432,18 @@ private:
         Eigen::Vector3d rel_pos = current_pos - arc_center;
         
         // Generate waypoints along the arc
-        // Use more waypoints for smoother motion and better IK continuity
-        int num_waypoints = 30;  // Increased from 10 for smoother arc
-        double angle_step = arc_angle / num_waypoints;
-        double duration_per_waypoint = (stage.duration > 0.0 ? stage.duration : 2.0) / num_waypoints;
+        // Standardize on 20Hz control loop
+        double control_rate = 20.0;
+        double dt = 1.0 / control_rate;
+        double total_duration = stage.duration > 0.0 ? stage.duration : 2.0;
+        int num_waypoints = static_cast<int>(total_duration * control_rate);
         
-        RCLCPP_INFO(this->get_logger(), "Generating %d waypoints, arc_angle=%.3f rad (%.1f deg)", 
-                    num_waypoints, arc_angle, arc_angle * 180.0 / M_PI);
+        if (num_waypoints < 10) num_waypoints = 10;
+        
+        double angle_step = arc_angle / num_waypoints;
+        
+        RCLCPP_INFO(this->get_logger(), "Generating %d waypoints for CIRC motion (%.2fs @ %.1fHz)", 
+                    num_waypoints, total_duration, control_rate);
         
         // Store previous joint values for continuity checking
         std::vector<double> prev_joint_values;
@@ -384,7 +469,6 @@ private:
             waypoint_pose.linear() = waypoint_quat.toRotationMatrix();
             
             // Solve IK for this waypoint
-            // The robot_state already contains previous solution, which seeds the IK
             kinematics::KinematicsQueryOptions ik_options;
             ik_options.return_approximate_solution = false;
             
@@ -392,7 +476,7 @@ private:
                 joint_model_group, 
                 waypoint_pose, 
                 tip_link, 
-                0.5,  // Timeout per waypoint
+                0.1,  // Reduced timeout for loop
                 moveit::core::GroupStateValidityCallbackFn(),
                 ik_options
             );
@@ -402,32 +486,26 @@ private:
                 return false;
             }
             
-            // Get joint values
             std::vector<double> joint_values;
             robot_state->copyJointGroupPositions(joint_model_group, joint_values);
             
-            // Check for large joint jumps (discontinuity detection)
+            // Discontinuity check
             double max_jump = 0.0;
             for (size_t j = 0; j < joint_values.size(); ++j) {
                 double jump = std::abs(joint_values[j] - prev_joint_values[j]);
                 if (jump > max_jump) max_jump = jump;
             }
-            
-            // Warn if jump is too large (> 30 degrees = 0.52 rad)
             if (max_jump > 0.52) {
-                RCLCPP_WARN(this->get_logger(), 
-                    "Large joint jump detected at waypoint %d (%.2f rad)", i, max_jump);
+                RCLCPP_WARN(this->get_logger(), "Large joint jump detected (%.2f rad)", max_jump);
             }
             
-            // Publish trajectory for this waypoint (interpolate from prev to current over duration)
-            publish_trajectory(joint_model_group, prev_joint_values, joint_values, duration_per_waypoint);
+            // Publish trajectory stream
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, dt);
 
-            // Update previous values for next iteration
             prev_joint_values = joint_values;
             
-            // Wait for execution (shorter wait for more waypoints)
-            std::this_thread::sleep_for(std::chrono::milliseconds(
-                static_cast<int>(duration_per_waypoint * 1000) + 100));
+            // Wait for exact dt (no buffer)
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(dt * 1000)));
         }
         
         RCLCPP_INFO(this->get_logger(), "CIRC motion completed");

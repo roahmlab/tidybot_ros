@@ -55,6 +55,8 @@ Thumbs.db
 /src/external/OrbbecSDK_ROS2
 /src/tidybot_openvla
 /openvla_finetuning_utils
+/src/external/moveit_task_constructor
+/src/external/py_binding_tools
 
 # Ignore Isaac Sim workspace
 isaac_sim_workspace/

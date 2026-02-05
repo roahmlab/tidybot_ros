@@ -71,7 +71,7 @@ class DrawerPolicyNode(Node):
         self.get_logger().info('  Service: /open_drawer_task')
         self.get_logger().info('  Action client: /execute_stages')
 
-    def handle_drawer_request(self, request, response):
+    async def handle_drawer_request(self, request, response):
         """
         Handle incoming drawer task request.
         Compiles the request into MotionStage sequences and executes them.
@@ -119,11 +119,38 @@ class DrawerPolicyNode(Node):
             feedback_callback=self.feedback_callback
         )
         
-        # Note: For a synchronous service response, we'd need to wait for the result
-        # For now, we return immediately with "accepted" and let execution proceed async
-        response.accepted = True
-        response.message = f"Task accepted, executing {len(stages)} stages"
+        # Wait for the goal to be accepted
+        try:
+            goal_handle = await future
+        except Exception as e:
+            response.accepted = False
+            response.message = f"Action call failed: {str(e)}"
+            return response
         
+        if not goal_handle.accepted:
+            response.accepted = False
+            response.message = "Goal rejected by executor"
+            return response
+            
+        self.get_logger().info("Goal accepted by executor, waiting for result...")
+        
+        # Wait for the result
+        result_future = goal_handle.get_result_async()
+        
+        try:
+            result_wrapper = await result_future
+            result = result_wrapper.result
+            
+            if result.success:
+                response.accepted = True
+                response.message = f"Task completed successfully: {result.message}"
+            else:
+                response.accepted = False
+                response.message = f"Task failed: {result.message}"
+        except Exception as e:
+            response.accepted = False
+            response.message = f"Failed to get result: {str(e)}"
+            
         return response
 
     def feedback_callback(self, feedback_msg):

@@ -34,9 +34,11 @@ def generate_launch_description():
     outpath = Path(robot_description_path) / "urdf/tidybot.urdf"
     outpath.write_text(urdf_xml, encoding="utf-8")
 
-    # 2. Load MoveIt Configs
+    # 2. Load MoveIt Configs with explicit URDF
     moveit_config = MoveItConfigsBuilder(
         "tidybot", package_name="tidybot_moveit_config"
+    ).robot_description(
+        file_path=str(outpath)
     ).to_moveit_configs()
 
     return LaunchDescription([
