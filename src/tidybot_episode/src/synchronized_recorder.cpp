@@ -84,6 +84,12 @@ private:
     sensor_msgs::msg::Image::ConstSharedPtr last_arm_image_;
     sensor_msgs::msg::Image::ConstSharedPtr last_ext_image_;
 
+    // Tactile sensor subscriptions
+    rclcpp::GenericSubscription::SharedPtr sensor_0_sub_;
+    rclcpp::GenericSubscription::SharedPtr sensor_1_sub_;
+    std::shared_ptr<rclcpp::SerializedMessage> latest_sensor_0_;
+    std::shared_ptr<rclcpp::SerializedMessage> latest_sensor_1_;
+
     // Latest observation buffers (updated outside writer loop)
     geometry_msgs::msg::PoseStamped latest_base_pose_;
     geometry_msgs::msg::PoseStamped latest_arm_pose_;
@@ -131,6 +137,7 @@ private:
     bool record_base_camera_ = true;
     bool record_arm_camera_ = true;
     bool record_ext_camera_ = true;
+    bool tactile_enabled_ = false;
 
     // Synchronized recording timer
     rclcpp::TimerBase::SharedPtr record_timer_;
@@ -158,10 +165,13 @@ public:
         declare_parameter<std::string>("storage_uri", "episode_bag");
         declare_parameter<double>("fps", 10.0);
         declare_parameter<std::vector<std::string>>("cameras", std::vector<std::string>{"base", "arm", "ext"});
+        declare_parameter<bool>("tactile_enabled", false);
+
         get_parameter("storage_uri", storage_uri_);
         get_parameter("fps", fps_);
         std::vector<std::string> camera_param;
         get_parameter("cameras", camera_param);
+        get_parameter("tactile_enabled", tactile_enabled_);
         configure_camera_selection(camera_param);
 
         // Initialize TF
@@ -199,7 +209,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
         RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
         RCLCPP_INFO(this->get_logger(), "%s%sUse simulation topics parameter retained for compatibility: %s%s",
-            GREEN, BOLD, use_sim_ ? "true" : "false", RESET);
+                GREEN, BOLD, use_sim_ ? "true" : "false", RESET);
     }
 
 private:
@@ -266,6 +276,32 @@ private:
         else
         {
             RCLCPP_INFO(this->get_logger(), "%sExternal camera recording disabled%s", YELLOW, RESET);
+        }
+
+        if (tactile_enabled_)
+        {
+            rclcpp::QoS qos(1);
+            qos.reliability(RMW_QOS_POLICY_RELIABILITY_RELIABLE)
+            .history(RMW_QOS_POLICY_HISTORY_KEEP_LAST);
+
+            sensor_0_sub_ = this->create_generic_subscription(
+                "/hub_0/sensor_0",
+                "sensor_interfaces/msg/SensorState",
+                qos,
+                [this](std::shared_ptr<rclcpp::SerializedMessage> msg) {
+                    latest_sensor_0_ = msg;
+                }
+            );
+            sensor_1_sub_ = this->create_generic_subscription(
+                "/hub_0/sensor_1",
+                "sensor_interfaces/msg/SensorState",
+                qos,
+                [this](std::shared_ptr<rclcpp::SerializedMessage> msg) {
+                    latest_sensor_1_ = msg;
+                }
+            );
+
+            RCLCPP_INFO(this->get_logger(), "%sTactile sensor recording enabled%s", GREEN, RESET);
         }
     }
 
@@ -627,7 +663,20 @@ private:
         write_observation_message<std_msgs::msg::Float64>(
             std::make_shared<std_msgs::msg::Float64>(latest_gripper_state_), "/gripper_state");
         write_observation_message<sensor_msgs::msg::JointState>(
-            std::make_shared<sensor_msgs::msg::JointStateFloat64>(last_joint_state), "/joint_states");
+            std::make_shared<sensor_msgs::msg::JointState>(*last_joint_state_), "/joint_states");
+        if (tactile_enabled_)
+        {
+            obs_writer_.write(
+                latest_sensor_0_, "/hub_0/sensor_0", 
+                "sensor_interfaces/msg/SensorState", 
+                this->get_clock()->now()
+            );
+            obs_writer_.write(
+                latest_sensor_1_, "/hub_0/sensor_1", 
+                "sensor_interfaces/msg/SensorState", 
+                this->get_clock()->now()
+            );
+        }
 
         // Write actions (use latest cached commands)
         if (last_base_cmd_)    write_action_message<std_msgs::msg::Float64MultiArray>(std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_), "/tidybot/base/target_pose");

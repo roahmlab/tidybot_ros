@@ -85,7 +85,8 @@ def generate_launch_description():
             launch_arguments={
                 'use_sim': LaunchConfiguration('use_sim_time'),
                 'storage_uri': 'episode_bag',
-                'fps': '10.0',
+                'fps': '30.0',
+                'tactile_enabled': 'True',
                 'cameras': '["arm","ext"]',
             }.items(),
             condition=IfCondition(LaunchConfiguration('start_recording_on_action')),
