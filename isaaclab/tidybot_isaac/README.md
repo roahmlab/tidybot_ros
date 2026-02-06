@@ -97,6 +97,66 @@ python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-Drawer-v0 --num_envs 4096
 
 ---
 
+## ROS2 Integration
+
+### `isaac_lab_sim.py`
+
+This script runs the Isaac Lab simulation and bridges it with the TidyBot ROS2 stack. It allows deployment of high-level policies (e.g., `drawer_policy`) while publishing camera feeds and collecting sensor data.
+
+**Usage**:
+```bash
+# Terminal 1: Isaac Lab Simulation
+cd isaaclab && ./isaaclab.sh -p tidybot_isaac/scripts/isaac_lab_sim.py \
+    --task Isaac-TidyBot-Drawer-v0 --num_envs 1 --real-time
+
+# Terminal 2: ROS2 Bridge + RViz
+ros2 launch tidybot_description launch_isaac_lab.launch.py
+
+# Terminal 3: Drawer Policy
+ros2 launch tidybot_policy launch_drawer_policy.launch.py use_sim_time:=true
+
+# Terminal 4: Send Drawer Command
+ros2 service call /open_drawer_task tidybot_utils/srv/OpenDrawerTask "{...}"
+```
+
+**Features**:
+| Feature | Description |
+|---------|-------------|
+| **ROS2 Subscribers** | `/gen3_7dof_controller/joint_trajectory`, `/robotiq_2f_85_controller/commands` |
+| **ROS2 Publishers** | `/joint_states`, `/clock`, `/wrist_camera/rgb`, `/base_camera/rgb` |
+| **Sensor Logging** | Contact forces, drawer velocity → CSV |
+| **Camera Publishing** | Wrist and base cameras via Replicator writers (640x480 @ 10Hz) |
+
+**Architecture**:
+```
+┌────────────────────────────┐     ┌─────────────────────────────────┐
+│        ROS2 Stack          │     │          Isaac Lab              │
+│  ┌──────────────────────┐  │     │  ┌───────────────────────────┐  │
+│  │    drawer_policy     │──┼────►│  │     isaac_lab_sim.py      │  │
+│  └──────────┬───────────┘  │     │  │  ┌─────────────────────┐  │  │
+│             │              │     │  │  │ IsaacLabROS2Node    │  │  │
+│  ┌──────────▼───────────┐  │     │  │  │ - arm_traj_sub      │  │  │
+│  │ multi_stage_planner  │──┼────►│  │  │ - gripper_sub       │  │  │
+│  └──────────────────────┘  │     │  │  │ - joint_state_pub   │  │  │
+│                            │     │  │  │ - clock_pub         │  │  │
+│  ┌──────────────────────┐  │     │  │  └─────────────────────┘  │  │
+│  │ robot_state_publisher│◄─┼─────│  │                           │  │
+│  │        RViz          │◄─┼─────│  │  Camera → /wrist_camera/rgb│  │
+│  └──────────────────────┘  │     │  └───────────────────────────┘  │
+└────────────────────────────┘     └─────────────────────────────────┘
+```
+
+**Command-line Options**:
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--task` | `Isaac-TidyBot-Drawer-v0` | Environment name |
+| `--num_envs` | `1` | Number of parallel environments |
+| `--real-time` | `false` | Run at real-time speed |
+| `--no-cameras` | `false` | Disable camera publishing |
+| `--save_path` | `logs/ros2_bridge/sensor_data_<timestamp>.csv` | Sensor log path |
+
+---
+
 ## Configuration Files
 
 ### `assets.py` - Robot and Object Configurations
