@@ -30,8 +30,11 @@
 #include <std_msgs/msg/float64.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
+#include <std_srvs/srv/empty.hpp>
+#include <geometry_msgs/msg/pose.hpp>
 
 #include <thread>
+#include <future>
 #include <cmath>
 
 using namespace moveit::task_constructor;
@@ -48,7 +51,11 @@ public:
         // Declare parameters
         this->declare_parameter("arm_group", "gen3_7dof");
         this->declare_parameter("tip_link", "tool_frame");
-        
+        this->declare_parameter("start_recording_on_action", false);
+
+        start_recording_client_ = this->create_client<std_srvs::srv::Empty>("/start_recording");
+        stop_recording_client_ = this->create_client<std_srvs::srv::Empty>("/stop_recording");
+
         action_server_ = rclcpp_action::create_server<ExecuteStages>(
             this,
             "execute_stages",
@@ -104,13 +111,18 @@ public:
             "/tidybot/hardware/arm/commands", 10);
         gripper_hardware_pub_ = this->create_publisher<std_msgs::msg::Float64>(
             "/tidybot/hardware/gripper/commands", 10);
-        
-        
+        arm_target_pose_pub_ = this->create_publisher<geometry_msgs::msg::Pose>(
+            "/tidybot/arm/target_pose", 10);
+        gripper_cmd_pub_ = this->create_publisher<std_msgs::msg::Float64>(
+            "/tidybot/gripper/commands", 10);
+
         RCLCPP_INFO(this->get_logger(), "Trajectory execution publishers initialized");
     }
 
 private:
     rclcpp_action::Server<ExecuteStages>::SharedPtr action_server_;
+    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr start_recording_client_;
+    rclcpp::Client<std_srvs::srv::Empty>::SharedPtr stop_recording_client_;
     std::mutex executor_mutex_;
     std::shared_ptr<planning_scene_monitor::PlanningSceneMonitor> psm_;
 
@@ -122,6 +134,8 @@ private:
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pub_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_traj_hardware_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_hardware_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::Pose>::SharedPtr arm_target_pose_pub_;
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_cmd_pub_;
 
     rclcpp_action::GoalResponse handle_goal(
         const rclcpp_action::GoalUUID& uuid,
@@ -150,7 +164,23 @@ private:
     {
         std::lock_guard<std::mutex> lock(executor_mutex_);
         RCLCPP_INFO(this->get_logger(), "Executing multi-stage motion");
-        
+
+        auto rec_param = this->get_parameter("start_recording_on_action");
+        bool start_recording = this->get_parameter("start_recording_on_action").as_bool();
+        if (start_recording) {
+            if (start_recording_client_->service_is_ready()) {
+                auto request = std::make_shared<std_srvs::srv::Empty::Request>();
+                auto result_future = start_recording_client_->async_send_request(request);
+                if (result_future.wait_for(std::chrono::seconds(2)) == std::future_status::ready) {
+                    RCLCPP_INFO(this->get_logger(), "Started episode recording on action");
+                } else {
+                    RCLCPP_WARN(this->get_logger(), "Start recording service call timed out");
+                }
+            } else {
+                RCLCPP_WARN(this->get_logger(), "Start recording service not available");
+            }
+        }
+
         const auto goal = goal_handle->get_goal();
         auto result = std::make_shared<ExecuteStages::Result>();
         auto feedback = std::make_shared<ExecuteStages::Feedback>();
@@ -264,6 +294,11 @@ private:
         result->stages_completed = stages_completed;
         goal_handle->succeed(result);
         RCLCPP_INFO(this->get_logger(), "Multi-stage execution completed successfully");
+        
+        if (start_recording) {
+            auto request = std::make_shared<std_srvs::srv::Empty::Request>();
+            auto result_future = stop_recording_client_->async_send_request(request);
+        }
     }
 
     bool execute_ptp(const MotionStage& stage, 
@@ -301,7 +336,7 @@ private:
         
         // Publish trajectory (interpolate from start to target over duration)
         double duration = stage.duration > 0.0 ? stage.duration : 2.0;
-        publish_trajectory(joint_model_group, start_positions, joint_values, duration);
+        publish_trajectory(joint_model_group, start_positions, joint_values, robot_state, duration);
         
         // Wait for execution
         std::this_thread::sleep_for(std::chrono::milliseconds(
@@ -382,7 +417,7 @@ private:
             Eigen::Isometry3d waypoint_pose = Eigen::Isometry3d::Identity();
             waypoint_pose.translation() = waypoint_pos;
             waypoint_pose.linear() = waypoint_quat.toRotationMatrix();
-            
+
             // Solve IK for this waypoint
             // The robot_state already contains previous solution, which seeds the IK
             kinematics::KinematicsQueryOptions ik_options;
@@ -420,7 +455,7 @@ private:
             }
             
             // Publish trajectory for this waypoint (interpolate from prev to current over duration)
-            publish_trajectory(joint_model_group, prev_joint_values, joint_values, duration_per_waypoint);
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, robot_state, duration_per_waypoint);
 
             // Update previous values for next iteration
             prev_joint_values = joint_values;
@@ -437,7 +472,11 @@ private:
     bool execute_gripper(const MotionStage& stage)
     {
         RCLCPP_INFO(this->get_logger(), "Gripper action: position=%.2f", stage.gripper_position);
-        
+
+        std_msgs::msg::Float64 gripper_cmd;
+        gripper_cmd.data = stage.gripper_position;
+        gripper_cmd_pub_->publish(gripper_cmd);
+
         // Scale the gripper position (0.0-1.0 input maps to 0.0-0.8 command)
         // This matches the scaling used in moveit_ee_pose_ik for phone teleoperation
         double scaled_position = stage.gripper_position * 0.8;
@@ -447,7 +486,7 @@ private:
         std_msgs::msg::Float64MultiArray msg;
         msg.data = {scaled_position, -scaled_position};
         std_msgs::msg::Float64 msg_f64;
-        msg_f64.data = scaled_position;
+        msg_f64.data = stage.gripper_position;
 
         gripper_pub_->publish(msg);
         gripper_hardware_pub_->publish(msg_f64);
@@ -500,9 +539,10 @@ private:
     }
 
     void publish_trajectory(const moveit::core::JointModelGroup* joint_model_group,
-                           const std::vector<double>& start_positions,
-                           const std::vector<double>& target_positions,
-                           double duration)
+                            const std::vector<double>& start_positions,
+                            const std::vector<double>& target_positions,
+                            std::shared_ptr<moveit::core::RobotState> robot_state,
+                            double duration)
     {
         const auto& joint_names = joint_model_group->getVariableNames();
         trajectory_msgs::msg::JointTrajectory traj;
@@ -536,7 +576,15 @@ private:
                 joint_state_msg.position[j] = interpolate_joint_angle(
                     start_positions[j], target_positions[j], alpha, joint_names[j]);
             }
+            
+            robot_state->setJointGroupPositions(joint_model_group, joint_state_msg.position);
+            robot_state->update();
+            const Eigen::Isometry3d& end_effector_state = robot_state->getGlobalLinkTransform(this->get_parameter("tip_link").as_string());
+            geometry_msgs::msg::Pose pose_msg = tf2::toMsg(end_effector_state);
+
             arm_traj_hardware_pub_->publish(joint_state_msg);
+            arm_target_pose_pub_->publish(pose_msg);
+
             if (i < num_points) {
                 std::this_thread::sleep_for(
                     std::chrono::microseconds(static_cast<int64_t>(dt * 1e6)));

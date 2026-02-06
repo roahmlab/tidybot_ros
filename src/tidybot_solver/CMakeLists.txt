@@ -72,6 +72,8 @@ ament_target_dependencies(multi_stage_planner
   moveit_msgs
   trajectory_msgs
   std_msgs
+  std_srvs
+  geometry_msgs
   tf2_eigen
   tidybot_utils
 )

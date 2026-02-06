@@ -19,8 +19,10 @@ from pathlib import Path
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.conditions import IfCondition
 from launch_ros.actions import Node
-from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 
 from moveit_configs_utils import MoveItConfigsBuilder
@@ -49,7 +51,11 @@ def generate_launch_description():
             'use_sim_time', default_value='true',
             description='Use simulation time'
         ),
-        
+        DeclareLaunchArgument(
+            'start_recording_on_action', default_value='false',
+            description='If true, start episode recording when an action is received and launch synchronized_recorder'
+        ),
+
         # Multi-Stage Executor (generic motion executor)
         Node(
             package='tidybot_solver',
@@ -61,11 +67,30 @@ def generate_launch_description():
                 {
                     'use_sim_time': LaunchConfiguration('use_sim_time'),
                     'arm_group': 'gen3_7dof',
-                    'tip_link': 'tool_frame'
+                    'tip_link': 'tool_frame',
+                    'start_recording_on_action': LaunchConfiguration('start_recording_on_action'),
                 }
             ]
         ),
-        
+
+        # Synchronized recorder (only when start_recording_on_action is true)
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(
+                    get_package_share_directory('tidybot_episode'),
+                    'launch',
+                    'synchronized_recorder.launch.py',
+                )
+            ),
+            launch_arguments={
+                'use_sim': LaunchConfiguration('use_sim_time'),
+                'storage_uri': 'episode_bag',
+                'fps': '10.0',
+                'cameras': '["arm","ext"]',
+            }.items(),
+            condition=IfCondition(LaunchConfiguration('start_recording_on_action')),
+        ),
+
         # Drawer Policy (task-specific policy server)
         Node(
             package='tidybot_policy',

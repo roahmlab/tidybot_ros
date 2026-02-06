@@ -111,6 +111,7 @@ def generate_launch_description():
         executable='papillarray_ros2_node',
         name='papillarray_ros2_node',
         output='screen',
+        arguments=['--ros-args', '--log-level', 'INFO'],
         condition=IfCondition(PythonExpression([
             "(",
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'",

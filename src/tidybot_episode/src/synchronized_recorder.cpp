@@ -195,10 +195,10 @@ public:
         auto period = std::chrono::milliseconds(static_cast<int>(1000.0 / fps_));
         record_timer_ = create_wall_timer(period, std::bind(&SynchronizedRecorder::synchronized_record_callback, this));
 
-    RCLCPP_INFO(this->get_logger(), "%s%sEpisode Recorder Node Initialized%s", GREEN, BOLD, RESET);
-    RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
-    RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
-    RCLCPP_INFO(this->get_logger(), "%s%sUse simulation topics parameter retained for compatibility: %s%s",
+        RCLCPP_INFO(this->get_logger(), "%s%sEpisode Recorder Node Initialized%s", GREEN, BOLD, RESET);
+        RCLCPP_INFO(this->get_logger(), "%s%sStorage URI: %s%s", GREEN, BOLD, storage_uri_.c_str(), RESET);
+        RCLCPP_INFO(this->get_logger(), "%s%sRecording frequency: %.1f Hz%s", GREEN, BOLD, fps_, RESET);
+        RCLCPP_INFO(this->get_logger(), "%s%sUse simulation topics parameter retained for compatibility: %s%s",
             GREEN, BOLD, use_sim_ ? "true" : "false", RESET);
     }
 
@@ -294,78 +294,29 @@ private:
 
     void configure_camera_selection(const std::vector<std::string> &camera_names)
     {
-        record_base_camera_ = false;
-        record_arm_camera_ = false;
-        record_ext_camera_ = false;
+        record_base_camera_ = record_arm_camera_ = record_ext_camera_ = false;
+        std::string active_log;
 
-        if (camera_names.empty())
+        for (auto name : camera_names)
         {
-            RCLCPP_INFO(this->get_logger(), "%sNo cameras requested; video capture disabled%s", YELLOW, RESET);
-            return;
-        }
-
-        for (const auto &name : camera_names)
-        {
-            const std::string normalized = normalize_camera_name(name);
-            if (normalized == "base")
-            {
-                record_base_camera_ = true;
-            }
-            else if (normalized == "arm")
-            {
-                record_arm_camera_ = true;
-            }
-            else if (normalized == "ext")
-            {
-                record_ext_camera_ = true;
-            }
-            else
-            {
-                RCLCPP_WARN(this->get_logger(), "%sCamera selection '%s' is not recognized (expected base, arm, or ext)%s",
+            std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+            if (name == "base")      record_base_camera_ = true;
+            else if (name == "arm")  record_arm_camera_ = true;
+            else if (name == "ext")  record_ext_camera_ = true;
+            else {
+                RCLCPP_WARN(this->get_logger(), "%sUnknown camera: '%s' (expected base, arm, ext)%s", 
                             YELLOW, name.c_str(), RESET);
+                continue;
             }
+            
+            active_log += (active_log.empty() ? "" : ", ") + name;
         }
 
-        if (record_base_camera_ || record_arm_camera_ || record_ext_camera_)
-        {
-            RCLCPP_INFO(this->get_logger(), "%sRecording camera streams: %s%s", GREEN, cameras_to_string().c_str(), RESET);
+        if (active_log.empty()) {
+            RCLCPP_WARN(this->get_logger(), "%sNo valid cameras; video capture disabled%s", YELLOW, RESET);
+        } else {
+            RCLCPP_INFO(this->get_logger(), "%sRecording cameras: %s%s", GREEN, active_log.c_str(), RESET);
         }
-        else
-        {
-            RCLCPP_WARN(this->get_logger(), "%sNo valid cameras selected; video capture disabled%s", YELLOW, RESET);
-        }
-    }
-
-    std::string cameras_to_string() const
-    {
-        std::vector<std::string> enabled;
-        if (record_base_camera_) { enabled.emplace_back("base"); }
-        if (record_arm_camera_) { enabled.emplace_back("arm"); }
-        if (record_ext_camera_) { enabled.emplace_back("ext"); }
-
-        if (enabled.empty())
-        {
-            return std::string("none");
-        }
-
-        std::ostringstream oss;
-        for (size_t i = 0; i < enabled.size(); ++i)
-        {
-            if (i != 0)
-            {
-                oss << ", ";
-            }
-            oss << enabled[i];
-        }
-        return oss.str();
-    }
-
-    static std::string normalize_camera_name(const std::string &name)
-    {
-        std::string lowered = name;
-        std::transform(lowered.begin(), lowered.end(), lowered.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return lowered;
     }
 
     void start_recording_callback(
@@ -641,28 +592,19 @@ private:
 
     bool perform_write_once()
     {
-        const bool cameras_requested = record_base_camera_ || record_arm_camera_ || record_ext_camera_;
-        if (cameras_requested)
-        {
-            if (record_base_camera_ && !last_base_image_)
-            {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "Skipping write: waiting for base camera frames");
-                return false;
+        auto check_missing = [&](bool req, const auto& ptr, const char* name) {
+            if (req && !ptr) {
+                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000, 
+                    "Skipping write: waiting for %s", name);
+                return true;
             }
-            if (record_arm_camera_ && !last_arm_image_)
-            {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "Skipping write: waiting for arm camera frames");
-                return false;
-            }
-            if (record_ext_camera_ && !last_ext_image_)
-            {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 2000,
-                                     "Skipping write: waiting for external camera frames");
-                return false;
-            }
-        }
+            return false;
+        };
+
+        if (check_missing(record_base_camera_, last_base_image_, "base camera")) return false;
+        if (check_missing(record_arm_camera_, last_arm_image_, "arm camera"))    return false;
+        if (check_missing(record_ext_camera_, last_ext_image_, "ext camera"))    return false;
+
         // Ensure we have observations
         if (!(have_base_pose_ && have_arm_pose_ && have_gripper_state_))
         {
@@ -684,97 +626,43 @@ private:
             std::make_shared<geometry_msgs::msg::PoseStamped>(latest_arm_pose_), "/arm_pose");
         write_observation_message<std_msgs::msg::Float64>(
             std::make_shared<std_msgs::msg::Float64>(latest_gripper_state_), "/gripper_state");
+        write_observation_message<sensor_msgs::msg::JointState>(
+            std::make_shared<sensor_msgs::msg::JointStateFloat64>(last_joint_state), "/joint_states");
 
         // Write actions (use latest cached commands)
-        if (last_base_cmd_)
-        {
-            auto cmd_copy = std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_);
-            write_action_message<std_msgs::msg::Float64MultiArray>(cmd_copy, "/tidybot/base/target_pose");
-        }
-        if (last_arm_cmd_)
-        {
-            auto cmd_copy = std::make_shared<geometry_msgs::msg::Pose>(*last_arm_cmd_);
-            write_action_message<geometry_msgs::msg::Pose>(cmd_copy, "/tidybot/arm/target_pose");
-        }
-        if (last_gripper_cmd_)
-        {
-            auto cmd_copy = std::make_shared<std_msgs::msg::Float64>(*last_gripper_cmd_);
-            write_action_message<std_msgs::msg::Float64>(cmd_copy, "/tidybot/gripper/commands");
-        }
-
+        if (last_base_cmd_)    write_action_message<std_msgs::msg::Float64MultiArray>(std::make_shared<std_msgs::msg::Float64MultiArray>(*last_base_cmd_), "/tidybot/base/target_pose");
+        if (last_arm_cmd_)     write_action_message<geometry_msgs::msg::Pose>(std::make_shared<geometry_msgs::msg::Pose>(*last_arm_cmd_), "/tidybot/arm/target_pose");
+        if (last_gripper_cmd_) write_action_message<std_msgs::msg::Float64>(std::make_shared<std_msgs::msg::Float64>(*last_gripper_cmd_), "/tidybot/gripper/commands");
+    
         // Write camera frames only for requested streams
-        if (cameras_requested)
-        {
-            try
-            {
-                if (record_base_camera_)
-                {
-                    auto base_cv = cv_bridge::toCvCopy(last_base_image_, sensor_msgs::image_encodings::BGR8);
-                    if (!base_video_initialized_ && !base_video_filename_.empty())
-                    {
-                        cv::Size frame_size(base_cv->image.cols, base_cv->image.rows);
-                        int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-                        base_video_writer_.open(base_video_filename_, fourcc, fps_, frame_size, true);
-                        base_video_initialized_ = base_video_writer_.isOpened();
-                        if (!base_video_initialized_)
-                        {
-                            RCLCPP_ERROR(this->get_logger(), "%sFailed to open base video writer%s", RED, RESET);
-                        }
-                    }
-                    if (base_video_initialized_)
-                    {
-                        base_video_writer_ << base_cv->image;
-                    }
-                }
-
-                if (record_arm_camera_)
-                {
-                    auto arm_cv = cv_bridge::toCvCopy(last_arm_image_, sensor_msgs::image_encodings::BGR8);
-                    if (!arm_video_initialized_ && !arm_video_filename_.empty())
-                    {
-                        cv::Size frame_size(arm_cv->image.cols, arm_cv->image.rows);
-                        int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-                        arm_video_writer_.open(arm_video_filename_, fourcc, fps_, frame_size, true);
-                        arm_video_initialized_ = arm_video_writer_.isOpened();
-                        if (!arm_video_initialized_)
-                        {
-                            RCLCPP_ERROR(this->get_logger(), "%sFailed to open arm video writer%s", RED, RESET);
-                        }
-                    }
-                    if (arm_video_initialized_)
-                    {
-                        arm_video_writer_ << arm_cv->image;
-                    }
-                }
-
-                if (record_ext_camera_)
-                {
-                    auto ext_cv = cv_bridge::toCvCopy(last_ext_image_, sensor_msgs::image_encodings::BGR8);
-                    if (!ext_video_initialized_ && !ext_video_filename_.empty())
-                    {
-                        cv::Size frame_size(ext_cv->image.cols, ext_cv->image.rows);
-                        int fourcc = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-                        ext_video_writer_.open(ext_video_filename_, fourcc, fps_, frame_size, true);
-                        ext_video_initialized_ = ext_video_writer_.isOpened();
-                        if (!ext_video_initialized_)
-                        {
-                            RCLCPP_ERROR(this->get_logger(), "%sFailed to open ext video writer%s", RED, RESET);
-                        }
-                    }
-                    if (ext_video_initialized_)
-                    {
-                        ext_video_writer_ << ext_cv->image;
-                    }
-                }
-            }
-            catch (cv_bridge::Exception &e)
-            {
-                RCLCPP_ERROR(this->get_logger(), "%sCamera cv_bridge exception: %s%s", RED, e.what(), RESET);
+        if (record_base_camera_ || record_arm_camera_ || record_ext_camera_) {
+            try {
+                process_video_frame(record_base_camera_, last_base_image_, base_video_writer_, base_video_initialized_, base_video_filename_);
+                process_video_frame(record_arm_camera_, last_arm_image_, arm_video_writer_, arm_video_initialized_, arm_video_filename_);
+                process_video_frame(record_ext_camera_, last_ext_image_, ext_video_writer_, ext_video_initialized_, ext_video_filename_);
+            } catch (const cv_bridge::Exception &e) {
+                RCLCPP_ERROR(this->get_logger(), "%sCvBridge Error: %s%s", RED, e.what(), RESET);
                 return false;
             }
         }
 
         return true;
+    }
+
+    void process_video_frame(bool enabled, const sensor_msgs::msg::Image::ConstSharedPtr& img, 
+                            cv::VideoWriter& writer, bool& is_init, const std::string& filename)
+    {
+        if (!enabled || !img) return;
+
+        auto cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::BGR8);
+        
+        if (!is_init && !filename.empty()) {
+            writer.open(filename, cv::VideoWriter::fourcc('m', 'p', '4', 'v'), fps_, cv::Size(cv_ptr->image.cols, cv_ptr->image.rows), true);
+            is_init = writer.isOpened();
+            if (!is_init) RCLCPP_ERROR(this->get_logger(), "%sFailed to open video: %s%s", RED, filename.c_str(), RESET);
+        }
+        
+        if (is_init) writer << cv_ptr->image;
     }
 
     template <typename MsgT>
