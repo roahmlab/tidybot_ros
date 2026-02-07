@@ -20,6 +20,7 @@
  * Parameters:
  * - storage_uri (string): Base directory for episode storage (default: "episode_bag")
  * - use_sim (bool): Use simulation topics (true) or real robot topics (false)
+ * - action_synchronized (bool): Observations are written only when actions are received (default: true)
  * - fps (double): Recording frequency in Hz (default: 10.0)
  * - cameras (string list): Subset of camera streams to record (choices: base, arm, ext; default: all)
  */
@@ -137,7 +138,6 @@ private:
     bool record_base_camera_ = true;
     bool record_arm_camera_ = true;
     bool record_ext_camera_ = true;
-    bool tactile_enabled_ = false;
 
     // Synchronized recording timer
     rclcpp::TimerBase::SharedPtr record_timer_;
@@ -146,6 +146,8 @@ private:
     std::string storage_uri_;
     bool use_sim_;
     bool recording_enabled_ = false;
+    bool action_synchronized_ = true;
+    bool tactile_enabled_ = false;
     double fps_;
     rclcpp::Time last_record_time_;
     
@@ -166,12 +168,14 @@ public:
         declare_parameter<double>("fps", 10.0);
         declare_parameter<std::vector<std::string>>("cameras", std::vector<std::string>{"base", "arm", "ext"});
         declare_parameter<bool>("tactile_enabled", false);
+        declare_parameter<bool>("action_synchronized", true);
 
         get_parameter("storage_uri", storage_uri_);
         get_parameter("fps", fps_);
         std::vector<std::string> camera_param;
         get_parameter("cameras", camera_param);
         get_parameter("tactile_enabled", tactile_enabled_);
+        get_parameter("action_synchronized", action_synchronized_);
         configure_camera_selection(camera_param);
 
         // Initialize TF
@@ -312,19 +316,19 @@ private:
             "/tidybot/base/target_pose", 10,
             [this](const std_msgs::msg::Float64MultiArray::SharedPtr msg) {
                 last_base_cmd_ = msg;
-                if (recording_enabled_) { pending_writes_++; }
+                if (recording_enabled_ && action_synchronized_) { pending_writes_++; }
             });
         arm_cmd_sub_ = this->create_subscription<geometry_msgs::msg::Pose>(
             "/tidybot/arm/target_pose", 10,
             [this](const geometry_msgs::msg::Pose::SharedPtr msg) {
                 last_arm_cmd_ = msg;
-                if (recording_enabled_) { pending_writes_++; }
+                if (recording_enabled_ && action_synchronized_) { pending_writes_++; }
             });
         gripper_cmd_sub_ = this->create_subscription<std_msgs::msg::Float64>(
             "/tidybot/gripper/commands", 10,
             [this](const std_msgs::msg::Float64::SharedPtr msg) {
                 last_gripper_cmd_ = msg;
-                if (recording_enabled_) { pending_writes_++; }
+                if (recording_enabled_ && action_synchronized_) { pending_writes_++; }
             });
     }
 
@@ -369,6 +373,7 @@ private:
         }
 
         recording_enabled_ = true;
+        pending_writes_ = 0;
         sample_count_ = 0;
         
         RCLCPP_INFO(this->get_logger(), "%sStarting synchronized episode recording%s", GREEN, RESET);
@@ -529,34 +534,31 @@ private:
         update_observation_buffers();
 
         // Only write when there is a pending trigger from an action message
-        if (pending_writes_ > 0)
+        if ((!action_synchronized_ || pending_writes_ > 0) && perform_write_once())
         {
-            if (perform_write_once())
+            if (action_synchronized_) pending_writes_--;
+            sample_count_++;
+            if (sample_count_ % 100 == 0)
             {
-                pending_writes_--;
-                sample_count_++;
-                if (sample_count_ % 100 == 0)
-                {
-                    RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
-                }
+                RCLCPP_INFO(this->get_logger(), "Recorded %lu synchronized samples", sample_count_);
             }
-            // If perform_write_once() failed due to missing data, keep pending_writes_ unchanged
         }
     }
+
     // Update observation buffers (no writes)
     void update_observation_buffers()
     {
         auto current_time = this->get_clock()->now();
+        geometry_msgs::msg::PoseStamped identity_pose;
+        identity_pose.header.stamp = rclcpp::Time(0);
+        identity_pose.pose.orientation.w = 1.0;
+
         // Base pose
         try
         {
-            auto transform_stamped = tf_buffer_->lookupTransform("world", "base", rclcpp::Time(0));
-            latest_base_pose_.header = transform_stamped.header;
+            identity_pose.header.frame_id = "base";
+            latest_base_pose_ = tf_buffer_->transform(identity_pose, "world");
             latest_base_pose_.header.stamp = current_time;
-            latest_base_pose_.pose.position.x = transform_stamped.transform.translation.x;
-            latest_base_pose_.pose.position.y = transform_stamped.transform.translation.y;
-            latest_base_pose_.pose.position.z = transform_stamped.transform.translation.z;
-            latest_base_pose_.pose.orientation = transform_stamped.transform.rotation;
             have_base_pose_ = true;
         }
         catch (const tf2::TransformException &ex)
@@ -567,13 +569,9 @@ private:
         // Arm pose
         try
         {
-            auto transform_stamped = tf_buffer_->lookupTransform("arm_base_link", "bracelet_link", rclcpp::Time(0));
-            latest_arm_pose_.header = transform_stamped.header;
+            identity_pose.header.frame_id = "bracelet_link";
+            latest_arm_pose_ = tf_buffer_->transform(identity_pose, "arm_base_link");
             latest_arm_pose_.header.stamp = current_time;
-            latest_arm_pose_.pose.position.x = transform_stamped.transform.translation.x;
-            latest_arm_pose_.pose.position.y = transform_stamped.transform.translation.y;
-            latest_arm_pose_.pose.position.z = transform_stamped.transform.translation.z;
-            latest_arm_pose_.pose.orientation = transform_stamped.transform.rotation;
             have_arm_pose_ = true;
         }
         catch (const tf2::TransformException &ex)
@@ -664,6 +662,7 @@ private:
             std::make_shared<std_msgs::msg::Float64>(latest_gripper_state_), "/gripper_state");
         write_observation_message<sensor_msgs::msg::JointState>(
             std::make_shared<sensor_msgs::msg::JointState>(*last_joint_state_), "/joint_states");
+        
         if (tactile_enabled_)
         {
             obs_writer_.write(

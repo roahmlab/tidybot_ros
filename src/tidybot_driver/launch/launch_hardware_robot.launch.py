@@ -6,6 +6,7 @@ from launch.substitutions import LaunchConfiguration, PythonExpression, PathJoin
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch_ros.substitutions import FindPackageShare
+from launch.actions import ExecuteProcess, TimerAction
 
 def generate_launch_description():
 
@@ -32,8 +33,8 @@ def generate_launch_description():
         description="Use external camera"
     )
 
-    enable_tactile = DeclareLaunchArgument(
-        "enable_tactile",
+    tactile_enabled = DeclareLaunchArgument(
+        "tactile_enabled",
         default_value="false",
         description="Enable PapillArray tactile sensors"
     )
@@ -110,12 +111,12 @@ def generate_launch_description():
         package='papillarray_ros2_v2',
         executable='papillarray_ros2_node',
         name='papillarray_ros2_node',
-        output='screen',
-        arguments=['--ros-args', '--log-level', 'INFO'],
+        output='log',
+        arguments=['--ros-args', '--log-level', 'WARN'],
         condition=IfCondition(PythonExpression([
             "(",
             "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'",
-            ") and '", LaunchConfiguration("enable_tactile"), "' == 'true'"
+            ") and '", LaunchConfiguration("tactile_enabled"), "' == 'true'"
         ])),
         parameters=[
             {'hub_id': 0},
@@ -127,6 +128,22 @@ def generate_launch_description():
             {'is_flush': True},
             {'sampling_rate': 500}
         ]
+    )
+
+    # Zeroes out tactile sensors
+    bias_request_cmd = ExecuteProcess(
+        cmd=[
+            'ros2', 'service', 'call',
+            '/hub_0/send_bias_request',
+            'sensor_interfaces/srv/BiasRequest',
+            '{}'
+        ],
+        output='screen',
+        condition=IfCondition(LaunchConfiguration("tactile_enabled"))
+    )
+    delayed_bias_request = TimerAction(
+        period=5.0,
+        actions=[bias_request_cmd]
     )
     
     camera_base_streamer = GroupAction(
@@ -184,7 +201,7 @@ def generate_launch_description():
         mode,
         base_mode,
         ext_camera,
-        enable_tactile,
+        tactile_enabled,
         rsp_launch,
         rviz_node,
         tf_relay,
@@ -192,6 +209,7 @@ def generate_launch_description():
         local_kinova_vision,
         camera_wrist_republisher,
         papillarray_node,
+        delayed_bias_request,
         camera_base_streamer,
         camera_ext_streamer,
         base_server,

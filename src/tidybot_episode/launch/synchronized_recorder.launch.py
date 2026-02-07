@@ -29,10 +29,16 @@ def generate_launch_description():
             description='YAML list of cameras to record (base, arm, ext)'
         ),
         DeclareLaunchArgument(
+            'action_synchronized',
+            default_value='false',
+            description='Whether observations are recorded synchronously with actions'
+        ),
+        DeclareLaunchArgument(
             'tactile_enabled',
             default_value='false',
             description='Record PapillArray tactile sensors'
         ),
+
         Node(
             package='tidybot_episode',
             executable='synchronized_recorder',
@@ -42,6 +48,7 @@ def generate_launch_description():
                 'use_sim_time': LaunchConfiguration('use_sim'),
                 'fps': LaunchConfiguration('fps'),
                 'cameras': LaunchConfiguration('cameras'),
+                'action_synchronized': LaunchConfiguration('action_synchronized'),
                 'tactile_enabled': LaunchConfiguration('tactile_enabled')
             }],
             output='screen',
