@@ -22,6 +22,7 @@ from tidybot_utils.msg import MotionStage
 from geometry_msgs.msg import Pose, Point, Vector3
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
+from std_srvs.srv import Empty as EmptySrv, SetBool
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -64,17 +65,69 @@ class DrawerPolicyNode(Node):
         self.declare_parameter('approach_distance', 0.15)  # Distance to approach from
         self.declare_parameter('approach_duration', 3.0)   # PTP motion duration
         self.declare_parameter('grasp_duration', 2.0)      # LIN motion duration
-        self.declare_parameter('pull_duration', 2.5)       # LIN/CIRC motion duration
+        self.declare_parameter('pull_duration', 4.0)       # LIN/CIRC motion duration
         self.declare_parameter('gripper_duration', 3.0)    # Gripper action duration
+        self.declare_parameter('record_sensor_data', True)  # Enable sensor recording
+        
+        # Sensor data recorder service clients
+        self.record_enabled = self.get_parameter('record_sensor_data').value
+        if self.record_enabled:
+            self.recorder_start_client = self.create_client(
+                EmptySrv, '/sensor_recorder/start',
+                callback_group=self.callback_group
+            )
+            self.recorder_stop_client = self.create_client(
+                EmptySrv, '/sensor_recorder/stop',
+                callback_group=self.callback_group
+            )
+            self.recorder_save_client = self.create_client(
+                SetBool, '/sensor_recorder/save',
+                callback_group=self.callback_group
+            )
         
         self.get_logger().info('Drawer Policy Node initialized')
         self.get_logger().info('  Service: /open_drawer_task')
         self.get_logger().info('  Action client: /execute_stages')
+        self.get_logger().info(f'  Sensor recording: {"enabled" if self.record_enabled else "disabled"}')
+
+    async def _call_recorder_start(self):
+        """Start sensor data recording."""
+        if not self.record_enabled:
+            return
+        if not self.recorder_start_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('Sensor recorder start service not available')
+            return
+        await self.recorder_start_client.call_async(EmptySrv.Request())
+        self.get_logger().info('Sensor recording started')
+
+    async def _call_recorder_stop(self):
+        """Stop sensor data recording."""
+        if not self.record_enabled:
+            return
+        if not self.recorder_stop_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('Sensor recorder stop service not available')
+            return
+        await self.recorder_stop_client.call_async(EmptySrv.Request())
+        self.get_logger().info('Sensor recording stopped')
+
+    async def _call_recorder_save(self, save: bool):
+        """Save (True) or discard (False) recorded sensor data."""
+        if not self.record_enabled:
+            return
+        if not self.recorder_save_client.wait_for_service(timeout_sec=2.0):
+            self.get_logger().warn('Sensor recorder save service not available')
+            return
+        req = SetBool.Request()
+        req.data = save
+        result = await self.recorder_save_client.call_async(req)
+        action = 'saved' if save else 'discarded'
+        self.get_logger().info(f'Sensor data {action}: {result.message}')
 
     async def handle_drawer_request(self, request, response):
         """
         Handle incoming drawer task request.
         Compiles the request into MotionStage sequences and executes them.
+        Controls sensor data recording: start before execution, save/discard after.
         """
         self.get_logger().info(f'Received drawer task request: joint_type={request.joint_type}')
         
@@ -107,6 +160,9 @@ class DrawerPolicyNode(Node):
             response.message = "Executor action server not available"
             return response
         
+        # Start sensor data recording
+        await self._call_recorder_start()
+        
         # Send goal to executor
         goal = ExecuteStages.Goal()
         goal.stages = stages
@@ -123,11 +179,17 @@ class DrawerPolicyNode(Node):
         try:
             goal_handle = await future
         except Exception as e:
+            # Stop recording and discard on failure
+            await self._call_recorder_stop()
+            await self._call_recorder_save(save=False)
             response.accepted = False
             response.message = f"Action call failed: {str(e)}"
             return response
         
         if not goal_handle.accepted:
+            # Stop recording and discard on rejection
+            await self._call_recorder_stop()
+            await self._call_recorder_save(save=False)
             response.accepted = False
             response.message = "Goal rejected by executor"
             return response
@@ -141,13 +203,23 @@ class DrawerPolicyNode(Node):
             result_wrapper = await result_future
             result = result_wrapper.result
             
+            # Stop recording
+            await self._call_recorder_stop()
+            
             if result.success:
+                # Save recorded data on success
+                await self._call_recorder_save(save=True)
                 response.accepted = True
                 response.message = f"Task completed successfully: {result.message}"
             else:
+                # Discard recorded data on failure
+                await self._call_recorder_save(save=False)
                 response.accepted = False
                 response.message = f"Task failed: {result.message}"
         except Exception as e:
+            # Stop recording and discard on error
+            await self._call_recorder_stop()
+            await self._call_recorder_save(save=False)
             response.accepted = False
             response.message = f"Failed to get result: {str(e)}"
             

@@ -4,9 +4,13 @@ Launch file for the drawer task system.
 This launches:
 1. multi_stage_planner - Generic motion executor (action server)
 2. drawer_policy - Task-specific policy server (service + action client)
+3. sensor_data_recorder (optional) - Records contact force data
 
 Usage:
   ros2 launch tidybot_policy launch_drawer_policy.launch.py
+
+  # With sensor recording disabled:
+  ros2 launch tidybot_policy launch_drawer_policy.launch.py record_sensor_data:=false
 
 Then call the service:
   ros2 service call /open_drawer_task tidybot_utils/srv/OpenDrawerTask \
@@ -21,7 +25,8 @@ from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch_ros.actions import Node
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.conditions import IfCondition
 
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -50,6 +55,14 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'use_sim_time', default_value='true',
             description='Use simulation time'
+        ),
+        DeclareLaunchArgument(
+            'record_sensor_data', default_value='true',
+            description='Enable sensor data recording during drawer tasks'
+        ),
+        DeclareLaunchArgument(
+            'output_dir', default_value='/tmp/sensor_data',
+            description='Directory for recorded sensor data CSV files'
         ),
         
         # Multi-Stage Executor (generic motion executor)
@@ -80,7 +93,22 @@ def generate_launch_description():
                 'approach_duration': 3.0,
                 'grasp_duration': 2.0,
                 'pull_duration': 2.5,
-                'gripper_duration': 1.0
+                'gripper_duration': 1.0,
+                'record_sensor_data': LaunchConfiguration('record_sensor_data'),
             }]
-        )
+        ),
+        
+        # Sensor Data Recorder (optional, controlled by drawer_policy)
+        Node(
+            condition=IfCondition(LaunchConfiguration('record_sensor_data')),
+            package='tidybot_episode',
+            executable='sensor_data_recorder',
+            name='sensor_data_recorder',
+            output='screen',
+            parameters=[{
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'output_dir': LaunchConfiguration('output_dir'),
+                'record_rate': 10.0,
+            }]
+        ),
     ])

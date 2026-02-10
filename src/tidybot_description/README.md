@@ -247,7 +247,13 @@ The isaac_sim_bridge.py applies gear ratios to command all joints together.
 import omni.usd
 from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf, PhysxSchema, UsdShade
 import omni.graph.core as og
+import omni.kit.commands
 import math
+
+# Enable required extensions for contact sensors
+import omni.kit.app
+ext_manager = omni.kit.app.get_app().get_extension_manager()
+ext_manager.set_extension_enabled_immediate("isaacsim.sensors.physics", True)
 
 # Configuration
 ROBOT_PATH = "/World/Robot/tidybot"
@@ -280,11 +286,17 @@ CAMERAS = {
     },
 }
 
+# Note: Contact forces are handled in Step 3.5 using PhysX Contact Report API
+# No need to create separate contact sensor prims
+
 stage = omni.usd.get_context().get_stage()
 
 # Helper function to get prim at path (handles string to Sdf.Path conversion)
 def get_prim(path_str):
     return stage.GetPrimAtPath(Sdf.Path(path_str))
+
+# Articulation root path (where the ArticulationRootAPI is applied)
+artic_root_path = f"{ROBOT_PATH}/root_joint"
 
 print("\nSetting initial joint positions...")
 
@@ -400,6 +412,7 @@ for cam_name, cam_config in CAMERAS.items():
     if cam_path:
         camera_paths[cam_name] = cam_path
 
+
 # Create ROS 2 Action Graph
 print("\nCreating ROS 2 Action Graph...")
 graph_path = "/World/ROS2_ActionGraph"
@@ -423,6 +436,10 @@ for cam_name in camera_paths:
         (f"{cam_name}_RenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
         (f"{cam_name}_CameraHelper", "isaacsim.ros2.bridge.ROS2CameraHelper"),
     ])
+
+# Note: Contact sensors are created as USD prims above.
+# They can be read via Python API (omni.isaac.sensor.ContactSensor) in custom scripts.
+# The sensor_data_recorder.py node subscribes to /joint_states for force data.
 
 # Build values list
 values_to_set = [
@@ -467,6 +484,9 @@ for cam_name in camera_paths:
         (f"{cam_name}_RenderProduct.outputs:renderProductPath", f"{cam_name}_CameraHelper.inputs:renderProductPath"),
     ])
 
+# Note: Contact sensor XYZ forces are published via the Python API script in Step 3.5
+# The OmniGraph IsaacReadContactSensor node only provides scalar magnitude, not XYZ components
+
 og.Controller.edit(
     {"graph_path": graph_path, "evaluator_name": "execution"},
     {
@@ -486,6 +506,171 @@ The script above does these things:
   - Publishes camera images to `/tidybot/camera_wrist/color/raw` and `/tidybot/camera_base/color/raw`
 
 After executing, press **Play** to start the simulation. Or you can save the scene for later use.
+
+### Step 3.5: Contact Force Publisher (Optional)
+
+To publish **XYZ contact forces** to ROS2, run this script in the Script Editor. This script uses the `omni.physx` timeline subscription to read contact forces and publishes them as `geometry_msgs/WrenchStamped` messages.
+
+**Note:** Run this script, then press **Play** in Isaac Sim to start publishing.
+
+```python
+"""
+Contact Force Publisher for Isaac Sim
+
+This script publishes gripper contact forces (Fx, Fy, Fz) to ROS2.
+Run this in Isaac Sim's Script Editor after importing the robot.
+"""
+
+import omni.usd
+from pxr import Usd, Sdf, UsdGeom
+import omni.kit.app
+import omni.physx
+from omni.physx import get_physx_interface, get_physx_simulation_interface
+import numpy as np
+import carb
+
+# Enable required extensions
+ext_manager = omni.kit.app.get_app().get_extension_manager()
+ext_manager.set_extension_enabled_immediate("omni.isaac.ros2_bridge", True)
+ext_manager.set_extension_enabled_immediate("omni.physx", True)
+
+# ROS2 imports
+import rclpy
+from rclpy.node import Node
+from geometry_msgs.msg import WrenchStamped
+from std_msgs.msg import Header
+
+# Configuration
+ROBOT_PATH = "/World/Robot/tidybot"
+LEFT_PAD_PATH = f"{ROBOT_PATH}/left_inner_finger/collisions/robotiq_arg2f_85_pad"
+RIGHT_PAD_PATH = f"{ROBOT_PATH}/right_inner_finger/collisions/robotiq_arg2f_85_pad"
+
+# Initialize ROS2
+if not rclpy.ok():
+    rclpy.init()
+
+class ContactForcePublisher(Node):
+    """ROS2 node that publishes contact forces from Isaac Sim."""
+    
+    def __init__(self):
+        super().__init__('contact_force_publisher')
+        
+        # Publishers
+        self.left_pub = self.create_publisher(
+            WrenchStamped, '/tidybot/contact/left_finger', 10)
+        self.right_pub = self.create_publisher(
+            WrenchStamped, '/tidybot/contact/right_finger', 10)
+        
+        self.get_logger().info('ContactForcePublisher initialized')
+        
+        # Contact data storage
+        self.left_force = [0.0, 0.0, 0.0]
+        self.right_force = [0.0, 0.0, 0.0]
+    
+    def publish_forces(self, sim_time: float):
+        """Publish stored contact forces."""
+        # Create timestamp
+        sec = int(sim_time)
+        nsec = int((sim_time - sec) * 1e9)
+        
+        # Publish left finger force
+        left_msg = WrenchStamped()
+        left_msg.header.stamp.sec = sec
+        left_msg.header.stamp.nanosec = nsec
+        left_msg.header.frame_id = "left_inner_finger"
+        left_msg.wrench.force.x = self.left_force[0]
+        left_msg.wrench.force.y = self.left_force[1]
+        left_msg.wrench.force.z = self.left_force[2]
+        self.left_pub.publish(left_msg)
+        
+        # Publish right finger force
+        right_msg = WrenchStamped()
+        right_msg.header.stamp.sec = sec
+        right_msg.header.stamp.nanosec = nsec
+        right_msg.header.frame_id = "right_inner_finger"
+        right_msg.wrench.force.x = self.right_force[0]
+        right_msg.wrench.force.y = self.right_force[1]
+        right_msg.wrench.force.z = self.right_force[2]
+        self.right_pub.publish(right_msg)
+
+
+# Create ROS2 node
+ros_node = ContactForcePublisher()
+
+# Get stage and physx interface
+stage = omni.usd.get_context().get_stage()
+
+# Contact report callback - receives all contacts in the scene
+def contact_report_callback(contact_headers, contact_data):
+    """Process contact reports to extract forces on fingertips."""
+    left_path = LEFT_PAD_PATH
+    right_path = RIGHT_PAD_PATH
+    
+    left_force = [0.0, 0.0, 0.0]
+    right_force = [0.0, 0.0, 0.0]
+    
+    for header in contact_headers:
+        actor0_path = header.actor0
+        actor1_path = header.actor1
+        
+        # Check if this contact involves our fingertips
+        if left_path in actor0_path or left_path in actor1_path:
+            # Get contact points for this pair
+            for i in range(header.num_contact_data):
+                data = contact_data[header.contact_data_offset + i]
+                left_force[0] += data.impulse[0]
+                left_force[1] += data.impulse[1]
+                left_force[2] += data.impulse[2]
+        
+        if right_path in actor0_path or right_path in actor1_path:
+            for i in range(header.num_contact_data):
+                data = contact_data[header.contact_data_offset + i]
+                right_force[0] += data.impulse[0]
+                right_force[1] += data.impulse[1]
+                right_force[2] += data.impulse[2]
+    
+    # Store forces (impulse / dt gives force, but we'll use impulse as proxy)
+    ros_node.left_force = left_force
+    ros_node.right_force = right_force
+
+# Physics step callback
+_sim_time = [0.0]  # Mutable container to track time
+
+def on_physics_step(dt: float):
+    """Called every physics step."""
+    _sim_time[0] += dt
+    rclpy.spin_once(ros_node, timeout_sec=0)
+    ros_node.publish_forces(_sim_time[0])
+
+# Subscribe to physics events using omni.physx
+physx_subs = get_physx_interface().subscribe_physics_step_events(on_physics_step)
+
+# Enable contact reporting on the fingertips
+from pxr import PhysxSchema
+for path in [LEFT_PAD_PATH, RIGHT_PAD_PATH]:
+    prim = stage.GetPrimAtPath(path)
+    if prim.IsValid():
+        # Apply contact report API if not already applied
+        if not prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
+            PhysxSchema.PhysxContactReportAPI.Apply(prim)
+        contact_api = PhysxSchema.PhysxContactReportAPI(prim)
+        contact_api.CreateThresholdAttr().Set(0.0)  # Report all contacts
+        print(f"[INFO] Contact reporting enabled on: {path}")
+
+# Subscribe to contact reports using the SIMULATION interface (not regular physx interface)
+contact_sub = get_physx_simulation_interface().subscribe_contact_report_events(contact_report_callback)
+
+print("[INFO] Contact Force Publisher registered. Press Play to start publishing.")
+print("[INFO] Topics: /tidybot/contact/left_finger, /tidybot/contact/right_finger")
+print("[INFO] Forces represent contact impulses (Newton-seconds per step)")
+```
+
+After running this script and pressing Play, verify the contact forces are being published:
+
+```bash
+ros2 topic echo /tidybot/contact/left_finger
+ros2 topic echo /tidybot/contact/right_finger
+```
 
 ### Step 4: Launch ROS 2 Stack
 
