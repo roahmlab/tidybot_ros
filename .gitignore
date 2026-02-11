@@ -46,7 +46,7 @@ episode_bag/
 src/tidybot_description/usd/*
 !src/tidybot_description/usd/Collected_tidybot/
 !src/tidybot_description/usd/Collected_tidybot/**
-
+/sensor_data/*
 # OS-specific junk
 .DS_Store
 Thumbs.db

@@ -61,7 +61,7 @@ def generate_launch_description():
             description='Enable sensor data recording during drawer tasks'
         ),
         DeclareLaunchArgument(
-            'output_dir', default_value='/tmp/sensor_data',
+            'output_dir', default_value='./sensor_data',
             description='Directory for recorded sensor data CSV files'
         ),
         

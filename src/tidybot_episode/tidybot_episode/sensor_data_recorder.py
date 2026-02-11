@@ -39,7 +39,7 @@ class SensorDataRecorder(Node):
         super().__init__('sensor_data_recorder')
 
         # Parameters
-        self.declare_parameter('output_dir', '/tmp/sensor_data')
+        self.declare_parameter('output_dir', './sensor_data/')
         self.declare_parameter('record_rate', 10.0)  # Hz
         self.declare_parameter('drawer_joint_name', 'top_drawer_joint')
         

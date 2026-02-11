@@ -333,7 +333,7 @@ private:
                                      
         // 2. Generate waypoints using interpolation
         // Standardize on 20Hz (50ms) control loop for smooth streaming
-        double control_rate = 20.0;
+        double control_rate = 50.0;
         double dt = 1.0 / control_rate;
         double total_duration = stage.duration > 0.0 ? stage.duration : 2.0;
         int num_waypoints = static_cast<int>(total_duration * control_rate);
@@ -433,7 +433,7 @@ private:
         
         // Generate waypoints along the arc
         // Standardize on 20Hz control loop
-        double control_rate = 20.0;
+        double control_rate = 50.0;
         double dt = 1.0 / control_rate;
         double total_duration = stage.duration > 0.0 ? stage.duration : 2.0;
         int num_waypoints = static_cast<int>(total_duration * control_rate);

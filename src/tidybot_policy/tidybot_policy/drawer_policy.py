@@ -64,7 +64,7 @@ class DrawerPolicyNode(Node):
         # Parameters
         self.declare_parameter('approach_distance', 0.15)  # Distance to approach from
         self.declare_parameter('approach_duration', 3.0)   # PTP motion duration
-        self.declare_parameter('grasp_duration', 2.0)      # LIN motion duration
+        self.declare_parameter('grasp_duration', 1.0)      # LIN motion duration
         self.declare_parameter('pull_duration', 4.0)       # LIN/CIRC motion duration
         self.declare_parameter('gripper_duration', 3.0)    # Gripper action duration
         self.declare_parameter('record_sensor_data', True)  # Enable sensor recording

@@ -522,7 +522,7 @@ Run this in Isaac Sim's Script Editor after importing the robot.
 """
 
 import omni.usd
-from pxr import Usd, Sdf, UsdGeom
+from pxr import Usd, Sdf, UsdGeom, PhysicsSchemaTools
 import omni.kit.app
 import omni.physx
 from omni.physx import get_physx_interface, get_physx_simulation_interface
@@ -533,6 +533,7 @@ import carb
 ext_manager = omni.kit.app.get_app().get_extension_manager()
 ext_manager.set_extension_enabled_immediate("omni.isaac.ros2_bridge", True)
 ext_manager.set_extension_enabled_immediate("omni.physx", True)
+ext_manager.set_extension_enabled_immediate("omni.debugdraw", True)
 
 # ROS2 imports
 import rclpy
@@ -542,8 +543,8 @@ from std_msgs.msg import Header
 
 # Configuration
 ROBOT_PATH = "/World/Robot/tidybot"
-LEFT_PAD_PATH = f"{ROBOT_PATH}/left_inner_finger/collisions/robotiq_arg2f_85_pad"
-RIGHT_PAD_PATH = f"{ROBOT_PATH}/right_inner_finger/collisions/robotiq_arg2f_85_pad"
+LEFT_PAD_PATH = f"{ROBOT_PATH}/left_inner_finger"
+RIGHT_PAD_PATH = f"{ROBOT_PATH}/right_inner_finger"
 
 # Initialize ROS2
 if not rclpy.ok():
@@ -610,8 +611,9 @@ def contact_report_callback(contact_headers, contact_data):
     right_force = [0.0, 0.0, 0.0]
     
     for header in contact_headers:
-        actor0_path = header.actor0
-        actor1_path = header.actor1
+        # Decode integer path IDs to string paths (Isaac Sim 5.x API)
+        actor0_path = str(PhysicsSchemaTools.intToSdfPath(header.actor0))
+        actor1_path = str(PhysicsSchemaTools.intToSdfPath(header.actor1))
         
         # Check if this contact involves our fingertips
         if left_path in actor0_path or left_path in actor1_path:
@@ -636,11 +638,55 @@ def contact_report_callback(contact_headers, contact_data):
 # Physics step callback
 _sim_time = [0.0]  # Mutable container to track time
 
+# Debug draw for force visualization
+from omni.debugdraw import get_debug_draw_interface
+debug_draw = get_debug_draw_interface()
+FORCE_SCALE = 0.01  # Scale factor: 1 N·s impulse = 0.01m arrow length
+
+def get_prim_world_position(prim_path):
+    """Get the world-space position of a prim."""
+    prim = stage.GetPrimAtPath(prim_path)
+    if not prim.IsValid():
+        return (0.0, 0.0, 0.0)
+    xformable = UsdGeom.Xformable(prim)
+    transform = xformable.ComputeLocalToWorldTransform(0)
+    t = transform.ExtractTranslation()
+    return (t[0], t[1], t[2])
+
+def draw_force_vectors():
+    """Draw RGB force arrows at the left finger position."""
+    pos = get_prim_world_position(LEFT_PAD_PATH)
+    fx, fy, fz = ros_node.left_force
+    
+    # Colors as packed 0xAARRGGBB integers
+    RED = 0xFFCC1919
+    GREEN = 0xFF19CC19
+    BLUE = 0xFF4D4DFF
+    
+    origin = carb.Float3(pos[0], pos[1], pos[2])
+    
+    # Red arrow = X force
+    debug_draw.draw_line(
+        origin, RED, 3.0,
+        carb.Float3(pos[0] + fx * FORCE_SCALE, pos[1], pos[2]), RED, 3.0
+    )
+    # Green arrow = Y force
+    debug_draw.draw_line(
+        origin, GREEN, 3.0,
+        carb.Float3(pos[0], pos[1] + fy * FORCE_SCALE, pos[2]), GREEN, 3.0
+    )
+    # Blue arrow = Z force
+    debug_draw.draw_line(
+        origin, BLUE, 3.0,
+        carb.Float3(pos[0], pos[1], pos[2] + fz * FORCE_SCALE), BLUE, 3.0
+    )
+
 def on_physics_step(dt: float):
     """Called every physics step."""
     _sim_time[0] += dt
     rclpy.spin_once(ros_node, timeout_sec=0)
     ros_node.publish_forces(_sim_time[0])
+    draw_force_vectors()
 
 # Subscribe to physics events using omni.physx
 physx_subs = get_physx_interface().subscribe_physics_step_events(on_physics_step)
