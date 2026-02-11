@@ -154,8 +154,10 @@ RUN cd /home/${USER_NAME}/tidybot_platform/src/external && \
 # Install Orbbec udev rules (reload may fail in build env; ignore non-zero exit)
 RUN bash /home/${USER_NAME}/tidybot_platform/src/external/OrbbecSDK_ROS2/orbbec_camera/scripts/install_udev_rules.sh || true
 
-# Initialize rosdep as root, then switch to user for build
-RUN . /opt/ros/${ROS_DISTRO}/setup.sh && (rosdep init || true)
+# Initialize rosdep as root
+RUN rm -rf /etc/ros/rosdep/sources.list.d && \
+    . /opt/ros/${ROS_DISTRO}/setup.sh && \
+    rosdep init
 
 # Ensure ownership for the workspace
 RUN chown -R ${USER_NAME}:${USER_NAME} /home/${USER_NAME}
@@ -168,15 +170,10 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     "arrow parquet warehouse_ros_mongo ament_python glog joint_state_publisher \
     joint_state_publisher_gui opencv opencv4 threadpoolctl setuptools numpy \
     libgoogle-glog-dev flask flask_socketio phoenix6 \
-    libgoogle-glog-dev flask flask_socketio phoenix6 \
     moveit_resources_panda_moveit_config moveit_resources_fanuc_moveit_config \
     py_binding_tools moveit_py" && \
     colcon build --symlink-install
 
-# Upgrade all packages
-RUN apt-get -y update \
-    && apt-get -y upgrade \   
-    && apt-get -y install
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USER_NAME}/.bashrc
 
