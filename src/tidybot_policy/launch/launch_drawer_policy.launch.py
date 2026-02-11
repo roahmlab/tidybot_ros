@@ -108,7 +108,7 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'output_dir': LaunchConfiguration('output_dir'),
-                'record_rate': 10.0,
+                'record_rate': 20.0,
             }]
         ),
     ])

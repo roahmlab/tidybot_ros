@@ -507,17 +507,19 @@ The script above does these things:
 
 After executing, press **Play** to start the simulation. Or you can save the scene for later use.
 
-### Step 3.5: Contact Force Publisher (Optional)
+### Step 3.5: Contact Force & Drawer State Publisher (Optional)
 
-To publish **XYZ contact forces** to ROS2, run this script in the Script Editor. This script uses the `omni.physx` timeline subscription to read contact forces and publishes them as `geometry_msgs/WrenchStamped` messages.
+To publish **XYZ contact forces** and **drawer joint state** (position, velocity, acceleration) to ROS2, run this script in the Script Editor. This script uses the `omni.physx` timeline subscription to read contact forces and drawer state, publishing them as ROS2 messages.
 
 **Note:** Run this script, then press **Play** in Isaac Sim to start publishing.
 
 ```python
 """
-Contact Force Publisher for Isaac Sim
+Contact Force & Drawer State Publisher for Isaac Sim
 
-This script publishes gripper contact forces (Fx, Fy, Fz) to ROS2.
+This script publishes:
+  - Gripper contact forces (Fx, Fy, Fz) as WrenchStamped
+  - Drawer handle state (position, velocity, acceleration in XYZ) as Float64MultiArray
 Run this in Isaac Sim's Script Editor after importing the robot.
 """
 
@@ -539,38 +541,66 @@ ext_manager.set_extension_enabled_immediate("omni.debugdraw", True)
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import WrenchStamped
-from std_msgs.msg import Header
+from std_msgs.msg import Header, Float64MultiArray, MultiArrayDimension
 
 # Configuration
 ROBOT_PATH = "/World/Robot/tidybot"
 LEFT_PAD_PATH = f"{ROBOT_PATH}/left_inner_finger"
 RIGHT_PAD_PATH = f"{ROBOT_PATH}/right_inner_finger"
+DRAWER_JOINT_PATH = "/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint"
 
 # Initialize ROS2
 if not rclpy.ok():
     rclpy.init()
 
 class ContactForcePublisher(Node):
-    """ROS2 node that publishes contact forces from Isaac Sim."""
+    """ROS2 node that publishes contact forces and drawer state from Isaac Sim."""
     
     def __init__(self):
         super().__init__('contact_force_publisher')
         
-        # Publishers
+        # Contact force publishers
         self.left_pub = self.create_publisher(
             WrenchStamped, '/tidybot/contact/left_finger', 10)
         self.right_pub = self.create_publisher(
             WrenchStamped, '/tidybot/contact/right_finger', 10)
+        
+        # Drawer state publisher: [pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, acc_x, acc_y, acc_z]
+        self.drawer_pub = self.create_publisher(
+            Float64MultiArray, '/tidybot/drawer/state', 10)
         
         self.get_logger().info('ContactForcePublisher initialized')
         
         # Contact data storage
         self.left_force = [0.0, 0.0, 0.0]
         self.right_force = [0.0, 0.0, 0.0]
+        
+        # Drawer state tracking (for numerical differentiation)
+        self.drawer_pos = np.zeros(3)
+        self.drawer_vel = np.zeros(3)
+        self.drawer_acc = np.zeros(3)
+        self._prev_drawer_pos = None
+        self._prev_drawer_vel = None
+    
+    def update_drawer_state(self, current_pos, dt):
+        """Update drawer position, velocity, and acceleration."""
+        self.drawer_pos = np.array(current_pos)
+        
+        if self._prev_drawer_pos is not None and dt > 0:
+            self.drawer_vel = (self.drawer_pos - self._prev_drawer_pos) / dt
+        else:
+            self.drawer_vel = np.zeros(3)
+        
+        if self._prev_drawer_vel is not None and dt > 0:
+            self.drawer_acc = (self.drawer_vel - self._prev_drawer_vel) / dt
+        else:
+            self.drawer_acc = np.zeros(3)
+        
+        self._prev_drawer_pos = self.drawer_pos.copy()
+        self._prev_drawer_vel = self.drawer_vel.copy()
     
     def publish_forces(self, sim_time: float):
         """Publish stored contact forces."""
-        # Create timestamp
         sec = int(sim_time)
         nsec = int((sim_time - sec) * 1e9)
         
@@ -593,6 +623,16 @@ class ContactForcePublisher(Node):
         right_msg.wrench.force.y = self.right_force[1]
         right_msg.wrench.force.z = self.right_force[2]
         self.right_pub.publish(right_msg)
+    
+    def publish_drawer_state(self):
+        """Publish drawer position, velocity, and acceleration."""
+        msg = Float64MultiArray()
+        msg.layout.dim = [
+            MultiArrayDimension(label='state', size=9, stride=9)
+        ]
+        # Layout: [pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, acc_x, acc_y, acc_z]
+        msg.data = list(self.drawer_pos) + list(self.drawer_vel) + list(self.drawer_acc)
+        self.drawer_pub.publish(msg)
 
 
 # Create ROS2 node
@@ -684,8 +724,14 @@ def draw_force_vectors():
 def on_physics_step(dt: float):
     """Called every physics step."""
     _sim_time[0] += dt
+    
+    # Update drawer state
+    drawer_pos = get_prim_world_position(DRAWER_JOINT_PATH)
+    ros_node.update_drawer_state(drawer_pos, dt)
+    
     rclpy.spin_once(ros_node, timeout_sec=0)
     ros_node.publish_forces(_sim_time[0])
+    ros_node.publish_drawer_state()
     draw_force_vectors()
 
 # Subscribe to physics events using omni.physx
@@ -711,11 +757,37 @@ print("[INFO] Topics: /tidybot/contact/left_finger, /tidybot/contact/right_finge
 print("[INFO] Forces represent contact impulses (Newton-seconds per step)")
 ```
 
-After running this script and pressing Play, verify the contact forces are being published:
+### Running Setup Scripts from CLI
+
+The Step 3 and Step 3.5 scripts are also available as standalone Python files in `tidybot_description/`, so you can run them with Isaac Sim's `--exec` flag instead of pasting into the Script Editor:
+
+| Script | Source | Purpose |
+|--------|--------|---------|
+| [`isaac_sim_setup.py`](tidybot_description/isaac_sim_setup.py) | Step 3 | Joint home positions, cameras, ROS2 action graph |
+| [`contact_force_publisher.py`](tidybot_description/contact_force_publisher.py) | Step 3.5 | Contact forces + drawer state publisher |
+
+**Basic usage:**
 
 ```bash
-ros2 topic echo /tidybot/contact/left_finger
-ros2 topic echo /tidybot/contact/right_finger
+./isaac-sim.sh \
+  --exec "/workspace/src/tidybot_description/tidybot_description/isaac_sim_setup.py" \
+  --exec "/workspace/src/tidybot_description/tidybot_description/contact_force_publisher.py"
+```
+
+**Configurable settings** — `contact_force_publisher.py` supports Carbonite settings overrides via `--/` flags:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `/app/tidybot/robot_path` | `/World/Robot/tidybot` | Robot articulation root path |
+| `/app/tidybot/drawer_joint_path` | `/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint` | Drawer handle joint prim path |
+
+**Example with custom drawer path:**
+
+```bash
+./isaac-sim.sh \
+  --exec "/workspace/.../isaac_sim_setup.py" \
+  --exec "/workspace/.../contact_force_publisher.py" \
+  --/app/tidybot/drawer_joint_path="/World/my_cabinet/drawer_top/handle_joint"
 ```
 
 ### Step 4: Launch ROS 2 Stack

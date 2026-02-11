@@ -2,28 +2,30 @@
 """
 Sensor Data Recorder Node for TidyBot++
 
-Records contact forces and other sensor data to CSV files in a format
+Records contact forces and drawer handle state to CSV files in a format
 compatible with Isaac Lab's data collection output.
 
 Subscribes to:
   - /tidybot/contact/left_finger (geometry_msgs/WrenchStamped) - XYZ force
   - /tidybot/contact/right_finger (geometry_msgs/WrenchStamped) - XYZ force
-  - /joint_states (sensor_msgs/JointState) - for drawer velocity proxy
+  - /tidybot/drawer/state (std_msgs/Float64MultiArray) - drawer handle XYZ pos/vel/acc
 
 Services:
   - /sensor_recorder/start (std_srvs/Empty)
   - /sensor_recorder/stop (std_srvs/Empty)
   - /sensor_recorder/save (std_srvs/SetBool)
 
-Output CSV format matches Isaac Lab:
-  Time(s), Left_Fx, Left_Fy, Left_Fz, Right_Fx, Right_Fy, Right_Fz, Drawer_Vx, Drawer_Vy, Drawer_Vz
+Output CSV format:
+  Time(s), Handle_x, Handle_y, Handle_z, Handle_vx, Handle_vy, Handle_vz,
+  Handle_ax, Handle_ay, Handle_az, Left_Fx, Left_Fy, Left_Fz,
+  Right_Fx, Right_Fy, Right_Fz
 """
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, DurabilityPolicy
 from geometry_msgs.msg import WrenchStamped
-from sensor_msgs.msg import JointState
+from std_msgs.msg import Float64MultiArray
 from std_srvs.srv import Empty, SetBool
 import csv
 import os
@@ -40,12 +42,10 @@ class SensorDataRecorder(Node):
 
         # Parameters
         self.declare_parameter('output_dir', './sensor_data/')
-        self.declare_parameter('record_rate', 10.0)  # Hz
-        self.declare_parameter('drawer_joint_name', 'top_drawer_joint')
+        self.declare_parameter('record_rate', 20.0)  # Hz
         
         self.output_dir = self.get_parameter('output_dir').get_parameter_value().string_value
         self.record_rate = self.get_parameter('record_rate').get_parameter_value().double_value
-        self.drawer_joint_name = self.get_parameter('drawer_joint_name').get_parameter_value().string_value
 
         # State
         self.is_recording = False
@@ -53,12 +53,11 @@ class SensorDataRecorder(Node):
         self.lock = threading.Lock()
         self.start_time = None
         
-        # Latest sensor readings (XYZ force vectors)
+        # Latest sensor readings
         self.left_force = [0.0, 0.0, 0.0]
         self.right_force = [0.0, 0.0, 0.0]
-        self.drawer_velocity = [0.0, 0.0, 0.0]  # Approximated from joint velocity
-        self.last_drawer_position = None
-        self.last_drawer_time = None
+        # Drawer handle state: [pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, acc_x, acc_y, acc_z]
+        self.handle_state = [0.0] * 9
 
         # QoS for sensor data
         sensor_qos = QoSProfile(
@@ -80,10 +79,10 @@ class SensorDataRecorder(Node):
             self._right_contact_callback,
             sensor_qos
         )
-        self.joint_state_sub = self.create_subscription(
-            JointState,
-            '/joint_states',
-            self._joint_state_callback,
+        self.drawer_state_sub = self.create_subscription(
+            Float64MultiArray,
+            '/tidybot/drawer/state',
+            self._drawer_state_callback,
             sensor_qos
         )
 
@@ -130,28 +129,10 @@ class SensorDataRecorder(Node):
             msg.wrench.force.z
         ]
 
-    def _joint_state_callback(self, msg: JointState):
-        """Extract drawer velocity from joint states."""
-        if self.drawer_joint_name in msg.name:
-            idx = msg.name.index(self.drawer_joint_name)
-            if idx < len(msg.velocity):
-                # Drawer is a prismatic joint, so velocity is linear
-                # We report it as X velocity (drawer opens along X typically)
-                drawer_vel = msg.velocity[idx]
-                self.drawer_velocity = [drawer_vel, 0.0, 0.0]
-            elif idx < len(msg.position):
-                # Approximate velocity from position changes
-                current_pos = msg.position[idx]
-                current_time = self.get_clock().now().nanoseconds / 1e9
-                
-                if self.last_drawer_position is not None and self.last_drawer_time is not None:
-                    dt = current_time - self.last_drawer_time
-                    if dt > 0:
-                        vel = (current_pos - self.last_drawer_position) / dt
-                        self.drawer_velocity = [vel, 0.0, 0.0]
-                
-                self.last_drawer_position = current_pos
-                self.last_drawer_time = current_time
+    def _drawer_state_callback(self, msg: Float64MultiArray):
+        """Update drawer handle state from /tidybot/drawer/state."""
+        if len(msg.data) >= 9:
+            self.handle_state = list(msg.data[:9])
 
     def _record_callback(self):
         """Record current sensor values if recording is active."""
@@ -163,15 +144,21 @@ class SensorDataRecorder(Node):
 
         row = {
             'Time(s)': elapsed_time,
+            'Handle_x': self.handle_state[0],
+            'Handle_y': self.handle_state[1],
+            'Handle_z': self.handle_state[2],
+            'Handle_vx': self.handle_state[3],
+            'Handle_vy': self.handle_state[4],
+            'Handle_vz': self.handle_state[5],
+            'Handle_ax': self.handle_state[6],
+            'Handle_ay': self.handle_state[7],
+            'Handle_az': self.handle_state[8],
             'Left_Fx': self.left_force[0],
             'Left_Fy': self.left_force[1],
             'Left_Fz': self.left_force[2],
             'Right_Fx': self.right_force[0],
             'Right_Fy': self.right_force[1],
             'Right_Fz': self.right_force[2],
-            'Drawer_Vx': self.drawer_velocity[0],
-            'Drawer_Vy': self.drawer_velocity[1],
-            'Drawer_Vz': self.drawer_velocity[2],
         }
 
         with self.lock:
