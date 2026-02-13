@@ -154,7 +154,7 @@ class SensorDataRecorder(Node):
         self.right_force = self._ema_update(self.right_force, raw)
 
     def _drawer_state_callback(self, msg: Float64MultiArray):
-        """Update drawer handle state with clamping on vel/acc."""
+        """Update drawer handle state with clamping and EMA smoothing on vel/acc."""
         if len(msg.data) >= 9:
             state = list(msg.data[:9])
             # Clamp velocities (indices 3-5)
@@ -163,6 +163,11 @@ class SensorDataRecorder(Node):
             # Clamp accelerations (indices 6-8)
             for i in range(6, 9):
                 state[i] = self._clamp(state[i], self.max_handle_acc)
+            # EMA smooth velocity and acceleration (leave position unfiltered)
+            old = self.handle_state
+            a = self.ema_alpha
+            for i in range(3, 9):
+                state[i] = a * state[i] + (1.0 - a) * old[i]
             self.handle_state = state
 
     def _record_callback(self):

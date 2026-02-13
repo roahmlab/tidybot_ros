@@ -314,7 +314,7 @@ class DrawerPolicyNode(Node):
         # Stage 4: Close gripper
         stage4 = MotionStage()
         stage4.stage_type = MotionStage.STAGE_GRIPPER
-        stage4.gripper_position = 0.74  # Closed (scaled by 0.82 by executor)
+        stage4.gripper_position = 0.8 # Closed (scaled by 0.82 by executor)
         stage4.duration = gripper_dur * 2  # Extra time for gripper to close
         stage4.description = "Close gripper"
         stages.append(stage4)
@@ -343,6 +343,8 @@ class DrawerPolicyNode(Node):
             stage5.arc_angle = pull_amount
         stage5.duration = pull_dur
         stage5.velocity_scaling = 0.1
+        stage5.speed_profile = MotionStage.PROFILE_SINUSOIDAL
+        stage5.speed_profile_freq = 1.0  # 1 cycle: smooth accel then decel
         stage5.description = "Pull drawer"
         stages.append(stage5)
         

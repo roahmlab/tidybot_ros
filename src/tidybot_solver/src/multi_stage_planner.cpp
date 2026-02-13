@@ -238,14 +238,11 @@ private:
                 return;
             }
 
-            // Synchronize robot_state with actual robot position after motion
-            // This ensures the next stage computes IK from the correct starting position
-            if (stage.stage_type != MotionStage::STAGE_GRIPPER &&
-                stage.stage_type != MotionStage::STAGE_WAIT) {
-                // Wait for robot to settle and state to update
+            // Synchronize robot_state with actual robot position after every stage
+            // (including GRIPPER/WAIT — contact forces can shift the arm)
+            {
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 
-                // Request fresh state from planning scene
                 if (!psm_->waitForCurrentRobotState(this->get_clock()->now(), 2.0)) {
                     RCLCPP_WARN(this->get_logger(), "Timeout waiting for updated robot state");
                 }
@@ -356,34 +353,55 @@ private:
 
         // Execute waypoints sequentially
         for (int i = 1; i <= num_waypoints; ++i) {
-            double fraction = static_cast<double>(i) / num_waypoints;
+            double t = static_cast<double>(i) / num_waypoints;  // Normalized time [0, 1]
+
+            // Compute position fraction based on speed profile
+            double fraction;
+            if (stage.speed_profile == MotionStage::PROFILE_SINUSOIDAL) {
+                // Sinusoidal speed: v(t) = mean_speed * (1 - cos(2π·freq·t))
+                // Position: fraction = t - sin(2π·freq·t) / (2π·freq)
+                double freq = stage.speed_profile_freq > 0.0 ? stage.speed_profile_freq : 2.0;
+                double omega = 2.0 * M_PI * freq;
+                fraction = t - std::sin(omega * t) / omega;
+                RCLCPP_DEBUG(this->get_logger(), "Sinusoidal profile: t=%.3f, fraction=%.3f", t, fraction);
+            } else {
+                // Constant speed (default)
+                fraction = t;
+            }
             
             // Interpolate Position (Linear)
             Eigen::Vector3d interp_pos = start_pos + (target_pos - start_pos) * fraction;
             // Interpolate Orientation (SLERP)
             Eigen::Quaterniond interp_quat = start_quat.slerp(fraction, target_quat);
             
-            geometry_msgs::msg::Pose waypoint_pose;
-            waypoint_pose.position.x = interp_pos.x();
-            waypoint_pose.position.y = interp_pos.y();
-            waypoint_pose.position.z = interp_pos.z();
-            waypoint_pose.orientation.x = interp_quat.x();
-            waypoint_pose.orientation.y = interp_quat.y();
-            waypoint_pose.orientation.z = interp_quat.z();
-            waypoint_pose.orientation.w = interp_quat.w();
-            
-            // Solve IK
-            bool found_ik = robot_state->setFromIK(joint_model_group, waypoint_pose, tip_link, 0.1, 
-                                                 moveit::core::GroupStateValidityCallbackFn(), ik_options);
-            
-            if (!found_ik) {
-                RCLCPP_ERROR(this->get_logger(), "IK failed at LIN waypoint %d/%d", i, num_waypoints);
-                return false;
-            }
-            
-            robot_state->enforceBounds();
+            // Skip IK when displacement is negligible (< 0.5mm) to avoid
+            // IK ambiguity causing twitches at the start of sinusoidal profiles
+            double displacement = (interp_pos - start_pos).norm();
             std::vector<double> joint_values;
-            robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+            if (displacement < 0.0005) {
+                joint_values = prev_joint_values;
+            } else {
+                geometry_msgs::msg::Pose waypoint_pose;
+                waypoint_pose.position.x = interp_pos.x();
+                waypoint_pose.position.y = interp_pos.y();
+                waypoint_pose.position.z = interp_pos.z();
+                waypoint_pose.orientation.x = interp_quat.x();
+                waypoint_pose.orientation.y = interp_quat.y();
+                waypoint_pose.orientation.z = interp_quat.z();
+                waypoint_pose.orientation.w = interp_quat.w();
+                
+                // Solve IK
+                bool found_ik = robot_state->setFromIK(joint_model_group, waypoint_pose, tip_link, 0.1, 
+                                                     moveit::core::GroupStateValidityCallbackFn(), ik_options);
+                
+                if (!found_ik) {
+                    RCLCPP_ERROR(this->get_logger(), "IK failed at LIN waypoint %d/%d", i, num_waypoints);
+                    return false;
+                }
+                
+                robot_state->enforceBounds();
+                robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+            }
 
             // Discontinuity check logic...
              double max_jump = 0.0;
@@ -394,10 +412,9 @@ private:
             if (max_jump > 0.52) { 
                  RCLCPP_WARN(this->get_logger(), "Large joint jump detected (%.2f rad)", max_jump);
             }
-            prev_joint_values = joint_values;
-            
-            // Publish with exact duration
+            // Publish smooth interpolation from previous to current joint values
             publish_trajectory(joint_model_group, prev_joint_values, joint_values, dt);
+            prev_joint_values = joint_values;
             
             // Wait for exact dt (no buffer) to maintain stream rate
             std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(dt * 1000)));

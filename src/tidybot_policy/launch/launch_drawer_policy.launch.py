@@ -92,7 +92,7 @@ def generate_launch_description():
                 'approach_distance': LaunchConfiguration('approach_distance'),
                 'approach_duration': 2.0,
                 'grasp_duration': 2.0,
-                'pull_duration': 2.0,
+                'pull_duration': 5.0,
                 'gripper_duration': 2.0,
                 'wait_after_grasp_duration': 0.5,
                 'record_sensor_data': LaunchConfiguration('record_sensor_data'),

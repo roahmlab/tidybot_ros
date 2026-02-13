@@ -206,7 +206,7 @@ FORCE_SCALE = 0.01  # 1 N = 0.01m arrow length
 
 def get_prim_world_position(prim_path):
     """Get the world-space position of a prim."""
-    prim = stage.GetPrimAtPath(prim_path)
+    prim = stage.GetPrimAtPath(Sdf.Path(prim_path))
     if not prim.IsValid():
         return (0.0, 0.0, 0.0)
     xformable = UsdGeom.Xformable(prim)

@@ -21,3 +21,9 @@ float64 gripper_position              # 0.0 = open, 1.0 = closed
 float64 velocity_scaling              # 0.0 to 1.0
 float64 duration                      # estimated duration in seconds
 string description                    # for feedback/logging
+
+# Speed profile for LIN motions (default: constant speed)
+uint8 PROFILE_CONSTANT = 0            # Uniform speed (default)
+uint8 PROFILE_SINUSOIDAL = 1          # Sinusoidal speed variation
+uint8 speed_profile
+float64 speed_profile_freq            # Number of oscillation cycles (e.g. 2.0)
