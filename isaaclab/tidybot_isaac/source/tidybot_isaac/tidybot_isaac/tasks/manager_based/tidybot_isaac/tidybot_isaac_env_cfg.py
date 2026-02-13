@@ -56,15 +56,26 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     # robot
     robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    # contact sensors
-    contact_forces = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/.*_inner_finger.*", 
+    # Per-finger contact sensors with filter targeting drawer handle
+    # (matches open_drawer_collect_data.py approach — friction_forces_w only)
+    contact_forces_left = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/left_inner_finger",
         update_period=0.0,
-        history_length=3,
-        track_air_time=False,
+        history_length=6,
         debug_vis=True,
-        # filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_top/handle"],
-        visualizer_cfg=FORCE_MARKER_CFG.replace(prim_path="/Visuals/ContactForceArrows"),
+        track_friction_forces=True,
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
+        max_contact_data_count_per_prim=4,
+    )
+
+    contact_forces_right = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/right_inner_finger",
+        update_period=0.0,
+        history_length=6,
+        debug_vis=True,
+        track_friction_forces=True,
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
+        max_contact_data_count_per_prim=16,
     )
 
     # End-effector Frame
@@ -389,4 +400,3 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.lookat = (0.0, 0.0, 0.0)
         # simulation settings
         self.sim.dt = 1 / 240
-        self.sim.render_interval = self.decimation

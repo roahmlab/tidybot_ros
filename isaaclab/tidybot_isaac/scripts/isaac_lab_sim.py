@@ -26,7 +26,7 @@ import argparse
 import sys
 import os
 import time
-from datetime import datetime
+
 
 from isaaclab.app import AppLauncher
 
@@ -34,7 +34,6 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Isaac Lab Simulation with ROS2 Bridge.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default="Isaac-TidyBot-Drawer-v0", help="Name of the task.")
-parser.add_argument("--save_path", type=str, default=None, help="Path to save sensor data CSV.")
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time.")
 
 # append AppLauncher cli args (includes --enable_cameras)
@@ -42,10 +41,7 @@ AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
 args_cli, hydra_args = parser.parse_known_args()
 
-# Handle default save path with timestamp
-if args_cli.save_path is None:
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    args_cli.save_path = f"logs/ros2_bridge/sensor_data_{timestamp}.csv"
+
 
 # clear out sys.argv for Hydra
 sys.argv = [sys.argv[0]] + hydra_args
@@ -62,7 +58,7 @@ ext_manager.set_extension_enabled_immediate("omni.isaac.ros2_bridge", True)
 """Rest everything follows after Isaac Sim is initialized."""
 
 import numpy as np
-import pandas as pd
+
 import torch
 import gymnasium as gym
 
@@ -70,8 +66,9 @@ import gymnasium as gym
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy
-from std_msgs.msg import Float64MultiArray
+from std_msgs.msg import Float64MultiArray, MultiArrayDimension
 from sensor_msgs.msg import JointState, Image
+from geometry_msgs.msg import WrenchStamped
 from trajectory_msgs.msg import JointTrajectory
 from rosgraph_msgs.msg import Clock
 from builtin_interfaces.msg import Time
@@ -134,20 +131,41 @@ class IsaacLabROS2Node(Node):
         self.wrist_camera_pub = self.create_publisher(Image, '/tidybot/camera_wrist/color/raw', 10)
         self.base_camera_pub = self.create_publisher(Image, '/tidybot/camera_base/color/raw', 10)
         
+        # Contact force publishers (matching contact_force_publisher.py topics)
+        self.left_contact_pub = self.create_publisher(
+            WrenchStamped, '/tidybot/contact/left_finger', 10)
+        self.right_contact_pub = self.create_publisher(
+            WrenchStamped, '/tidybot/contact/right_finger', 10)
+        
+        # Drawer state publisher (matching contact_force_publisher.py topic)
+        self.drawer_state_pub = self.create_publisher(
+            Float64MultiArray, '/tidybot/drawer/state', 10)
+        
         # === State ===
         self.target_arm_positions = None  # Will be set from robot initial state
         self.target_gripper_positions = [0.0, 0.0]  # [finger_joint, right_outer_knuckle]
         self.last_arm_command_time = time.time()
         self.last_gripper_command_time = time.time()
         
+        # Drawer state tracking for numerical differentiation
+        self._prev_drawer_pos = None
+        self._prev_drawer_vel = None
+        
         self.get_logger().info("Isaac Lab ROS2 Node initialized")
+        self.get_logger().info("  Contact topics: /tidybot/contact/{left,right}_finger")
+        self.get_logger().info("  Drawer topic: /tidybot/drawer/state")
     
     def arm_traj_callback(self, msg: JointTrajectory):
-        """Handle incoming arm trajectory commands."""
+        """Handle incoming arm trajectory commands.
+        
+        Matches isaac_sim_bridge.py: take the last trajectory point as the
+        goal and let the stiff position drive track it directly.
+        No interpolation needed — Isaac Sim does the same thing.
+        """
         if not msg.points:
             return
         
-        # Get the last point in the trajectory (goal)
+        # Use the last trajectory point as the target (same as isaac_sim_bridge.py)
         point = msg.points[-1]
         
         # Map joint names to positions
@@ -194,6 +212,90 @@ class IsaacLabROS2Node(Node):
         msg = Clock()
         msg.clock = self._float_to_stamp(sim_time)
         self.clock_pub.publish(msg)
+    
+    def publish_contact_forces(
+        self, left_sensor, right_sensor,
+        env_idx: int, sim_time: float
+    ):
+        """Publish gripper contact forces (friction only, filtered to drawer handle).
+        
+        Uses per-finger ContactSensorCfg with filter_prim_paths_expr targeting
+        the drawer handle, matching open_drawer_collect_data.py approach.
+        friction_forces_w gives only forces against the filtered target.
+        """
+        stamp = self._float_to_stamp(sim_time)
+        
+        # friction_forces_w shape: (N, B, M, 3) — B=bodies, M=filter prims
+        # Each sensor tracks one finger, so sum over bodies and filter prims
+        f_left_raw = left_sensor.data.friction_forces_w[env_idx]   # (B, M, 3)
+        f_right_raw = right_sensor.data.friction_forces_w[env_idx]  # (B, M, 3)
+        
+        # Replace NaN with 0 (NaN means no contact with that filter body)
+        f_left_raw = torch.nan_to_num(f_left_raw, nan=0.0)
+        f_right_raw = torch.nan_to_num(f_right_raw, nan=0.0)
+        
+        # Sum over bodies (dim=0) and filter prims (dim=0 after first sum)
+        if f_left_raw.dim() == 3:
+            left_force = f_left_raw.sum(dim=0).sum(dim=0)   # (3,)
+        else:
+            left_force = f_left_raw.sum(dim=0)               # (3,)
+        
+        if f_right_raw.dim() == 3:
+            right_force = f_right_raw.sum(dim=0).sum(dim=0)  # (3,)
+        else:
+            right_force = f_right_raw.sum(dim=0)              # (3,)
+        
+        # Publish left finger
+        left_msg = WrenchStamped()
+        left_msg.header.stamp = stamp
+        left_msg.header.frame_id = "left_inner_finger"
+        left_msg.wrench.force.x = float(left_force[0])
+        left_msg.wrench.force.y = float(left_force[1])
+        left_msg.wrench.force.z = float(left_force[2])
+        self.left_contact_pub.publish(left_msg)
+        
+        # Publish right finger
+        right_msg = WrenchStamped()
+        right_msg.header.stamp = stamp
+        right_msg.header.frame_id = "right_inner_finger"
+        right_msg.wrench.force.x = float(right_force[0])
+        right_msg.wrench.force.y = float(right_force[1])
+        right_msg.wrench.force.z = float(right_force[2])
+        self.right_contact_pub.publish(right_msg)
+    
+    def publish_drawer_state(self, scene, env_idx: int, dt: float):
+        """Publish drawer handle position, velocity, and acceleration.
+        
+        Uses the cabinet_frame FrameTransformer to get the handle's world 
+        position, then computes velocity and acceleration via numerical 
+        differentiation (same as contact_force_publisher.py).
+        """
+        # Get handle world position from FrameTransformer
+        handle_pos = scene["cabinet_frame"].data.target_pos_w[env_idx, 0].cpu().numpy()
+        drawer_pos = np.array(handle_pos)
+        
+        # Numerical differentiation for velocity
+        if self._prev_drawer_pos is not None and dt > 0:
+            drawer_vel = (drawer_pos - self._prev_drawer_pos) / dt
+        else:
+            drawer_vel = np.zeros(3)
+        
+        # Numerical differentiation for acceleration
+        if self._prev_drawer_vel is not None and dt > 0:
+            drawer_acc = (drawer_vel - self._prev_drawer_vel) / dt
+        else:
+            drawer_acc = np.zeros(3)
+        
+        self._prev_drawer_pos = drawer_pos.copy()
+        self._prev_drawer_vel = drawer_vel.copy()
+        
+        # Publish as Float64MultiArray [pos_xyz, vel_xyz, acc_xyz]
+        msg = Float64MultiArray()
+        msg.layout.dim = [
+            MultiArrayDimension(label='state', size=9, stride=9)
+        ]
+        msg.data = list(drawer_pos) + list(drawer_vel) + list(drawer_acc)
+        self.drawer_state_pub.publish(msg)
     
     def _float_to_stamp(self, t: float) -> Time:
         """Convert float seconds to ROS2 Time message."""
@@ -253,7 +355,7 @@ class IsaacLabROS2Node(Node):
             except Exception as e:
                 self.get_logger().debug(f"Base camera publish error: {e}")
     
-    def get_action_tensor(self, robot_articulation, device: str) -> torch.Tensor:
+    def get_action_tensor(self, robot_articulation, device) -> torch.Tensor:
         """
         Convert ROS2 commands to Isaac Lab action tensor.
         
@@ -271,18 +373,26 @@ class IsaacLabROS2Node(Node):
             for i, arm_joint in enumerate(self.ARM_JOINTS):
                 if arm_joint in joint_names:
                     joint_idx = list(joint_names).index(arm_joint)
-                    # Action is scaled, so we need to invert the scale
-                    # The env uses scale=0.1, use_default_offset=True
                     # Action = (target - default) / scale
+                    # In ROS2 bridge mode, scale is overridden to 1.0
                     default_pos = robot_articulation.data.default_joint_pos[0, joint_idx].item()
                     target = self.target_arm_positions[i]
-                    action[3 + i] = (target - default_pos) / 0.1
+                    action[3 + i] = (target - default_pos) / 1.0
         
-        # Gripper: Map position to action (0=open, 1=closed)
-        # finger_joint: 0.0 (open) to 0.82 (closed)
-        gripper_pos = self.target_gripper_positions[0]
-        gripper_action = gripper_pos / 0.82  # Normalize to [0, 1]
-        action[10] = gripper_action
+        # Gripper
+        if self.target_gripper_positions is not None:
+            # Map gripper command (0=open, 1=closed) to normalized action [0, 1]
+            # Assuming max position is around 0.82 rad (closed)
+            # Taking max of command to synchronise fingers
+            cmd = max(self.target_gripper_positions)
+            
+            # Normalize to [0, 1] range expected by MimicGripperAction
+            # If cmd is in radians (0..0.8), then action is cmd / 0.82
+            gripper_action = cmd / 0.82
+            # Clamp to [0, 1]
+            gripper_action = max(0.0, min(1.0, gripper_action))
+            
+            action[10] = gripper_action
         
         return torch.tensor(action, dtype=torch.float32, device=device).unsqueeze(0)
 
@@ -308,6 +418,44 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
     env_cfg.scene.num_envs = args_cli.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else "cuda:0"
     
+    # ── ROS2 bridge mode overrides ──────────────────────────────────────
+    # These overrides adapt the RL-oriented env config for real-time
+    # ROS2 control without touching the shared training config.
+    
+    # 1. Disable automatic resets (drawer_policy manages lifecycle)
+    env_cfg.episode_length_s = 600  # 10 min — effectively no timeout
+    env_cfg.terminations.time_out = None
+    if hasattr(env_cfg.terminations, 'success'):
+        env_cfg.terminations.success = None
+    
+    # 2. Arm action scale 0.1→1.0: the RL scale compresses actions
+    #    into a [-1,1] range for policy learning. For ROS2 bridge we
+    #    want a 1:1 mapping so trajectory positions pass through directly.
+    env_cfg.actions.arm_pos.scale = 1.0
+    
+    # 3. Override arm effort limit for fast tracking:
+    #    Isaac Sim's direct PhysX drives ignore URDF effort limits (~39 Nm).
+    #    Isaac Lab's ImplicitActuator enforces them, capping drive torque.
+    #    With real-time pacing now forced, wall-clock ≈ sim-time, so
+    #    the URDF velocity limits (~2.1 rad/s) won't cause stage misses.
+    env_cfg.scene.robot.actuators["arm"].effort_limit = 1e6
+    
+    # 4. Reduce decimation for higher sensor publish rate:
+    #    Default decimation=4 → 60Hz loop. Decimation=2 → 120Hz loop,
+    #    well above the sensor_data_recorder's 50Hz capture rate.
+    env_cfg.decimation = 1
+    
+    # 5. Increase contact sensor buffer for friction tracking:
+    #    Default max_contact_data_count_per_prim=4 overflows when the gripper
+    #    pulls the drawer handle (fingers slide, generating many contacts).
+    #    PhysX crashes with "srcIndex < srcSelectDimSize" CUDA assertion.
+    for sensor_name in ['contact_forces_left', 'contact_forces_right', 'contact_forces']:
+        if hasattr(env_cfg.scene, sensor_name):
+            getattr(env_cfg.scene, sensor_name).max_contact_data_count_per_prim = 16
+    
+    print("[INFO] ROS2 bridge mode: arm_scale=1.0, effort_limit=1e6, real-time pacing ON")
+    print("[INFO] ROS2 bridge mode: disabled auto-resets (episode=600s, no terminations)")
+    
     # Create environment
     print(f"[INFO] Creating environment: {args_cli.task}")
     env = gym.make(args_cli.task, cfg=env_cfg)
@@ -320,7 +468,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
     scene = env.unwrapped.scene
     robot = scene["robot"]
     cabinet = scene["cabinet"]
-    contact_sensor = scene.sensors.get("contact_forces")
+    left_contact_sensor = scene.sensors.get("contact_forces_left")
+    right_contact_sensor = scene.sensors.get("contact_forces_right")
+    has_contact_sensors = left_contact_sensor is not None and right_contact_sensor is not None
+    
+    if has_contact_sensors:
+        print(f"[INFO] Left contact sensor bodies: {left_contact_sensor.body_names}")
+        print(f"[INFO] Right contact sensor bodies: {right_contact_sensor.body_names}")
+    else:
+        print("[WARNING] Per-finger contact sensors not found in scene")
     
     # Log camera status
     if args_cli.enable_cameras:
@@ -336,9 +492,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
             initial_arm_pos.append(0.0)
     ros_node.target_arm_positions = initial_arm_pos
     
-    # Data logging
-    data_list = []
-    
     # Drawer body index for velocity tracking
     drawer_body_name = "drawer_top"
     try:
@@ -347,19 +500,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
         print(f"[WARNING] '{drawer_body_name}' not found in cabinet bodies. Using index 0.")
         drawer_body_idx = 0
     
-    # Get gripper contact body indices
-    if contact_sensor:
-        sensor_body_names = contact_sensor.body_names
-        print(f"[INFO] Contact sensor tracking: {sensor_body_names}")
-        left_pad_indices = [i for i, name in enumerate(sensor_body_names) if "left" in name.lower()]
-        right_pad_indices = [i for i, name in enumerate(sensor_body_names) if "right" in name.lower()]
-    else:
-        left_pad_indices = []
-        right_pad_indices = []
-    
     # Simulation loop
     print("[INFO] Starting Isaac Lab simulation with ROS2 bridge...")
-    print("[INFO] Topics published: /joint_states, /clock")
+    print("[INFO] Topics published: /joint_states, /clock, /tidybot/contact/{left,right}_finger, /tidybot/drawer/state")
     print("[INFO] Topics subscribed: /gen3_7dof_controller/joint_trajectory, /robotiq_2f_85_controller/commands")
     
     dt = env.unwrapped.step_dt
@@ -386,58 +529,36 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
         ros_node.publish_joint_states(robot, sim_time)
         ros_node.publish_clock(sim_time)
         
+        # Publish contact forces every step
+        if has_contact_sensors:
+            ros_node.publish_contact_forces(
+                left_contact_sensor, right_contact_sensor,
+                env_idx=0, sim_time=sim_time
+            )
+        
+        # Publish drawer state every step
+        ros_node.publish_drawer_state(scene, env_idx=0, dt=dt)
+        
         # Publish camera images (every 3 steps to reduce overhead, ~10Hz)
         if args_cli.enable_cameras and step_count % 3 == 0:
             ros_node.publish_camera_images(scene, sim_time)
         
-        # Collect sensor data (every 10 steps to reduce overhead)
-        if contact_sensor and step_count % 10 == 0:
-            env_idx = 0
-            
-            # Contact forces
-            net_forces_w = contact_sensor.data.net_forces_w[env_idx]
-            left_force_w = torch.sum(net_forces_w[left_pad_indices], dim=0) if left_pad_indices else torch.zeros(3)
-            right_force_w = torch.sum(net_forces_w[right_pad_indices], dim=0) if right_pad_indices else torch.zeros(3)
-            
-            # Drawer velocity
-            drawer_vel_w = cabinet.data.body_lin_vel_w[env_idx, drawer_body_idx]
-            
-            # Log data row
-            row = {
-                "Time(s)": sim_time,
-                "Left_Fx": left_force_w[0].item() if torch.is_tensor(left_force_w) else 0.0,
-                "Left_Fy": left_force_w[1].item() if torch.is_tensor(left_force_w) else 0.0,
-                "Left_Fz": left_force_w[2].item() if torch.is_tensor(left_force_w) else 0.0,
-                "Right_Fx": right_force_w[0].item() if torch.is_tensor(right_force_w) else 0.0,
-                "Right_Fy": right_force_w[1].item() if torch.is_tensor(right_force_w) else 0.0,
-                "Right_Fz": right_force_w[2].item() if torch.is_tensor(right_force_w) else 0.0,
-                "Drawer_Vx": drawer_vel_w[0].item(),
-                "Drawer_Vy": drawer_vel_w[1].item(),
-                "Drawer_Vz": drawer_vel_w[2].item(),
-            }
-            data_list.append(row)
         
         step_count += 1
         
-        # Real-time pacing
-        if args_cli.real_time:
-            elapsed = time.time() - start_time
-            sleep_time = dt - elapsed
-            if sleep_time > 0:
-                time.sleep(sleep_time)
+        # Real-time pacing (REQUIRED for ROS2 bridge mode)
+        # multi_stage_planner.cpp uses std::this_thread::sleep_for (wall-clock)
+        # for all stage timing. If sim runs faster/slower than real-time,
+        # the planner's wall-clock waits won't match sim-time progression.
+        elapsed = time.time() - start_time
+        sleep_time = dt - elapsed
+        if sleep_time > 0:
+            time.sleep(sleep_time)
         
         # Status update
         if step_count % 500 == 0:
             print(f"[INFO] Step {step_count}, Sim Time: {sim_time:.2f}s")
-    
-    # Save sensor data
-    if data_list:
-        df = pd.DataFrame(data_list)
-        save_dir = os.path.dirname(args_cli.save_path)
-        if save_dir and not os.path.exists(save_dir):
-            os.makedirs(save_dir)
-        df.to_csv(args_cli.save_path, index=False, float_format='%.6e')
-        print(f"[INFO] Sensor data saved to {args_cli.save_path}")
+
     
     # Cleanup
     ros_node.destroy_node()

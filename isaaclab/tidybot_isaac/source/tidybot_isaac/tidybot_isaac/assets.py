@@ -47,12 +47,12 @@ TIDYBOT_CFG = ArticulationCfg(
             "joint_5": 0.0,
             "joint_6": -1.13,
             "joint_7": 1.57,
-            # Gripper
+            # Gripper (active joints: [0.0, 0.82], inner joints: [-0.82, 0.0])
             "finger_joint": 0.4,
             "right_outer_knuckle_joint": 0.4,
-            "left_inner_finger_knuckle_joint": 0.4,
-            "right_inner_finger_knuckle_joint": 0.4,
-            "left_inner_finger_joint": 0.4,
+            "left_inner_finger_knuckle_joint": -0.4,
+            "right_inner_finger_knuckle_joint": -0.4,
+            "left_inner_finger_joint": -0.4,
             "right_inner_finger_joint": 0.4,
             "left_outer_finger_joint": 0.0,
             "right_outer_finger_joint": 0.0,
@@ -100,7 +100,7 @@ CABINET_CFG = ArticulationCfg(
         usd_path=CABINET_USD_URL,
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(1.5, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
+        pos=(1.3, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
         rot=(0.0, 0.0, 0.0, 1.0),  # Original verified rotation
     ),
     actuators={

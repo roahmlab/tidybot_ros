@@ -3,6 +3,7 @@ uint8 STAGE_PTP = 0      # Point-to-point motion (free-space)
 uint8 STAGE_LIN = 1      # Linear constraint motion (straight line)
 uint8 STAGE_CIRC = 2     # Circular constraint motion (arc)
 uint8 STAGE_GRIPPER = 3  # Gripper action
+uint8 STAGE_WAIT = 4     # Wait/hold position for duration
 uint8 stage_type
 
 # Target pose (for PTP, LIN, CIRC endpoint)

@@ -90,10 +90,11 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'approach_distance': LaunchConfiguration('approach_distance'),
-                'approach_duration': 3.0,
+                'approach_duration': 2.0,
                 'grasp_duration': 2.0,
-                'pull_duration': 2.5,
-                'gripper_duration': 1.0,
+                'pull_duration': 2.0,
+                'gripper_duration': 2.0,
+                'wait_after_grasp_duration': 0.5,
                 'record_sensor_data': LaunchConfiguration('record_sensor_data'),
             }]
         ),
@@ -108,7 +109,7 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'output_dir': LaunchConfiguration('output_dir'),
-                'record_rate': 20.0,
+                'record_rate': 50.0,
             }]
         ),
     ])

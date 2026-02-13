@@ -64,9 +64,10 @@ class DrawerPolicyNode(Node):
         # Parameters
         self.declare_parameter('approach_distance', 0.15)  # Distance to approach from
         self.declare_parameter('approach_duration', 3.0)   # PTP motion duration
-        self.declare_parameter('grasp_duration', 1.0)      # LIN motion duration
-        self.declare_parameter('pull_duration', 4.0)       # LIN/CIRC motion duration
+        self.declare_parameter('grasp_duration', 3.0)      # LIN motion duration
+        self.declare_parameter('pull_duration', 3.0)       # LIN/CIRC motion duration
         self.declare_parameter('gripper_duration', 3.0)    # Gripper action duration
+        self.declare_parameter('wait_after_grasp_duration', 1.0)  # Wait after grasp before pull
         self.declare_parameter('record_sensor_data', True)  # Enable sensor recording
         
         # Sensor data recorder service clients
@@ -313,10 +314,19 @@ class DrawerPolicyNode(Node):
         # Stage 4: Close gripper
         stage4 = MotionStage()
         stage4.stage_type = MotionStage.STAGE_GRIPPER
-        stage4.gripper_position = 1.0  # Closed (scaled to 0.8 by executor)
+        stage4.gripper_position = 0.74  # Closed (scaled by 0.82 by executor)
         stage4.duration = gripper_dur * 2  # Extra time for gripper to close
         stage4.description = "Close gripper"
         stages.append(stage4)
+        
+        # Stage 4b: Wait after grasp (let grasp stabilize before pulling)
+        wait_dur = self.get_parameter('wait_after_grasp_duration').get_parameter_value().double_value
+        if wait_dur > 0.0:
+            stage_wait = MotionStage()
+            stage_wait.stage_type = MotionStage.STAGE_WAIT
+            stage_wait.duration = wait_dur
+            stage_wait.description = "Wait after grasp"
+            stages.append(stage_wait)
         
         # Stage 5: Pull motion (LIN for prismatic, CIRC for revolute)
         stage5 = MotionStage()

@@ -46,6 +46,8 @@ episode_bag/
 src/tidybot_description/usd/*
 !src/tidybot_description/usd/Collected_tidybot/
 !src/tidybot_description/usd/Collected_tidybot/**
+!src/tidybot_description/usd/Collected_open_drawer/
+!src/tidybot_description/usd/Collected_open_drawer/**
 /sensor_data/*
 # OS-specific junk
 .DS_Store

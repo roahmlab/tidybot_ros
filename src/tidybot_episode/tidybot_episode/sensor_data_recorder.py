@@ -29,6 +29,7 @@ from std_msgs.msg import Float64MultiArray
 from std_srvs.srv import Empty, SetBool
 import csv
 import os
+import math
 from datetime import datetime
 from collections import deque
 import threading
@@ -42,10 +43,18 @@ class SensorDataRecorder(Node):
 
         # Parameters
         self.declare_parameter('output_dir', './sensor_data/')
-        self.declare_parameter('record_rate', 20.0)  # Hz
+        self.declare_parameter('record_rate', 50.0)  # Hz
+        self.declare_parameter('ema_alpha', 0.3)      # EMA smoothing factor (0=max smooth, 1=no smooth)
+        self.declare_parameter('max_force', 100.0)    # Clamp forces above this (N)
+        self.declare_parameter('max_handle_vel', 5.0)  # Clamp handle velocity (m/s)
+        self.declare_parameter('max_handle_acc', 200.0) # Clamp handle acceleration (m/s²)
         
         self.output_dir = self.get_parameter('output_dir').get_parameter_value().string_value
         self.record_rate = self.get_parameter('record_rate').get_parameter_value().double_value
+        self.ema_alpha = self.get_parameter('ema_alpha').get_parameter_value().double_value
+        self.max_force = self.get_parameter('max_force').get_parameter_value().double_value
+        self.max_handle_vel = self.get_parameter('max_handle_vel').get_parameter_value().double_value
+        self.max_handle_acc = self.get_parameter('max_handle_acc').get_parameter_value().double_value
 
         # State
         self.is_recording = False
@@ -53,7 +62,7 @@ class SensorDataRecorder(Node):
         self.lock = threading.Lock()
         self.start_time = None
         
-        # Latest sensor readings
+        # Latest sensor readings (smoothed)
         self.left_force = [0.0, 0.0, 0.0]
         self.right_force = [0.0, 0.0, 0.0]
         # Drawer handle state: [pos_x, pos_y, pos_z, vel_x, vel_y, vel_z, acc_x, acc_y, acc_z]
@@ -110,29 +119,51 @@ class SensorDataRecorder(Node):
         )
 
         self.get_logger().info(
-            f'SensorDataRecorder initialized. Output dir: {self.output_dir}, Rate: {self.record_rate}Hz'
+            f'SensorDataRecorder initialized. Output dir: {self.output_dir}, '
+            f'Rate: {self.record_rate}Hz, EMA alpha: {self.ema_alpha}, '
+            f'Max force: {self.max_force}N'
         )
 
+    def _clamp(self, value: float, limit: float) -> float:
+        """Clamp value to [-limit, +limit]. Return 0 if NaN/Inf."""
+        if math.isnan(value) or math.isinf(value):
+            return 0.0
+        return max(-limit, min(limit, value))
+
+    def _ema_update(self, old: list, new: list) -> list:
+        """Apply exponential moving average: out = alpha*new + (1-alpha)*old."""
+        a = self.ema_alpha
+        return [a * n + (1.0 - a) * o for o, n in zip(old, new)]
+
     def _left_contact_callback(self, msg: WrenchStamped):
-        """Update left finger contact force (XYZ)."""
-        self.left_force = [
-            msg.wrench.force.x,
-            msg.wrench.force.y,
-            msg.wrench.force.z
+        """Update left finger contact force with EMA smoothing + clamping."""
+        raw = [
+            self._clamp(msg.wrench.force.x, self.max_force),
+            self._clamp(msg.wrench.force.y, self.max_force),
+            self._clamp(msg.wrench.force.z, self.max_force),
         ]
+        self.left_force = self._ema_update(self.left_force, raw)
 
     def _right_contact_callback(self, msg: WrenchStamped):
-        """Update right finger contact force (XYZ)."""
-        self.right_force = [
-            msg.wrench.force.x,
-            msg.wrench.force.y,
-            msg.wrench.force.z
+        """Update right finger contact force with EMA smoothing + clamping."""
+        raw = [
+            self._clamp(msg.wrench.force.x, self.max_force),
+            self._clamp(msg.wrench.force.y, self.max_force),
+            self._clamp(msg.wrench.force.z, self.max_force),
         ]
+        self.right_force = self._ema_update(self.right_force, raw)
 
     def _drawer_state_callback(self, msg: Float64MultiArray):
-        """Update drawer handle state from /tidybot/drawer/state."""
+        """Update drawer handle state with clamping on vel/acc."""
         if len(msg.data) >= 9:
-            self.handle_state = list(msg.data[:9])
+            state = list(msg.data[:9])
+            # Clamp velocities (indices 3-5)
+            for i in range(3, 6):
+                state[i] = self._clamp(state[i], self.max_handle_vel)
+            # Clamp accelerations (indices 6-8)
+            for i in range(6, 9):
+                state[i] = self._clamp(state[i], self.max_handle_acc)
+            self.handle_state = state
 
     def _record_callback(self):
         """Record current sensor values if recording is active."""

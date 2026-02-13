@@ -222,6 +222,9 @@ private:
                 case MotionStage::STAGE_GRIPPER:
                     stage_success = execute_gripper(stage);
                     break;
+                case MotionStage::STAGE_WAIT:
+                    stage_success = execute_wait(stage);
+                    break;
                 default:
                     RCLCPP_ERROR(this->get_logger(), "Unknown stage type: %d", stage.stage_type);
                     stage_success = false;
@@ -237,7 +240,8 @@ private:
 
             // Synchronize robot_state with actual robot position after motion
             // This ensures the next stage computes IK from the correct starting position
-            if (stage.stage_type != MotionStage::STAGE_GRIPPER) {
+            if (stage.stage_type != MotionStage::STAGE_GRIPPER &&
+                stage.stage_type != MotionStage::STAGE_WAIT) {
                 // Wait for robot to settle and state to update
                 std::this_thread::sleep_for(std::chrono::milliseconds(200));
                 
@@ -518,7 +522,7 @@ private:
         
         // Scale the gripper position (0.0-1.0 input maps to 0.0-0.8 command)
         // This matches the scaling used in moveit_ee_pose_ik for phone teleoperation
-        double scaled_position = stage.gripper_position * 0.8;
+        double scaled_position = stage.gripper_position * 0.82;
         
         // Send command to both joints (finger_joint, right_outer_knuckle_joint)
         // Note: right_outer_knuckle_joint axis is flipped, so we send negative command
@@ -544,6 +548,15 @@ private:
         // Extra time for gripper to settle
         std::this_thread::sleep_for(std::chrono::milliseconds(200));
         
+        return true;
+    }
+
+    bool execute_wait(const MotionStage& stage)
+    {
+        double duration = stage.duration > 0.0 ? stage.duration : 1.0;
+        RCLCPP_INFO(this->get_logger(), "Waiting for %.1f seconds (holding position)", duration);
+        std::this_thread::sleep_for(std::chrono::milliseconds(
+            static_cast<int>(duration * 1000)));
         return true;
     }
 
