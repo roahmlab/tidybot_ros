@@ -42,10 +42,13 @@ episode_bag/
 *.hdf5
 *.parquet
 *.urdf
-!tidybot_isaac.urdf
+!tidybot_hande_isaac.urdf
+!tidybot_2f_85_isaac.urdf
 src/tidybot_description/usd/*
-!src/tidybot_description/usd/Collected_tidybot/
-!src/tidybot_description/usd/Collected_tidybot/**
+!src/tidybot_description/usd/Collected_tidybot_hande/
+!src/tidybot_description/usd/Collected_tidybot_hande/**
+!src/tidybot_description/usd/Collected_tidybot_2f_85/
+!src/tidybot_description/usd/Collected_tidybot_2f_85/**
 !src/tidybot_description/usd/Collected_open_drawer/
 !src/tidybot_description/usd/Collected_open_drawer/**
 /sensor_data/*

@@ -288,7 +288,7 @@ class DrawerPolicyNode(Node):
         # Stage 1: Open gripper
         stage1 = MotionStage()
         stage1.stage_type = MotionStage.STAGE_GRIPPER
-        stage1.gripper_position = 0.0  # Open
+        stage1.gripper_position = 0.0  # Normalized: 0.0 = fully open
         stage1.duration = gripper_dur
         stage1.description = "Open gripper"
         stages.append(stage1)
@@ -314,7 +314,7 @@ class DrawerPolicyNode(Node):
         # Stage 4: Close gripper
         stage4 = MotionStage()
         stage4.stage_type = MotionStage.STAGE_GRIPPER
-        stage4.gripper_position = 0.8 # Closed (scaled by 0.82 by executor)
+        stage4.gripper_position = 1.0  # Normalized: 1.0 = fully closed
         stage4.duration = gripper_dur * 2  # Extra time for gripper to close
         stage4.description = "Close gripper"
         stages.append(stage4)

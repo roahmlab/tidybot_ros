@@ -9,7 +9,7 @@ Subscribed Topics:
     /tidybot_base_pos_controller/commands (Float64MultiArray) - Base position [x, y, theta]
     /tidybot_base_vel_controller/commands (Float64MultiArray) - Base velocity [vx, vy, omega]
     /gen3_7dof_controller/joint_trajectory (JointTrajectory) - Arm joint trajectory
-    /robotiq_2f_85_controller/commands (Float64MultiArray) - Gripper position
+    /robotiq_hande_controller/commands (Float64MultiArray) - Gripper position
     /tidybot/gripper/commands (Float64) - Simple gripper command
 
 Published Topics:
@@ -62,8 +62,10 @@ INITIAL_JOINT_POSITIONS = {
     "joint_5": 0.0,
     "joint_6": -1.13,
     "joint_7": 1.574186,
-    # Gripper - only leader joint (others use Mimic Joint API)
-    "finger_joint": 0.0,
+    # Gripper - Hand-E prismatic fingers (both driven explicitly, no mimic)
+    # 0 = closed, 0.025 = open
+    "hande_left_finger_joint": 0.025,
+    "hande_right_finger_joint": 0.025,
 }
 
 # Joint position tolerance for checking if robot reached initial state
@@ -91,12 +93,11 @@ class IsaacSimBridge(Node):
         self.arm_joints = ['joint_1', 'joint_2', 'joint_3', 'joint_4', 
                           'joint_5', 'joint_6', 'joint_7']
         
-        # Gripper configuration: Drive only active joints (finger_joint and right_outer_knuckle_joint)
-        # Other joints (inner fingers/knuckles) are passive and driven by 
-        # mechanical constraints (PhysX 4-bar linkage) in Isaac Sim, matching Isaac Lab assets.py strategy.
+        # Gripper configuration: Hand-E has 2 prismatic finger joints
+        # Both commanded explicitly (no mimic constraint in URDF)
         self.gripper_joints = {
-            'finger_joint': 1.0,               # Leader
-            'right_outer_knuckle_joint': 1.0,  # Active Mimic
+            'hande_left_finger_joint': 1.0,    # Left finger (+X axis)
+            'hande_right_finger_joint': 1.0,   # Right finger (-X axis)
         }
         
         # Current target state (initialize to home position)
@@ -115,7 +116,7 @@ class IsaacSimBridge(Node):
             INITIAL_JOINT_POSITIONS['joint_6'],
             INITIAL_JOINT_POSITIONS['joint_7'],
         ]
-        self.gripper_position = 0.0  # Leader joint position (0 = open, ~0.8 = closed)
+        self.gripper_position = 0.025  # Leader joint position (0 = closed, 0.025 = open)
         
         # Current actual joint states from Isaac Sim
         self.current_joint_states = {}
@@ -151,7 +152,7 @@ class IsaacSimBridge(Node):
         # Gripper controller (ros2_control style)
         self.gripper_sub = self.create_subscription(
             Float64MultiArray,
-            '/robotiq_2f_85_controller/commands',
+            '/robotiq_hande_controller/commands',
             self.gripper_callback,
             10
         )
@@ -201,7 +202,7 @@ class IsaacSimBridge(Node):
             f'    - /tidybot_base_pos_controller/commands\n'
             f'    - /tidybot_base_vel_controller/commands\n'
             f'    - /gen3_7dof_controller/joint_trajectory\n'
-            f'    - /robotiq_2f_85_controller/commands\n'
+            f'    - /robotiq_hande_controller/commands\n'
             f'    - /tidybot/gripper/commands\n'
             f'  Publishing to:\n'
             f'    - /joint_command\n'

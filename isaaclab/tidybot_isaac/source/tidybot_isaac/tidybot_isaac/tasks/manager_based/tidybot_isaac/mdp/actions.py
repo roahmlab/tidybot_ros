@@ -93,3 +93,4 @@ class MimicGripperActionCfg(JointPositionActionCfg):
     # The joint name to read the observation from
     open_command_expr: dict[str, float] = {"finger_joint": 0.0}
     close_command_expr: dict[str, float] = {"finger_joint": 0.8}
+
