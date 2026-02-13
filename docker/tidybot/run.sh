@@ -54,6 +54,11 @@ DOCKER_OPTIONS+="-v $XAUTH:$XAUTH:ro "
 for cam in /dev/video*; do
   DOCKER_OPTIONS+="--device=${cam} "
 done
+for serial in /dev/ttyACM* /dev/ttyUSB*; do
+  if [ -e "$serial" ]; then
+    DOCKER_OPTIONS+="--device=${serial} "
+  fi
+done
 
 if command -v nvidia-smi &> /dev/null && nvidia-smi &> /dev/null; then
   echo "✔ NVIDIA GPU detected. Enabling GPU support."

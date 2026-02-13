@@ -38,7 +38,7 @@ RUN apt-get -y update \
         libgl1-mesa-dri libegl1 libgbm1 mesa-vulkan-drivers mesa-utils vulkan-tools \
         gstreamer1.0-tools gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
         gstreamer1.0-plugins-ugly gstreamer1.0-libav libgstreamer1.0-0 libgstreamer-plugins-base1.0-0 \
-        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+        libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # ROS and Orbbec SDK runtime dependencies
@@ -142,7 +142,6 @@ RUN curl -s --compressed -o /usr/share/keyrings/ctr-pubkey.gpg "https://deb.ctr-
 
 # Build the workspace
 WORKDIR /home/${USER_NAME}/tidybot_platform
-
 COPY ./src ./src
 COPY ./requirements.txt ./requirements.txt
 
@@ -170,13 +169,8 @@ RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     libgoogle-glog-dev flask flask_socketio phoenix6 \
     libgoogle-glog-dev flask flask_socketio phoenix6 \
     moveit_resources_panda_moveit_config moveit_resources_fanuc_moveit_config \
-    py_binding_tools moveit_py" && \
+    py_binding_tools moveit_py ros-jazzy-rmw-cyclonedds-cpp" && \
     colcon build --symlink-install
-
-# Upgrade all packages
-RUN apt-get -y update \
-    && apt-get -y upgrade \   
-    && apt-get -y install
 
 RUN echo "source /opt/ros/${ROS_DISTRO}/setup.bash" >> /home/${USER_NAME}/.bashrc
 

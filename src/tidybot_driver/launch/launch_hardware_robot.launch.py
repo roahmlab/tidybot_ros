@@ -177,6 +177,9 @@ def generate_launch_description():
         package="tidybot_driver",
         executable="camera_ext",
         name="camera_ext",
+        parameters=[
+            {"fps": 30},
+        ],
         condition=IfCondition(LaunchConfiguration("ext_camera"))
     )
 

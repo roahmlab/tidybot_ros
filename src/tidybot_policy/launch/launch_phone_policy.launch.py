@@ -107,7 +107,7 @@ def generate_launch_description():
         launch_arguments={
             'use_sim': use_sim_str,
             'storage_uri': 'episode_bag',
-            'fps': '10.0',
+            'fps': '30.0',
             'cameras': LaunchConfiguration('cameras'),
         }.items(),
         condition=IfCondition(LaunchConfiguration('record')),
