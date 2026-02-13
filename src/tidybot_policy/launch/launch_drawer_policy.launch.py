@@ -4,9 +4,13 @@ Launch file for the drawer task system.
 This launches:
 1. multi_stage_planner - Generic motion executor (action server)
 2. drawer_policy - Task-specific policy server (service + action client)
+3. sensor_data_recorder (optional) - Records contact force data
 
 Usage:
   ros2 launch tidybot_policy launch_drawer_policy.launch.py
+
+  # With sensor recording disabled:
+  ros2 launch tidybot_policy launch_drawer_policy.launch.py record_sensor_data:=false
 
 Then call the service:
   ros2 service call /open_drawer_task tidybot_utils/srv/OpenDrawerTask \
@@ -23,7 +27,9 @@ from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.conditions import IfCondition
 from launch_ros.actions import Node
-from launch.substitutions import LaunchConfiguration
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.conditions import IfCondition
 
 from moveit_configs_utils import MoveItConfigsBuilder
 
@@ -36,9 +42,11 @@ def generate_launch_description():
     outpath = Path(robot_description_path) / "urdf/tidybot.urdf"
     outpath.write_text(urdf_xml, encoding="utf-8")
 
-    # 2. Load MoveIt Configs
+    # 2. Load MoveIt Configs with explicit URDF
     moveit_config = MoveItConfigsBuilder(
         "tidybot", package_name="tidybot_moveit_config"
+    ).robot_description(
+        file_path=str(outpath)
     ).to_moveit_configs()
 
     return LaunchDescription([
@@ -54,6 +62,14 @@ def generate_launch_description():
         DeclareLaunchArgument(
             'start_recording_on_action', default_value='false',
             description='If true, start episode recording when an action is received and launch synchronized_recorder'
+        ),
+        DeclareLaunchArgument(
+            'record_sensor_data', default_value='true',
+            description='Enable sensor data recording during drawer tasks'
+        ),
+        DeclareLaunchArgument(
+            'output_dir', default_value='./sensor_data',
+            description='Directory for recorded sensor data CSV files'
         ),
 
         # Multi-Stage Executor (generic motion executor)
@@ -102,10 +118,26 @@ def generate_launch_description():
             parameters=[{
                 'use_sim_time': LaunchConfiguration('use_sim_time'),
                 'approach_distance': LaunchConfiguration('approach_distance'),
-                'approach_duration': 3.0,
+                'approach_duration': 2.0,
                 'grasp_duration': 2.0,
-                'pull_duration': 2.5,
-                'gripper_duration': 1.0
+                'pull_duration': 5.0,
+                'gripper_duration': 2.0,
+                'wait_after_grasp_duration': 0.5,
+                'record_sensor_data': LaunchConfiguration('record_sensor_data'),
             }]
-        )
+        ),
+        
+        # Sensor Data Recorder (optional, controlled by drawer_policy)
+        Node(
+            condition=IfCondition(LaunchConfiguration('record_sensor_data')),
+            package='tidybot_episode',
+            executable='sensor_data_recorder',
+            name='sensor_data_recorder',
+            output='screen',
+            parameters=[{
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'output_dir': LaunchConfiguration('output_dir'),
+                'record_rate': 50.0,
+            }]
+        ),
     ])

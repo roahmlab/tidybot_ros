@@ -247,7 +247,13 @@ The isaac_sim_bridge.py applies gear ratios to command all joints together.
 import omni.usd
 from pxr import Usd, UsdPhysics, Sdf, UsdGeom, Gf, PhysxSchema, UsdShade
 import omni.graph.core as og
+import omni.kit.commands
 import math
+
+# Enable required extensions for contact sensors
+import omni.kit.app
+ext_manager = omni.kit.app.get_app().get_extension_manager()
+ext_manager.set_extension_enabled_immediate("isaacsim.sensors.physics", True)
 
 # Configuration
 ROBOT_PATH = "/World/Robot/tidybot"
@@ -280,11 +286,17 @@ CAMERAS = {
     },
 }
 
+# Note: Contact forces are handled in Step 3.5 using PhysX Contact Report API
+# No need to create separate contact sensor prims
+
 stage = omni.usd.get_context().get_stage()
 
 # Helper function to get prim at path (handles string to Sdf.Path conversion)
 def get_prim(path_str):
     return stage.GetPrimAtPath(Sdf.Path(path_str))
+
+# Articulation root path (where the ArticulationRootAPI is applied)
+artic_root_path = f"{ROBOT_PATH}/root_joint"
 
 print("\nSetting initial joint positions...")
 
@@ -400,6 +412,7 @@ for cam_name, cam_config in CAMERAS.items():
     if cam_path:
         camera_paths[cam_name] = cam_path
 
+
 # Create ROS 2 Action Graph
 print("\nCreating ROS 2 Action Graph...")
 graph_path = "/World/ROS2_ActionGraph"
@@ -423,6 +436,10 @@ for cam_name in camera_paths:
         (f"{cam_name}_RenderProduct", "isaacsim.core.nodes.IsaacCreateRenderProduct"),
         (f"{cam_name}_CameraHelper", "isaacsim.ros2.bridge.ROS2CameraHelper"),
     ])
+
+# Note: Contact sensors are created as USD prims above.
+# They can be read via Python API (omni.isaac.sensor.ContactSensor) in custom scripts.
+# The sensor_data_recorder.py node subscribes to /joint_states for force data.
 
 # Build values list
 values_to_set = [
@@ -467,6 +484,9 @@ for cam_name in camera_paths:
         (f"{cam_name}_RenderProduct.outputs:renderProductPath", f"{cam_name}_CameraHelper.inputs:renderProductPath"),
     ])
 
+# Note: Contact sensor XYZ forces are published via the Python API script in Step 3.5
+# The OmniGraph IsaacReadContactSensor node only provides scalar magnitude, not XYZ components
+
 og.Controller.edit(
     {"graph_path": graph_path, "evaluator_name": "execution"},
     {
@@ -486,6 +506,61 @@ The script above does these things:
   - Publishes camera images to `/tidybot/camera_wrist/color/raw` and `/tidybot/camera_base/color/raw`
 
 After executing, press **Play** to start the simulation. Or you can save the scene for later use.
+
+### Step 3.5: Contact Force & Drawer State Publisher (Optional)
+
+To publish **friction forces** and **drawer joint state** (position, velocity, acceleration) to ROS2, run the `contact_force_publisher.py` script. This script uses `omni.physx.tensors.RigidContactView.get_friction_data(dt)` to measure precise friction forces (tangential forces, world frame) on each gripper finger against the drawer handle.
+
+> **Note:** The `RigidContactView` is initialized lazily on the first physics step (after pressing **Play**), because the PhysX GPU pipeline must be ready before the view can be created.
+
+**What it publishes:**
+
+| Topic | Type | Data |
+|-------|------|------|
+| `/tidybot/contact/left_finger` | `WrenchStamped` | Friction force (Fx, Fy, Fz) in world frame |
+| `/tidybot/contact/right_finger` | `WrenchStamped` | Friction force (Fx, Fy, Fz) in world frame |
+| `/tidybot/drawer/state` | `Float64MultiArray` | [pos_xyz, vel_xyz, acc_xyz] (9 values) |
+
+**How it works:**
+1. Enables `PhysxContactReportAPI` on both finger prims and the drawer handle
+2. Creates a `RigidContactView` with the finger prims as sensors and the drawer handle as a filter target
+3. Each physics step, calls `get_friction_data(dt)` to get per-contact-point friction forces
+4. Sums friction forces per finger and publishes as `WrenchStamped`
+
+### Running Setup Scripts from CLI
+
+The Step 3 and Step 3.5 scripts are also available as standalone Python files in `tidybot_description/`, so you can run them with Isaac Sim's `--exec` flag instead of pasting into the Script Editor:
+
+| Script | Source | Purpose |
+|--------|--------|---------|
+| [`isaac_sim_setup.py`](tidybot_description/isaac_sim_setup.py) | Step 3 | Joint home positions, cameras, ROS2 action graph |
+| [`contact_force_publisher.py`](tidybot_description/contact_force_publisher.py) | Step 3.5 | Friction forces + drawer state publisher |
+
+**Basic usage:**
+
+```bash
+./isaac-sim.sh \
+  --exec "/workspace/src/tidybot_description/tidybot_description/isaac_sim_setup.py" \
+  --exec "/workspace/src/tidybot_description/tidybot_description/contact_force_publisher.py"
+```
+
+**Configurable settings** — `contact_force_publisher.py` supports Carbonite settings overrides via `--/` flags:
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `/app/tidybot/robot_path` | `/World/Robot/tidybot` | Robot articulation root path |
+| `/app/tidybot/drawer_joint_path` | `/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint` | Drawer handle joint prim path |
+| `/app/tidybot/drawer_handle_path` | `/World/sektion_cabinet_instanceable/drawer_handle_top` | Drawer handle body prim path (filter target for friction sensing) |
+
+**Example with custom paths:**
+
+```bash
+./isaac-sim.sh \
+  --exec "/workspace/.../isaac_sim_setup.py" \
+  --exec "/workspace/.../contact_force_publisher.py" \
+  --/app/tidybot/drawer_joint_path="/World/my_cabinet/drawer_top/handle_joint" \
+  --/app/tidybot/drawer_handle_path="/World/my_cabinet/drawer_handle_top"
+```
 
 ### Step 4: Launch ROS 2 Stack
 

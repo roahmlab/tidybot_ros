@@ -121,15 +121,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg: RslRlBaseRun
     
     # Access internal scene for direct data extraction
     scene = env.unwrapped.scene
-    contact_sensor = scene.sensors["contact_forces"]
+    left_contact_sensor = scene.sensors["contact_forces_left"]
+    right_contact_sensor = scene.sensors["contact_forces_right"]
     cabinet = scene["cabinet"]
     
-    # Identify Indices for Gripper Pads and Drawer
-    sensor_body_names = contact_sensor.body_names
-    print(f"[INFO] Contact sensor tracking bodies: {sensor_body_names}")
-    
-    left_pad_indices = [i for i, name in enumerate(sensor_body_names) if "left" in name.lower()]
-    right_pad_indices = [i for i, name in enumerate(sensor_body_names) if "right" in name.lower()]
+    print(f"[INFO] Left contact sensor bodies: {left_contact_sensor.body_names}")
+    print(f"[INFO] Right contact sensor bodies: {right_contact_sensor.body_names}")
     
     # Identify Drawer Link for Velocity
     drawer_body_name = "drawer_top"
@@ -139,8 +136,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg: RslRlBaseRun
         print(f"[WARNING] '{drawer_body_name}' not found in cabinet bodies: {cabinet.body_names}. Using index 0.")
         drawer_body_idx = 0
 
-    print(f"[INFO] Left Pad Indices: {left_pad_indices}")
-    print(f"[INFO] Right Pad Indices: {right_pad_indices}")
     print(f"[INFO] Drawer Body Index: {drawer_body_idx} ({cabinet.body_names[drawer_body_idx]})")
 
     # 5. Run Simulation Loop
@@ -164,13 +159,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg: RslRlBaseRun
         # Time
         current_time = i * sim_dt
         
-        # Forces (World Frame)
-        # Shape: (num_envs, num_bodies, 3)
-        net_forces_w = contact_sensor.data.net_forces_w[env_idx] 
+        # Forces — friction_forces_w filtered to drawer handle
+        # (matches open_drawer_collect_data.py approach)
+        # Shape: (B, M, 3) where B=bodies tracked, M=filter prims
+        f_left_raw = left_contact_sensor.data.friction_forces_w[env_idx]
+        f_right_raw = right_contact_sensor.data.friction_forces_w[env_idx]
         
-        # Aggregate forces if multiple links match (e.g. pad + mesh parts)
-        left_force_w = torch.sum(net_forces_w[left_pad_indices], dim=0)
-        right_force_w = torch.sum(net_forces_w[right_pad_indices], dim=0)
+        # Replace NaN with 0 (NaN means no contact with filter body)
+        f_left_raw = torch.nan_to_num(f_left_raw, nan=0.0)
+        f_right_raw = torch.nan_to_num(f_right_raw, nan=0.0)
+        
+        # Sum over bodies and filter prims to get (3,) per finger
+        if f_left_raw.dim() == 3:
+            left_force_w = f_left_raw.sum(dim=0).sum(dim=0)
+        else:
+            left_force_w = f_left_raw.sum(dim=0)
+        
+        if f_right_raw.dim() == 3:
+            right_force_w = f_right_raw.sum(dim=0).sum(dim=0)
+        else:
+            right_force_w = f_right_raw.sum(dim=0)
         
         # Get Orientations for Local Frame Transformation
         # Helper to get quat for a body name pattern
