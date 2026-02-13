@@ -62,8 +62,8 @@ def main():
             actions = torch.rand(env.action_space.shape, device=env.unwrapped.device)
             
             # Explicitly control gripper (last dimension) with a sine wave
-            # Frequency 0.05, range [0.0, 0.82] mapped to full range of joint
-            gripper_cmd = 0.41 + 0.41 * torch.sin(torch.tensor(step_count * 0.05, device=env.unwrapped.device))
+            # Hand-E: range [0.0, 0.025] mapped to action [0, 1] (0=open, 1=closed)
+            gripper_cmd = 0.5 + 0.5 * torch.sin(torch.tensor(step_count * 0.05, device=env.unwrapped.device))
             actions[:, -1] = gripper_cmd
             
             # Reset base velocity
@@ -79,8 +79,8 @@ def main():
 
                 # Try to print gripper info
                 try:
-                    leader_idx = robot.data.joint_names.index("finger_joint")
-                    follower_idx = robot.data.joint_names.index("right_outer_knuckle_joint")
+                    leader_idx = robot.data.joint_names.index("hande_left_finger_joint")
+                    follower_idx = robot.data.joint_names.index("hande_right_finger_joint")
                     
                     pos_L = robot.data.joint_pos[0, leader_idx]
                     pos_F = robot.data.joint_pos[0, follower_idx]

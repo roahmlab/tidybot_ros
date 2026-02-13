@@ -33,6 +33,7 @@
 
 #include <thread>
 #include <cmath>
+#include <algorithm>
 
 using namespace moveit::task_constructor;
 
@@ -48,6 +49,7 @@ public:
         // Declare parameters
         this->declare_parameter("arm_group", "gen3_7dof");
         this->declare_parameter("tip_link", "tool_frame");
+        this->declare_parameter("gripper_type", "hande");
         
         action_server_ = rclcpp_action::create_server<ExecuteStages>(
             this,
@@ -98,8 +100,17 @@ public:
         // Initialize publishers
         arm_traj_pub_ = this->create_publisher<trajectory_msgs::msg::JointTrajectory>(
             "/gen3_7dof_controller/joint_trajectory", 10);
+        
+        // Gripper publisher: topic depends on gripper_type
+        gripper_type_ = this->get_parameter("gripper_type").as_string();
+        std::string gripper_topic = (gripper_type_ == "hande")
+            ? "/robotiq_hande_controller/commands"
+            : "/robotiq_2f_85_controller/commands";
         gripper_pub_ = this->create_publisher<std_msgs::msg::Float64MultiArray>(
-            "/robotiq_2f_85_controller/commands", 10);
+            gripper_topic, 10);
+        RCLCPP_INFO(this->get_logger(), "Gripper type: %s, topic: %s",
+            gripper_type_.c_str(), gripper_topic.c_str());
+        
         arm_traj_hardware_pub_ = this->create_publisher<sensor_msgs::msg::JointState>(
             "/tidybot/hardware/arm/commands", 10);
         gripper_hardware_pub_ = this->create_publisher<std_msgs::msg::Float64>(
@@ -120,6 +131,7 @@ private:
 
     rclcpp::Publisher<trajectory_msgs::msg::JointTrajectory>::SharedPtr arm_traj_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr gripper_pub_;
+    std::string gripper_type_;
     rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr arm_traj_hardware_pub_;
     rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr gripper_hardware_pub_;
 
@@ -267,6 +279,32 @@ private:
         RCLCPP_INFO(this->get_logger(), "Multi-stage execution completed successfully");
     }
 
+    /**
+     * Normalize continuous (unbounded revolute) joint solutions to be nearest
+     * to the reference position. This prevents the robot from spinning the
+     * long way around (±2π) when IK returns an equivalent but distant solution.
+     */
+    void normalize_continuous_joints(
+        std::vector<double>& joint_values,
+        const std::vector<double>& reference,
+        const moveit::core::JointModelGroup* joint_model_group)
+    {
+        const auto& joint_models = joint_model_group->getActiveJointModels();
+        for (size_t i = 0; i < joint_values.size() && i < joint_models.size(); ++i) {
+            if (joint_models[i]->getType() == moveit::core::JointModel::REVOLUTE) {
+                const auto* revolute = dynamic_cast<const moveit::core::RevoluteJointModel*>(joint_models[i]);
+                if (revolute && revolute->isContinuous()) {
+                    // Wrap to nearest equivalent angle to reference
+                    double diff = joint_values[i] - reference[i];
+                    diff = std::fmod(diff + M_PI, 2.0 * M_PI);
+                    if (diff < 0) diff += 2.0 * M_PI;
+                    diff -= M_PI;
+                    joint_values[i] = reference[i] + diff;
+                }
+            }
+        }
+    }
+
     bool execute_ptp(const MotionStage& stage, 
                      std::shared_ptr<moveit::core::RobotState> robot_state,
                      const moveit::core::JointModelGroup* joint_model_group,
@@ -299,6 +337,7 @@ private:
         robot_state->enforceBounds();
         std::vector<double> joint_values;
         robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+        normalize_continuous_joints(joint_values, start_positions, joint_model_group);
         
         // Publish trajectory (interpolate from start to target over duration)
         double duration = stage.duration > 0.0 ? stage.duration : 2.0;
@@ -401,6 +440,7 @@ private:
                 
                 robot_state->enforceBounds();
                 robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+                normalize_continuous_joints(joint_values, prev_joint_values, joint_model_group);
             }
 
             // Discontinuity check logic...
@@ -509,6 +549,7 @@ private:
             
             std::vector<double> joint_values;
             robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+            normalize_continuous_joints(joint_values, prev_joint_values, joint_model_group);
             
             // Discontinuity check
             double max_jump = 0.0;
@@ -535,18 +576,28 @@ private:
 
     bool execute_gripper(const MotionStage& stage)
     {
-        RCLCPP_INFO(this->get_logger(), "Gripper action: position=%.2f", stage.gripper_position);
+        // Input: normalized position (0.0 = fully open, 1.0 = fully closed)
+        double normalized = std::clamp(static_cast<double>(stage.gripper_position), 0.0, 1.0);
+        RCLCPP_INFO(this->get_logger(), "Gripper action: normalized=%.4f (type=%s)",
+            normalized, gripper_type_.c_str());
         
-        // Scale the gripper position (0.0-1.0 input maps to 0.0-0.8 command)
-        // This matches the scaling used in moveit_ee_pose_ik for phone teleoperation
-        double scaled_position = stage.gripper_position * 0.82;
-        
-        // Send command to both joints (finger_joint, right_outer_knuckle_joint)
-        // Note: right_outer_knuckle_joint axis is flipped, so we send negative command
+        double position;
         std_msgs::msg::Float64MultiArray msg;
-        msg.data = {scaled_position, -scaled_position};
         std_msgs::msg::Float64 msg_f64;
-        msg_f64.data = scaled_position;
+        
+        if (gripper_type_ == "hande") {
+            // Hand-E: prismatic, 0.025m = open, 0.0m = closed
+            // Map: 0.0 (open) -> 0.025, 1.0 (closed) -> 0.0
+            position = 0.025 * (1.0 - normalized);
+            msg.data = {position, position};
+        } else {
+            // 2F-85: revolute, 0.0 rad = open, 0.82 rad = closed
+            // Map: 0.0 (open) -> 0.0, 1.0 (closed) -> 0.82
+            // right_outer_knuckle_joint axis is flipped
+            position = 0.82 * normalized;
+            msg.data = {position, -position};
+        }
+        msg_f64.data = position;
 
         gripper_pub_->publish(msg);
         gripper_hardware_pub_->publish(msg_f64);

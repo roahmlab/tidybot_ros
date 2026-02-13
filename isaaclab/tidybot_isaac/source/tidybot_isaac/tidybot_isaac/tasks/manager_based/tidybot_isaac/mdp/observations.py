@@ -70,7 +70,7 @@ def gripper_open_amount(
 ) -> torch.Tensor:
     """Gripper opening amount (1D).
     
-    Returns the finger_joint position (0 = open, 0.82 = closed).
+    Returns the leader finger joint position (0 = open, 0.82 = closed for 2F-85).
     """
     robot: Articulation = env.scene[robot_cfg.name]
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]

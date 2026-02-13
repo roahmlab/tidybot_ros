@@ -16,7 +16,7 @@ Features:
 
 Usage:
     cd isaaclab && ./isaaclab.sh -p tidybot_isaac/scripts/isaac_lab_sim.py \\
-        --task Isaac-TidyBot-Drawer-v0 --num_envs 1 --real-time
+        --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 1 --real-time
 
 Then launch the ROS2 stack:
     ros2 launch tidybot_description launch_isaac_lab.launch.py
@@ -33,7 +33,7 @@ from isaaclab.app import AppLauncher
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Isaac Lab Simulation with ROS2 Bridge.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isaac-TidyBot-Drawer-v0", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isaac-TidyBot-HandE-Drawer-v0", help="Name of the task.")
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time.")
 
 # append AppLauncher cli args (includes --enable_cameras)
@@ -93,11 +93,35 @@ class IsaacLabROS2Node(Node):
     
     # Joint names matching the URDF
     ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
-    GRIPPER_JOINTS = ["finger_joint", "right_outer_knuckle_joint"]
     BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
     
-    def __init__(self):
+    # Gripper configurations keyed by type
+    GRIPPER_CONFIGS = {
+        "hande": {
+            "joints": ["hande_left_finger_joint", "hande_right_finger_joint"],
+            "topic": "/robotiq_hande_controller/commands",
+            "open_pos": [0.025, 0.025],   # prismatic, meters
+            "close_pos": [0.0, 0.0],
+            "range": 0.025,               # full travel
+            "inverted": True,             # 0.025=open, 0.0=closed
+        },
+        "2f85": {
+            "joints": ["finger_joint", "right_outer_knuckle_joint"],
+            "topic": "/robotiq_2f_85_controller/commands",
+            "open_pos": [0.0, 0.0],       # revolute, radians
+            "close_pos": [0.82, -0.82],
+            "range": 0.82,                # full travel
+            "inverted": False,            # 0.0=open, 0.82=closed
+        },
+    }
+    
+    def __init__(self, gripper_type: str = "hande"):
         super().__init__('isaac_lab_sim')
+        
+        # Gripper configuration
+        self.gripper_type = gripper_type
+        self.gripper_cfg = self.GRIPPER_CONFIGS[gripper_type]
+        self.GRIPPER_JOINTS = self.gripper_cfg["joints"]
         
         # QoS for sensor data
         sensor_qos = QoSProfile(
@@ -118,7 +142,7 @@ class IsaacLabROS2Node(Node):
         # Gripper commands from multi_stage_planner
         self.gripper_sub = self.create_subscription(
             Float64MultiArray,
-            '/robotiq_2f_85_controller/commands',
+            self.gripper_cfg["topic"],
             self.gripper_callback,
             10
         )
@@ -143,7 +167,7 @@ class IsaacLabROS2Node(Node):
         
         # === State ===
         self.target_arm_positions = None  # Will be set from robot initial state
-        self.target_gripper_positions = [0.0, 0.0]  # [finger_joint, right_outer_knuckle]
+        self.target_gripper_positions = list(self.gripper_cfg["open_pos"])
         self.last_arm_command_time = time.time()
         self.last_gripper_command_time = time.time()
         
@@ -152,6 +176,8 @@ class IsaacLabROS2Node(Node):
         self._prev_drawer_vel = None
         
         self.get_logger().info("Isaac Lab ROS2 Node initialized")
+        self.get_logger().info(f"  Gripper type: {gripper_type}")
+        self.get_logger().info(f"  Gripper topic: {self.gripper_cfg['topic']}")
         self.get_logger().info("  Contact topics: /tidybot/contact/{left,right}_finger")
         self.get_logger().info("  Drawer topic: /tidybot/drawer/state")
     
@@ -381,14 +407,19 @@ class IsaacLabROS2Node(Node):
         
         # Gripper
         if self.target_gripper_positions is not None:
-            # Map gripper command (0=open, 1=closed) to normalized action [0, 1]
-            # Assuming max position is around 0.82 rad (closed)
-            # Taking max of command to synchronise fingers
-            cmd = max(self.target_gripper_positions)
+            # multi_stage_planner sends hardware-specific commands:
+            #   Hand-E: meters (0.025=open, 0.0=closed)
+            #   2F-85:  radians (0.0=open, 0.82=closed)
+            # MimicGripperAction expects [0, 1] where 0=open, 1=closed
+            cmd = self.target_gripper_positions[0]  # Leader joint position
             
-            # Normalize to [0, 1] range expected by MimicGripperAction
-            # If cmd is in radians (0..0.8), then action is cmd / 0.82
-            gripper_action = cmd / 0.82
+            if self.gripper_cfg["inverted"]:
+                # Hand-E: 0.025 (open) -> 0.0, 0.0 (closed) -> 1.0
+                gripper_action = 1.0 - (cmd / self.gripper_cfg["range"])
+            else:
+                # 2F-85: 0.0 (open) -> 0.0, 0.82 (closed) -> 1.0
+                gripper_action = cmd / self.gripper_cfg["range"]
+            
             # Clamp to [0, 1]
             gripper_action = max(0.0, min(1.0, gripper_action))
             
@@ -460,9 +491,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
     print(f"[INFO] Creating environment: {args_cli.task}")
     env = gym.make(args_cli.task, cfg=env_cfg)
     
+    # Detect gripper type from task name
+    if "2F85" in args_cli.task:
+        gripper_type = "2f85"
+    else:
+        gripper_type = "hande"
+    print(f"[INFO] Detected gripper type: {gripper_type} (from task: {args_cli.task})")
+    
     # Initialize ROS2
     rclpy.init()
-    ros_node = IsaacLabROS2Node()
+    ros_node = IsaacLabROS2Node(gripper_type=gripper_type)
     
     # Access scene objects
     scene = env.unwrapped.scene
@@ -503,10 +541,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
     # Simulation loop
     print("[INFO] Starting Isaac Lab simulation with ROS2 bridge...")
     print("[INFO] Topics published: /joint_states, /clock, /tidybot/contact/{left,right}_finger, /tidybot/drawer/state")
-    print("[INFO] Topics subscribed: /gen3_7dof_controller/joint_trajectory, /robotiq_2f_85_controller/commands")
+    print(f"[INFO] Topics subscribed: /gen3_7dof_controller/joint_trajectory, {ros_node.gripper_cfg['topic']}")
+    print(f"[INFO] Real-time pacing: {'ENABLED' if args_cli.real_time else 'DISABLED (max speed)'}")
     
     dt = env.unwrapped.step_dt
     step_count = 0
+    wall_start = time.time()
     
     obs = env.reset()[0]
     
@@ -525,39 +565,39 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg):
         # Get simulation time
         sim_time = env.unwrapped.sim.current_time
         
-        # Publish to ROS2
+        # Publish to ROS2 (joint states + clock every step)
         ros_node.publish_joint_states(robot, sim_time)
         ros_node.publish_clock(sim_time)
         
-        # Publish contact forces every step
-        if has_contact_sensors:
-            ros_node.publish_contact_forces(
-                left_contact_sensor, right_contact_sensor,
-                env_idx=0, sim_time=sim_time
-            )
+        # Publish contact forces + drawer state every 4 steps to reduce overhead
+        if step_count % 4 == 0:
+            if has_contact_sensors:
+                ros_node.publish_contact_forces(
+                    left_contact_sensor, right_contact_sensor,
+                    env_idx=0, sim_time=sim_time
+                )
+            ros_node.publish_drawer_state(scene, env_idx=0, dt=dt)
         
-        # Publish drawer state every step
-        ros_node.publish_drawer_state(scene, env_idx=0, dt=dt)
-        
-        # Publish camera images (every 3 steps to reduce overhead, ~10Hz)
-        if args_cli.enable_cameras and step_count % 3 == 0:
+        # Publish camera images (every 10 steps to reduce overhead)
+        if args_cli.enable_cameras and step_count % 10 == 0:
             ros_node.publish_camera_images(scene, sim_time)
-        
         
         step_count += 1
         
-        # Real-time pacing (REQUIRED for ROS2 bridge mode)
-        # multi_stage_planner.cpp uses std::this_thread::sleep_for (wall-clock)
-        # for all stage timing. If sim runs faster/slower than real-time,
-        # the planner's wall-clock waits won't match sim-time progression.
-        elapsed = time.time() - start_time
-        sleep_time = dt - elapsed
-        if sleep_time > 0:
-            time.sleep(sleep_time)
+        # Real-time pacing (only when --real-time flag is set)
+        if args_cli.real_time:
+            elapsed = time.time() - start_time
+            sleep_time = dt - elapsed
+            if sleep_time > 0:
+                time.sleep(sleep_time)
         
-        # Status update
+        # Status update with speed ratio
         if step_count % 500 == 0:
-            print(f"[INFO] Step {step_count}, Sim Time: {sim_time:.2f}s")
+            wall_elapsed = time.time() - wall_start
+            speed_ratio = sim_time / wall_elapsed if wall_elapsed > 0 else 0
+            fps = step_count / wall_elapsed if wall_elapsed > 0 else 0
+            print(f"[INFO] Step {step_count}, Sim: {sim_time:.2f}s, Wall: {wall_elapsed:.1f}s, "
+                  f"Speed: {speed_ratio:.2f}x real-time, FPS: {fps:.1f}")
 
     
     # Cleanup

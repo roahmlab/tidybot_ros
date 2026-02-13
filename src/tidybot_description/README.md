@@ -15,8 +15,8 @@
 - Transmission macros and ROS2 control interfaces for executing trajectories
 
 ### **End Effectors**
-- Robotiq 2F-85 with visual/collision meshes
-- Placeholder macros for Kinova Lite gripper variants
+- Robotiq Hand-E parallel-jaw gripper (2 prismatic fingers, no closed loop)
+- Legacy Robotiq 2F-85 xacro macros retained for reference
 
 ### **Vision & Sensors**
 - Wrist camera frame hierarchy and extrinsics
@@ -162,7 +162,7 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
 
 2. **Import the URDF:**
    - Go to `File` → `Import`
-   - Select `/workspace/src/tidybot_description/urdf/tidybot_isaac.urdf` (a pre-configured URDF for Isaac Sim)
+   - Select `/workspace/src/tidybot_description/urdf/tidybot_isaac.urdf` (pre-configured URDF with Robotiq Hand-E gripper)
    - **Important settings:**
      - ✅ Static Base (checked)
      - Output directory: `/tmp` or similar writable path
@@ -170,23 +170,14 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
    - Click "Import"
 
 3. **Verify the robot** appears in the stage at `/World/tidybot`
-4. **Add inner knuckle joints** (for closed-loop gripper kinematics):
-   - Switch to **Right** view and zoom into the gripper
-   - Select `left_inner_knuckle` + `robotiq_arg2f_base_link` → Right-click → **Create > Physics > Joint > Revolute Joint**
-   - Position joint center at the knuckle-pad connection (see image below)
-   - Repeat for `right_inner_knuckle`
-   - Name joints `left_inner_knuckle_joint` and `right_inner_knuckle_joint`
-   - For both joints: **Property > Exclude From Articulation** ✅
-   - Select both → **Property > Add > Physics > Angular Drive**
 
-   <img width="1648" height="933" alt="Inner knuckle joint placement" src="https://github.com/user-attachments/assets/d6ddc068-3420-42ee-942e-c54f91ddc327" />
+4. **Configure gripper joint drives** (Property > Physics > Linear Drive):
 
-5. **Configure gripper joint drives** (Property > Physics > Angular Drive):
-   | Joints | Stiffness | Damping | Max Force | Max Velocity |
-   |--------|-----------|---------|-----------|--------------|
-   | `finger_joint`, `right_outer_knuckle_joint` | 10000 | 100 | 180 | 130 |
-   | `left_outer_finger_joint`, `right_outer_finger_joint` | 0.05 | 5000 | 180 | 130 |
-   | `*_inner_finger_joint`, `*_inner_finger_knuckle_joint` | 0.00 | 5000 | 180 | 130 |
+   The Hand-E has only 2 prismatic finger joints — no closed-loop linkage to set up.
+
+   | Joints | Type | Stiffness | Damping | Max Force |
+   |--------|------|-----------|---------|-----------|
+   | `hande_left_finger_joint`, `hande_right_finger_joint` | Linear | 10000 | 100 | 130 |
 
    **Configure base joint drives** (Property > Physics > Linear/Angular Drive):
    | Joints | Type | Stiffness | Damping | Max Force |
@@ -199,18 +190,12 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
    |--------|-----------|---------|-----------|
    | `joint_1` through `joint_7` | 1e7 | 1e4 | 1e7 |
 
-6. **Apply fingertip material**:
+5. **Apply fingertip material**:
    - **Create > Physics > Physics Material > Rigid Body Material** → rename to `fingertip_material`
    - Set friction coefficients to `0.8`, Friction Combine Mode to `max`
-   - Apply to `left_inner_finger` and `right_inner_finger` and choose `Strength` to `Stronger than Descendants`
+   - Apply to `hande_left_finger` and `hande_right_finger` and choose `Strength` to `Stronger than Descendants`
 
-7. **Add fingertip colliders**:
-   - Select `left_inner_finger/collisions` → uncheck **Instanceable**
-   - Navigate to `collisions/robotiq_arg2f_85_inner_finger/node_STL_BINARY_/mesh`
-   - **Add > Physics > Collider**, set Rest Offset=`0.0`, Contact Offset=`0.005`
-   - Repeat for `robotiq_arg2f_85_pad` mesh and for `right_inner_finger`
-
-8. **Save the USD**: `File → Collect and Save As...` to a mounted directory
+6. **Save the USD**: `File → Collect and Save As...` to a mounted directory
 
 Now you have the USD file ready to be used in the simulation.
 
@@ -239,9 +224,8 @@ Use the setup script in Isaac Sim's Script Editor to configure physics and ROS 2
 Isaac Sim Setup Script for TidyBot++
 Run this after importing the URDF into Isaac Sim.
 
-Gripper: Uses spring-loaded mechanism for the outer fingers.
-Outer finger joints are revolute and driven by angular drives.
-The isaac_sim_bridge.py applies gear ratios to command all joints together.
+Gripper: Robotiq Hand-E with 2 prismatic finger joints.
+The isaac_sim_bridge.py commands both fingers together.
 """
 
 import omni.usd
@@ -259,9 +243,7 @@ ext_manager.set_extension_enabled_immediate("isaacsim.sensors.physics", True)
 ROBOT_PATH = "/World/Robot/tidybot"
 BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
-GRIPPER_JOINTS = ["finger_joint", "left_inner_finger_knuckle_joint", "left_inner_finger_joint",
-                  "right_outer_knuckle_joint", "right_inner_finger_knuckle_joint", "right_inner_finger_joint",
-                  "left_outer_finger_joint", "right_outer_finger_joint"]
+GRIPPER_JOINTS = ["hande_left_finger_joint", "hande_right_finger_joint"]
 CAMERAS = {
     "arm_camera": {
         "parent_link": "bracelet_link/end_effector_link/arm_camera_link",
@@ -315,14 +297,9 @@ INITIAL_JOINT_POSITIONS = {
     "joint_5": 0.0,
     "joint_6": -1.13,
     "joint_7": 1.574186,
-    # Gripper - all joints start at 0 (open position)
-    # The isaac_sim_bridge applies gear ratios when commanding
-    "finger_joint": 0.0,
-    "right_outer_knuckle_joint": 0.0,
-    "left_inner_finger_joint": 0.0,
-    "right_inner_finger_joint": 0.0,
-    "left_inner_finger_knuckle_joint": 0.0,
-    "right_inner_finger_knuckle_joint": 0.0,
+    # Gripper - Hand-E prismatic fingers start at 0 (open position)
+    "hande_left_finger_joint": 0.0,
+    "hande_right_finger_joint": 0.0,
 }
 
 # Find and configure each joint by traversing the stage
@@ -613,7 +590,7 @@ The package defines multiple controller configurations in `config/tidybot_contro
 - `gen3_7dof_controller` — joint trajectory interface for MoveIt
 
 ### **Gripper Controller**
-- `robotiq_2f_85_controller` — parallel gripper position controller
+- `robotiq_hande_controller` — Hand-E parallel-jaw gripper position controller
 
 ## 🔧 Customization & Tips
 

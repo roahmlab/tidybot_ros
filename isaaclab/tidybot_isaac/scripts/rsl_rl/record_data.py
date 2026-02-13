@@ -189,9 +189,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg, agent_cfg: RslRlBaseRun
                     return articulation.data.body_quat_w[env_idx, idx]
             return torch.tensor([1.0, 0.0, 0.0, 0.0], device=articulation.device) # Identity default
 
-        left_quat = get_body_quat(scene["robot"], "left_inner_finger") # Approximate link name
-        right_quat = get_body_quat(scene["robot"], "right_inner_finger")
-        ee_quat = get_body_quat(scene["robot"], "robotiq_arg2f_base_link") # Hand frame
+        left_quat = get_body_quat(scene["robot"], "hande_left_finger")
+        right_quat = get_body_quat(scene["robot"], "hande_right_finger")
+        ee_quat = get_body_quat(scene["robot"], "hande_link") # Hand frame
         
         # Transform Forces to Local Frame
         from isaaclab.utils.math import quat_apply_inverse
