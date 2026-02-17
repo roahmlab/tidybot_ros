@@ -1,21 +1,10 @@
 #!/usr/bin/env python3
 """
-Contact Force & Drawer State Publisher for Isaac Sim (Robotiq Hand-E)
-
-Publishes gripper contact forces and drawer handle state to ROS2:
-  - /tidybot/contact/left_finger  (geometry_msgs/WrenchStamped) - total force (world frame)
-  - /tidybot/contact/right_finger (geometry_msgs/WrenchStamped) - total force (world frame)
-  - /tidybot/drawer/state         (std_msgs/Float64MultiArray)  - XYZ pos/vel/acc
-
-Uses subscribe_contact_report_events which provides per-contact-point impulse
-vectors. The impulse includes both normal and friction components. Converting
-impulse to force via F = impulse / dt.
-
-Usage:
-  Run via Isaac Sim's Script Editor, or from the command line:
-    ./isaac-sim.sh --exec "/path/to/contact_force_publisher_hande.py"
-
-  Then press Play in Isaac Sim to start publishing.
+Contact Force & Drawer State Publisher
+Updates: 
+- Separates Friction (Tangential) vs Normal (Perpendicular) forces.
+- Visualizes Friction (Red), Normal (Blue), and NET FORCE (Green).
+- Publishes Net Force X/Y/Z to ROS.
 """
 
 import omni.usd
@@ -25,12 +14,7 @@ import omni.physx
 from omni.physx import get_physx_interface, get_physx_simulation_interface
 import numpy as np
 import carb
-
-# Enable required extensions
-ext_manager = omni.kit.app.get_app().get_extension_manager()
-ext_manager.set_extension_enabled_immediate("omni.isaac.ros2_bridge", True)
-ext_manager.set_extension_enabled_immediate("omni.physx", True)
-ext_manager.set_extension_enabled_immediate("omni.debugdraw", True)
+from omni.debugdraw import get_debug_draw_interface
 
 # ROS2 imports
 import rclpy
@@ -38,52 +22,53 @@ from rclpy.node import Node
 from geometry_msgs.msg import WrenchStamped
 from std_msgs.msg import Float64MultiArray, MultiArrayDimension
 
-# Configuration — override via Isaac Sim CLI flags:
-#   --/app/tidybot/robot_path="/World/Robot/tidybot"
-#   --/app/tidybot/drawer_joint_path="/World/some_cabinet/drawer/joint"
-#   --/app/tidybot/drawer_handle_path="/World/some_cabinet/drawer_handle_top"
-settings = carb.settings.get_settings()
-ROBOT_PATH = settings.get("/app/tidybot/robot_path") or "/World/Robot/tidybot"
-DRAWER_JOINT_PATH = settings.get("/app/tidybot/drawer_joint_path") or \
-    "/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint"
-DRAWER_HANDLE_PATH = settings.get("/app/tidybot/drawer_handle_path") or \
-    "/World/sektion_cabinet_instanceable/drawer_handle_top"
+# --- CONFIGURATION ---
+ROBOT_PATH = "/World/Robot/tidybot" 
 LEFT_PAD_PATH = f"{ROBOT_PATH}/hande_left_finger"
 RIGHT_PAD_PATH = f"{ROBOT_PATH}/hande_right_finger"
 
-print(f"[CONFIG] ROBOT_PATH: {ROBOT_PATH}")
-print(f"[CONFIG] DRAWER_JOINT_PATH: {DRAWER_JOINT_PATH}")
-print(f"[CONFIG] DRAWER_HANDLE_PATH: {DRAWER_HANDLE_PATH}")
-print(f"[CONFIG] Left  finger: {LEFT_PAD_PATH}")
-print(f"[CONFIG] Right finger: {RIGHT_PAD_PATH}")
+DRAWER_JOINT_PATH = "/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint"
+DRAWER_HANDLE_PATH = "/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_visual"
+
+# Visualization Settings
+FORCE_SCALE = 0.05
+COLOR_YELLOW = 0xFF00FFFF # Total Force (Individual Fingers)
+COLOR_RED    = 0xFF0000FF # Friction (Tangential/Shear)
+COLOR_BLUE   = 0xFFFF0000 # Normal (Squeeze)
+COLOR_GREEN  = 0xFF00FF00 # NET FORCE (Combined Pull)
 
 # Initialize ROS2
 if not rclpy.ok():
     rclpy.init()
 
-
 class ContactForcePublisher(Node):
-    """ROS2 node that publishes contact forces and drawer state from Isaac Sim."""
-
     def __init__(self):
         super().__init__('contact_force_publisher')
+        
+        # Publishers
+        self.left_pub = self.create_publisher(WrenchStamped, '/tidybot/contact/left_finger', 10)
+        self.right_pub = self.create_publisher(WrenchStamped, '/tidybot/contact/right_finger', 10)
+        self.net_pub = self.create_publisher(WrenchStamped, '/tidybot/contact/net_force', 10) 
+        self.drawer_pub = self.create_publisher(Float64MultiArray, '/tidybot/drawer/state', 10)
 
-        # Contact force publishers (matching sensor_data_recorder.py topics)
-        self.left_pub = self.create_publisher(
-            WrenchStamped, '/tidybot/contact/left_finger', 10)
-        self.right_pub = self.create_publisher(
-            WrenchStamped, '/tidybot/contact/right_finger', 10)
-        # Drawer state publisher
-        self.drawer_pub = self.create_publisher(
-            Float64MultiArray, '/tidybot/drawer/state', 10)
-
-        self.get_logger().info('ContactForcePublisher initialized')
-
-        # Contact data storage (set by callback, read by physics step)
+        # -- Data Storage --
+        # Total Force (Friction + Normal)
         self.left_force = np.zeros(3)
         self.right_force = np.zeros(3)
+        self.net_force = np.zeros(3) 
 
-        # Drawer state tracking
+        # Components (For Debugging/Visualization)
+        self.left_friction = np.zeros(3)
+        self.left_normal = np.zeros(3)
+        self.right_friction = np.zeros(3)
+        self.right_normal = np.zeros(3)
+        
+        # Center of Pressure
+        self.left_cop = np.zeros(3)
+        self.right_cop = np.zeros(3)
+        self.handle_center = np.zeros(3)
+
+        # Drawer Kinematics
         self.drawer_pos = np.zeros(3)
         self.drawer_vel = np.zeros(3)
         self.drawer_acc = np.zeros(3)
@@ -91,7 +76,6 @@ class ContactForcePublisher(Node):
         self._prev_drawer_vel = None
 
     def update_drawer_state(self, current_pos, dt):
-        """Update drawer position, velocity, and acceleration."""
         self.drawer_pos = np.array(current_pos)
         if self._prev_drawer_pos is not None and dt > 0:
             self.drawer_vel = (self.drawer_pos - self._prev_drawer_pos) / dt
@@ -104,165 +88,196 @@ class ContactForcePublisher(Node):
         self._prev_drawer_pos = self.drawer_pos.copy()
         self._prev_drawer_vel = self.drawer_vel.copy()
 
-    def publish_forces(self, sim_time: float):
-        """Publish contact forces."""
+    def publish(self, sim_time):
         sec = int(sim_time)
         nsec = int((sim_time - sec) * 1e9)
-
-        for pub, force in [
-            (self.left_pub, self.left_force),
-            (self.right_pub, self.right_force),
-        ]:
+        
+        # 1. Publish Individual Wrenches
+        for pub, force in [(self.left_pub, self.left_force), (self.right_pub, self.right_force)]:
             msg = WrenchStamped()
             msg.header.stamp.sec = sec
             msg.header.stamp.nanosec = nsec
             msg.header.frame_id = "world"
-            msg.wrench.force.x = float(force[0])
-            msg.wrench.force.y = float(force[1])
-            msg.wrench.force.z = float(force[2])
+            msg.wrench.force.x, msg.wrench.force.y, msg.wrench.force.z = force
             pub.publish(msg)
 
-    def publish_drawer_state(self):
-        """Publish drawer position, velocity, and acceleration."""
+        # 2. Publish NET FORCE (The Green Arrow)
+        # This represents the actual vector sum acting on the handle
+        self.net_force = self.left_force + self.right_force
+        
+        msg_net = WrenchStamped()
+        msg_net.header.stamp.sec = sec
+        msg_net.header.stamp.nanosec = nsec
+        msg_net.header.frame_id = "world"
+        msg_net.wrench.force.x, msg_net.wrench.force.y, msg_net.wrench.force.z = self.net_force
+        self.net_pub.publish(msg_net)
+
+        # 3. Publish Drawer State
         msg = Float64MultiArray()
-        msg.layout.dim = [
-            MultiArrayDimension(label='state', size=9, stride=9)
-        ]
+        msg.layout.dim = [MultiArrayDimension(label='state', size=9, stride=9)]
         msg.data = list(self.drawer_pos) + list(self.drawer_vel) + list(self.drawer_acc)
         self.drawer_pub.publish(msg)
 
-
-# Create ROS2 node
+# Global Setup
 ros_node = ContactForcePublisher()
 stage = omni.usd.get_context().get_stage()
+debug_draw = get_debug_draw_interface()
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Enable contact reporting on fingertips and drawer handle
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------
+# 1. Apply Contact API
+# ---------------------------------------------------------
 for path in [LEFT_PAD_PATH, RIGHT_PAD_PATH, DRAWER_HANDLE_PATH]:
     prim = stage.GetPrimAtPath(path)
     if prim.IsValid():
         if not prim.HasAPI(PhysxSchema.PhysxContactReportAPI):
             PhysxSchema.PhysxContactReportAPI.Apply(prim)
-        contact_api = PhysxSchema.PhysxContactReportAPI(prim)
-        contact_api.CreateThresholdAttr().Set(0.0)
+        PhysxSchema.PhysxContactReportAPI(prim).CreateThresholdAttr().Set(0.0)
         print(f"[INFO] Contact reporting enabled on: {path}")
     else:
-        raise RuntimeError(f"Prim not found: {path}")
+        print(f"[WARN] Prim not found: {path}")
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Contact report callback — called by PhysX each step with all contacts
-#
-# data.impulse contains the TOTAL contact impulse (normal + friction).
-# We convert impulse (N·s) to force (N) by dividing by dt.
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------
+# 2. Contact Report Callback (Physics Thread)
+# ---------------------------------------------------------
 _last_dt = [1.0 / 60.0]
 
-
 def contact_report_callback(contact_headers, contact_data):
-    """Process contact reports to extract total forces on fingertips."""
     dt = _last_dt[0]
+    if dt <= 0: return
 
-    left_force = np.zeros(3)
-    right_force = np.zeros(3)
+    # Temporary Accumulators
+    l_accum = {"total": np.zeros(3), "friction": np.zeros(3), "normal": np.zeros(3), "pos": np.zeros(3), "count": 0}
+    r_accum = {"total": np.zeros(3), "friction": np.zeros(3), "normal": np.zeros(3), "pos": np.zeros(3), "count": 0}
 
     for header in contact_headers:
-        actor0_path = str(PhysicsSchemaTools.intToSdfPath(header.actor0))
-        actor1_path = str(PhysicsSchemaTools.intToSdfPath(header.actor1))
+        # Identify Actors
+        act0_path = str(PhysicsSchemaTools.intToSdfPath(header.actor0))
+        act1_path = str(PhysicsSchemaTools.intToSdfPath(header.actor1))
+        
+        is_left_0 = LEFT_PAD_PATH in act0_path
+        is_left_1 = LEFT_PAD_PATH in act1_path
+        is_right_0 = RIGHT_PAD_PATH in act0_path
+        is_right_1 = RIGHT_PAD_PATH in act1_path
 
-        is_left = LEFT_PAD_PATH in actor0_path or LEFT_PAD_PATH in actor1_path
-        is_right = RIGHT_PAD_PATH in actor0_path or RIGHT_PAD_PATH in actor1_path
+        target_accum = None
+        sign_flip = 1.0 
 
-        if not (is_left or is_right):
+        if is_left_0:
+            target_accum = l_accum
+            sign_flip = 1.0
+        elif is_left_1:
+            target_accum = l_accum
+            sign_flip = -1.0
+        elif is_right_0:
+            target_accum = r_accum
+            sign_flip = 1.0
+        elif is_right_1:
+            target_accum = r_accum
+            sign_flip = -1.0
+        else:
             continue
 
         for i in range(header.num_contact_data):
-            data = contact_data[header.contact_data_offset + i]
-            impulse = np.array([data.impulse[0], data.impulse[1], data.impulse[2]])
+            d = contact_data[header.contact_data_offset + i]
+            
+            # 1. Raw Data
+            raw_impulse = np.array([d.impulse[0], d.impulse[1], d.impulse[2]])
+            raw_normal = np.array([d.normal[0], d.normal[1], d.normal[2]])
+            pos = np.array([d.position[0], d.position[1], d.position[2]])
 
-            # Convert impulse (N·s) to force (N)
-            force = impulse / dt if dt > 0 else impulse
+            norm_len = np.linalg.norm(raw_normal)
+            if norm_len > 1e-6:
+                raw_normal /= norm_len
 
-            if is_left:
-                left_force += force
-            if is_right:
-                right_force += force
+            # 2. Calculate Total Force on the Finger
+            total_force = (raw_impulse / dt) * sign_flip
+            
+            # 3. Decompose
+            normal_component_scalar = np.dot(total_force, raw_normal)
+            force_normal_vec = normal_component_scalar * raw_normal
+            force_friction_vec = total_force - force_normal_vec
 
-    ros_node.left_force = left_force
-    ros_node.right_force = right_force
+            # 4. Accumulate
+            target_accum["total"] += total_force
+            target_accum["friction"] += force_friction_vec
+            target_accum["normal"] += force_normal_vec
+            target_accum["pos"] += pos
+            target_accum["count"] += 1
 
+    # Apply to Node
+    ros_node.left_force = l_accum["total"]
+    ros_node.left_friction = l_accum["friction"]
+    ros_node.left_normal = l_accum["normal"]
+    
+    ros_node.right_force = r_accum["total"]
+    ros_node.right_friction = r_accum["friction"]
+    ros_node.right_normal = r_accum["normal"]
 
-# Subscribe to contact reports
-contact_sub = get_physx_simulation_interface().subscribe_contact_report_events(
-    contact_report_callback)
+    if l_accum["count"] > 0: ros_node.left_cop = l_accum["pos"] / l_accum["count"]
+    if r_accum["count"] > 0: ros_node.right_cop = r_accum["pos"] / r_accum["count"]
+    
+    # Calculate Center of Handle (Midpoint between fingers) for drawing the Net Force
+    if l_accum["count"] > 0 and r_accum["count"] > 0:
+        ros_node.handle_center = (ros_node.left_cop + ros_node.right_cop) / 2.0
+    elif l_accum["count"] > 0:
+        ros_node.handle_center = ros_node.left_cop
+    elif r_accum["count"] > 0:
+        ros_node.handle_center = ros_node.right_cop
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Debug drawing
-# ─────────────────────────────────────────────────────────────────────────────
-from omni.debugdraw import get_debug_draw_interface
-debug_draw = get_debug_draw_interface()
-FORCE_SCALE = 0.01  # 1 N = 0.01m arrow length
+contact_sub = get_physx_simulation_interface().subscribe_contact_report_events(contact_report_callback)
 
+# ---------------------------------------------------------
+# 3. Helpers
+# ---------------------------------------------------------
+def get_world_pos(path):
+    prim = stage.GetPrimAtPath(path)
+    if not prim.IsValid(): return np.zeros(3)
+    return np.array(UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(0).ExtractTranslation())
 
-def get_prim_world_position(prim_path):
-    """Get the world-space position of a prim."""
-    prim = stage.GetPrimAtPath(Sdf.Path(prim_path))
-    if not prim.IsValid():
-        return (0.0, 0.0, 0.0)
-    xformable = UsdGeom.Xformable(prim)
-    transform = xformable.ComputeLocalToWorldTransform(0)
-    t = transform.ExtractTranslation()
-    return (t[0], t[1], t[2])
+def draw_arrow(start, vec, color):
+    mag = np.linalg.norm(vec)
+    if mag < 0.1: return 
+    
+    end = start + (vec * FORCE_SCALE)
+    debug_draw.draw_line(
+        carb.Float3(float(start[0]), float(start[1]), float(start[2])),
+        color, 5.0,
+        carb.Float3(float(end[0]), float(end[1]), float(end[2])), 
+        color, 5.0
+    )
 
-
-def draw_force_vectors():
-    """Draw force arrows at each finger (yellow = total contact force)."""
-    YELLOW = 0xFFFFCC00
-
-    for pad_path, force in [
-        (LEFT_PAD_PATH, ros_node.left_force),
-        (RIGHT_PAD_PATH, ros_node.right_force),
-    ]:
-        pos = get_prim_world_position(pad_path)
-        origin = carb.Float3(pos[0], pos[1], pos[2])
-        debug_draw.draw_line(
-            origin, YELLOW, 3.0,
-            carb.Float3(
-                pos[0] + force[0] * FORCE_SCALE,
-                pos[1] + force[1] * FORCE_SCALE,
-                pos[2] + force[2] * FORCE_SCALE,
-            ), YELLOW, 3.0)
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Main physics step callback
-# ─────────────────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------
+# 4. Main Loop
+# ---------------------------------------------------------
 _sim_time = [0.0]
 
-
 def on_physics_step(dt: float):
-    """Called every physics step — publishes forces and drawer state."""
     _sim_time[0] += dt
     _last_dt[0] = dt
-
-    # Update drawer state
-    drawer_pos = get_prim_world_position(DRAWER_JOINT_PATH)
+    
+    # 1. Update Drawer State
+    drawer_pos = get_world_pos(DRAWER_JOINT_PATH)
     ros_node.update_drawer_state(drawer_pos, dt)
-
-    # ROS2 spin + publish
+    
+    # 2. ROS Spin & Publish
     rclpy.spin_once(ros_node, timeout_sec=0)
-    ros_node.publish_forces(_sim_time[0])
-    ros_node.publish_drawer_state()
-    draw_force_vectors()
+    ros_node.publish(_sim_time[0])
+    
+    # LEFT FINGER
+    draw_arrow(ros_node.left_cop, ros_node.left_friction, COLOR_RED)  
+    draw_arrow(ros_node.left_cop, ros_node.left_normal, COLOR_BLUE)   
 
+    # RIGHT FINGER
+    draw_arrow(ros_node.right_cop, ros_node.right_friction, COLOR_RED)
+    draw_arrow(ros_node.right_cop, ros_node.right_normal, COLOR_BLUE)
+    
+    # NET FORCE (GREEN ARROW)
+    # Visualizes the combined pull of both fingers
+    draw_arrow(ros_node.handle_center, ros_node.net_force, COLOR_GREEN)
 
-# Subscribe to physics events
-physx_subs = get_physx_interface().subscribe_physics_step_events(on_physics_step)
+physx_sub = get_physx_interface().subscribe_physics_step_events(on_physics_step)
 
-print("[INFO] Contact Force & Drawer State Publisher registered.")
-print("[INFO] Using subscribe_contact_report_events (impulse includes normal + friction)")
-print("[INFO] Topics:")
-print("[INFO]   /tidybot/contact/left_finger   (WrenchStamped, total force N, world frame)")
-print("[INFO]   /tidybot/contact/right_finger   (WrenchStamped, total force N, world frame)")
-print("[INFO]   /tidybot/drawer/state            (Float64MultiArray, pos/vel/acc)")
-print("[INFO] Press Play to start publishing.")
+print("[INFO] Script Running.")
+print("[INFO] RED Arrow   = Friction Force")
+print("[INFO] BLUE Arrow  = Normal Force (Squeeze)")
+print("[INFO] GREEN Arrow = NET FORCE (Resultant Pull)")
