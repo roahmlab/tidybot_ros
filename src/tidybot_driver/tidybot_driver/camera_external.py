@@ -11,6 +11,9 @@ class Camera(Node):
     def __init__(self):
         super().__init__('tidybot_ext_camera')
 
+        self.declare_parameter('fps', 30)
+        fps = self.get_parameter('fps').get_parameter_value().integer_value
+
         qos = QoSProfile(
             reliability=ReliabilityPolicy.BEST_EFFORT,
             history=HistoryPolicy.KEEP_LAST,
@@ -31,7 +34,7 @@ class Camera(Node):
         self.br = CvBridge()
 
         # Use webcam
-        self.cap = cv2.VideoCapture(4)
+        self.cap = cv2.VideoCapture(0)
 
         if not self.cap.isOpened():
             self.get_logger().error("Failed to open webcam (/dev/video4)")
@@ -42,8 +45,8 @@ class Camera(Node):
         w = self.cap.get(cv2.CAP_PROP_FRAME_WIDTH)
         h = self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.get_logger().info(f"Webcam resolution: {w}x{h}")
+        self.get_logger().info(f"Streaming at FPS: {fps}")
 
-        fps = 30
         self.timer = self.create_timer(1.0 / fps, self.timer_callback)
 
     def timer_callback(self):

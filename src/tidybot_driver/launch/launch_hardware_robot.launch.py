@@ -146,6 +146,18 @@ def generate_launch_description():
         actions=[bias_request_cmd]
     )
     
+    papillarray_wrench_transformer = Node(
+        package='tidybot_driver',
+        executable='papillarray_wrench_transformer', 
+        name='papillarray_wrench_transformer',
+        output='screen',
+        condition=IfCondition(PythonExpression([
+            "(",
+            "'", LaunchConfiguration("mode"), "' == 'arm_only' or '", LaunchConfiguration("mode"), "' == 'full'",
+            ") and '", LaunchConfiguration("tactile_enabled"), "' == 'true'"
+        ]))
+    )
+
     camera_base_streamer = GroupAction(
         actions=[
             SetRemap(src='/camera/color/image_raw', dst='/tidybot/camera_base/color/raw'),
@@ -213,6 +225,7 @@ def generate_launch_description():
         camera_wrist_republisher,
         papillarray_node,
         delayed_bias_request,
+        papillarray_wrench_transformer,
         camera_base_streamer,
         camera_ext_streamer,
         base_server,

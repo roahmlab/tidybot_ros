@@ -38,6 +38,7 @@ setup(
             'arm_server = tidybot_driver.arm_server:main',
             'camera_wrist = tidybot_driver.camera_wrist:main',
             'camera_ext = tidybot_driver.camera_external:main',
+            'papillarray_wrench_transformer = tidybot_driver.tactile_sensor:main',
             'joint_state_publisher = tidybot_driver.joint_state_publisher:main',
             'play_csv_delta = tidybot_driver.play_csv_delta:main',
             'play_csv_pose = tidybot_driver.play_csv_pose:main'
