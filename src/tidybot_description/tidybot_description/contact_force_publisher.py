@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Contact Force & Drawer State Publisher for Isaac Sim (Robotiq Hand-E)
+Contact Force & Drawer State Publisher for Isaac Sim
 
 Publishes gripper contact forces and drawer handle state to ROS2:
   - /tidybot/contact/left_finger  (geometry_msgs/WrenchStamped) - total force (world frame)
@@ -13,7 +13,7 @@ impulse to force via F = impulse / dt.
 
 Usage:
   Run via Isaac Sim's Script Editor, or from the command line:
-    ./isaac-sim.sh --exec "/path/to/contact_force_publisher_hande.py"
+    ./isaac-sim.sh --exec "/path/to/contact_force_publisher.py"
 
   Then press Play in Isaac Sim to start publishing.
 """
@@ -48,8 +48,8 @@ DRAWER_JOINT_PATH = settings.get("/app/tidybot/drawer_joint_path") or \
     "/World/sektion_cabinet_instanceable/drawer_top/drawer_handle_top_joint"
 DRAWER_HANDLE_PATH = settings.get("/app/tidybot/drawer_handle_path") or \
     "/World/sektion_cabinet_instanceable/drawer_handle_top"
-LEFT_PAD_PATH = f"{ROBOT_PATH}/hande_left_finger"
-RIGHT_PAD_PATH = f"{ROBOT_PATH}/hande_right_finger"
+LEFT_PAD_PATH = f"{ROBOT_PATH}/left_inner_finger"
+RIGHT_PAD_PATH = f"{ROBOT_PATH}/right_inner_finger"
 
 print(f"[CONFIG] ROBOT_PATH: {ROBOT_PATH}")
 print(f"[CONFIG] DRAWER_JOINT_PATH: {DRAWER_JOINT_PATH}")

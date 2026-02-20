@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Isaac Sim Setup Script for TidyBot++ (Robotiq Hand-E Gripper)
+Isaac Sim Setup Script for TidyBot++
 
 Configures the robot in Isaac Sim:
   - Sets initial joint positions (home pose)
@@ -9,7 +9,7 @@ Configures the robot in Isaac Sim:
 
 Usage:
   Run via Isaac Sim's Script Editor, or from the command line:
-    ./isaac-sim.sh --exec "/path/to/isaac_sim_setup_hande.py"
+    ./isaac-sim.sh --exec "/path/to/isaac_sim_setup.py"
 """
 
 import omni.usd
@@ -27,7 +27,8 @@ ext_manager.set_extension_enabled_immediate("isaacsim.sensors.physics", True)
 ROBOT_PATH = "/World/Robot/tidybot"
 BASE_JOINTS = ["joint_x", "joint_y", "joint_th"]
 ARM_JOINTS = ["joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6", "joint_7"]
-GRIPPER_JOINTS = ["hande_left_finger_joint", "hande_right_finger_joint"]
+GRIPPER_JOINTS = ["finger_joint", "left_inner_finger_knuckle_joint", "left_inner_finger_joint",
+                  "right_outer_knuckle_joint", "right_inner_finger_knuckle_joint", "right_inner_finger_joint"]
 CAMERAS = {
     "arm_camera": {
         "parent_link": "bracelet_link/end_effector_link/arm_camera_link",
@@ -83,10 +84,12 @@ INITIAL_JOINT_POSITIONS = {
     "joint_7": 1.574186,
     # Gripper - all joints start at 0 (open position)
     # The isaac_sim_bridge applies gear ratios when commanding
-    # Gripper - Hand-E prismatic fingers start at 0.025 (open)
-    # 0 = closed, 0.025 = open
-    "hande_left_finger_joint": 0.025,
-    "hande_right_finger_joint": 0.025,
+    "finger_joint": 0.0,
+    "right_outer_knuckle_joint": 0.0,
+    "left_inner_finger_joint": 0.0,
+    "right_inner_finger_joint": 0.0,
+    "left_inner_finger_knuckle_joint": 0.0,
+    "right_inner_finger_knuckle_joint": 0.0,
 }
 
 # Find and configure each joint by traversing the stage

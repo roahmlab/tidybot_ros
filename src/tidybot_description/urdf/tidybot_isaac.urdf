@@ -47,8 +47,7 @@
     </inertial>
   </link>
   <joint name="joint_x" type="prismatic">
-    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.005"/>
-    <!-- 0.085 base height - 0.08 Isaac Lab spawn offset -->
+    <origin rpy="0.0 0.0 0.0" xyz="0.0 0.0 0.085"/>
     <parent link="world"/>
     <child link="joint_x_jointbody"/>
     <axis xyz="1 0 0"/>

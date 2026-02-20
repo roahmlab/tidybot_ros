@@ -11,21 +11,17 @@ Nodes launched:
     - isaac_sim_bridge: Bridges ros2_control topics to Isaac Sim's /joint_command
 
 Usage:
-    # Hand-E gripper (default):
     ros2 launch tidybot_description launch_isaac_sim.launch.py
 
-    # 2F-85 gripper:
-    ros2 launch tidybot_description launch_isaac_sim.launch.py gripper_type:=2f85
-
 Arguments:
-    gripper_type: Which gripper to use ('hande' or '2f85')
     use_rviz: Launch RViz for visualization (default: true)
     publish_rate: Isaac Sim bridge publishing rate in Hz (default: 50.0)
     use_velocity_control: Use velocity control for base (default: false)
+    rviz_config: Path to RViz config file
 """
 
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction
+from launch.actions import DeclareLaunchArgument
 from launch.substitutions import (
     LaunchConfiguration,
     Command,
@@ -34,85 +30,20 @@ from launch.substitutions import (
 from launch.conditions import IfCondition
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-from launch_ros.parameter_descriptions import ParameterValue
-
-
-def _launch_nodes(context):
-    """Build nodes after launch args are resolved."""
-    gripper_type = context.launch_configurations['gripper_type']
-    tidybot_pkg = FindPackageShare("tidybot_description")
-
-    if gripper_type == 'hande':
-        urdf_filename = "tidybot_hande_isaac.urdf"
-        rviz_config = PathJoinSubstitution([tidybot_pkg, "config", "tidybot_hande.rviz"])
-    else:
-        urdf_filename = "tidybot_2f_85_isaac.urdf"
-        rviz_config = PathJoinSubstitution([tidybot_pkg, "config", "tidybot.rviz"])
-
-    robot_description_content = Command([
-        "cat ",
-        PathJoinSubstitution([tidybot_pkg, "urdf", urdf_filename]),
-    ])
-
-    return [
-        # Robot State Publisher
-        Node(
-            package="robot_state_publisher",
-            executable="robot_state_publisher",
-            name="robot_state_publisher",
-            output="screen",
-            parameters=[{
-                "robot_description": ParameterValue(robot_description_content, value_type=str),
-                "use_sim_time": True,
-                "ignore_timestamp": True,
-            }],
-        ),
-
-        # TF Relay
-        Node(
-            package="tidybot_description",
-            executable="tf_relay",
-            name="tf_relay",
-            output="screen",
-            parameters=[{"use_sim_time": True}],
-        ),
-
-        # Isaac Sim Bridge
-        Node(
-            package="tidybot_description",
-            executable="isaac_sim_bridge",
-            name="isaac_sim_bridge",
-            output="screen",
-            parameters=[{
-                "publish_rate": LaunchConfiguration("publish_rate"),
-                "use_velocity_control": LaunchConfiguration("use_velocity_control"),
-            }],
-        ),
-
-        # RViz (optional)
-        Node(
-            package="rviz2",
-            executable="rviz2",
-            name="rviz2",
-            output="screen",
-            arguments=["-d", rviz_config],
-            parameters=[{"use_sim_time": True}],
-            remappings=[
-                ("/tf", "/tf_relay"),
-                ("/tf_static", "/tf_static_relay"),
-            ],
-            condition=IfCondition(LaunchConfiguration("use_rviz")),
-        ),
-    ]
 
 
 def generate_launch_description():
+    tidybot_pkg = FindPackageShare("tidybot_description")
+    default_rviz_config = PathJoinSubstitution([tidybot_pkg, "config", "tidybot.rviz"])
+    
+    # Robot description from xacro
+    robot_description_content = Command([
+        "xacro ",
+        PathJoinSubstitution([tidybot_pkg, "urdf", "tidybot.xacro"]),
+    ])
+    
     return LaunchDescription([
-        DeclareLaunchArgument(
-            "gripper_type",
-            default_value="hande",
-            description="Gripper type: 'hande' (Robotiq Hand-E) or '2f85' (Robotiq 2F-85)"
-        ),
+        # Arguments
         DeclareLaunchArgument(
             "use_rviz",
             default_value="true",
@@ -128,6 +59,62 @@ def generate_launch_description():
             default_value="false",
             description="Use velocity control for base instead of position"
         ),
-
-        OpaqueFunction(function=_launch_nodes),
+        DeclareLaunchArgument(
+            "rviz_config",
+            default_value=default_rviz_config,
+            description="Path to RViz config file"
+        ),
+        
+        # Robot State Publisher
+        # Publishes /tf and /tf_static from /joint_states
+        Node(
+            package="robot_state_publisher",
+            executable="robot_state_publisher",
+            name="robot_state_publisher",
+            output="screen",
+            parameters=[{
+                "robot_description": robot_description_content,
+                "use_sim_time": True,
+                "ignore_timestamp": True,  # Important for Isaac Sim timing
+            }],
+        ),
+        
+        # TF Relay
+        # Relays TF to /tf_relay and /tf_static_relay for RViz compatibility
+        Node(
+            package="tidybot_description",
+            executable="tf_relay",
+            name="tf_relay",
+            output="screen",
+            parameters=[{"use_sim_time": True}],
+        ),
+        
+        # Isaac Sim Bridge
+        # Bridges ros2_control topics to Isaac Sim's /joint_command
+        Node(
+            package="tidybot_description",
+            executable="isaac_sim_bridge",
+            name="isaac_sim_bridge",
+            output="screen",
+            parameters=[{
+                "publish_rate": LaunchConfiguration("publish_rate"),
+                "use_velocity_control": LaunchConfiguration("use_velocity_control"),
+            }],
+        ),
+        
+        # RViz (optional)
+        Node(
+            package="rviz2",
+            executable="rviz2",
+            name="rviz2",
+            output="screen",
+            arguments=["-d", LaunchConfiguration("rviz_config")],
+            parameters=[{"use_sim_time": True}],
+            remappings=[
+                ("/tf", "/tf_relay"),
+                ("/tf_static", "/tf_static_relay"),
+            ],
+            condition=IfCondition(LaunchConfiguration("use_rviz")),
+        ),
     ])
+

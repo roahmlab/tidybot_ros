@@ -54,12 +54,12 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     # robot
-    robot: ArticulationCfg = assets.TIDYBOT_HANDE_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # Per-finger contact sensors with filter targeting drawer handle
     # (matches open_drawer_collect_data.py approach — friction_forces_w only)
     contact_forces_left = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/hande_left_finger",
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/left_inner_finger",
         update_period=0.0,
         history_length=6,
         debug_vis=True,
@@ -69,7 +69,7 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     contact_forces_right = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/hande_right_finger",
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/right_inner_finger",
         update_period=0.0,
         history_length=6,
         debug_vis=True,
@@ -121,42 +121,46 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
     
-    # Cameras disabled for performance — uncomment to re-enable
-    # wrist_camera = TiledCameraCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link/end_effector_link/arm_camera_link/sensor",
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0,
-    #         focus_distance=400.0,
-    #         horizontal_aperture=20.955,
-    #         clipping_range=(0.1, 100.0),
-    #     ),
-    #     offset=TiledCameraCfg.OffsetCfg(
-    #         pos=(0.0, -0.01, 0.03),
-    #         rot=(1.0, 0.0, 0.0, 0.0),
-    #         convention="ros",
-    #     ),
-    #     width=640,
-    #     height=480,
-    # )
-    #
-    # base_camera = TiledCameraCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/tidybot/base/base_camera_link/sensor",
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0,
-    #         focus_distance=400.0,
-    #         horizontal_aperture=20.955,
-    #         clipping_range=(0.1, 100.0),
-    #     ),
-    #     offset=TiledCameraCfg.OffsetCfg(
-    #         pos=(0.0, 0.0, 0.0),
-    #         rot=(0.5, -0.5, 0.5, -0.5),
-    #         convention="ros",
-    #     ),
-    #     width=640,
-    #     height=480,
-    # )
+    # Wrist/Arm Camera - mounted on end-effector
+    # Using TiledCameraCfg for efficient batch rendering and regex path support
+    # Orientation from Isaac Sim setup: Gf.Quatf(0.0, -1.0, 0.0, 0.0) in (w,x,y,z)
+    wrist_camera = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link/end_effector_link/arm_camera_link/sensor",
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 100.0),
+        ),
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, -0.01, 0.03),
+            rot=(1.0, 0.0, 0.0, 0.0),  # 180° Z-axis rotation applied (identity after composition)
+            convention="ros",
+        ),
+        width=640,
+        height=480,
+    )
+    
+    # Base Camera - mounted on base, looking downward
+    # Orientation from Isaac Sim setup: Gf.Quatf(0.5, 0.5, -0.5, -0.5) in (w,x,y,z)
+    base_camera = TiledCameraCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/base/base_camera_link/sensor",
+        data_types=["rgb"],
+        spawn=sim_utils.PinholeCameraCfg(
+            focal_length=24.0,
+            focus_distance=400.0,
+            horizontal_aperture=20.955,
+            clipping_range=(0.1, 100.0),
+        ),
+        offset=TiledCameraCfg.OffsetCfg(
+            pos=(0.0, 0.0, 0.0),
+            rot=(0.5, -0.5, 0.5, -0.5),  # 180° Z-axis rotation applied
+            convention="ros",
+        ),
+        width=640,
+        height=480,
+    )
     
 
 
@@ -187,16 +191,15 @@ class ActionsCfg:
     )
 
     # Position control for gripper (Continuous with mimic)
-    # Hand-E: 2 prismatic joints, 0.025 = open, 0.0 = closed
     gripper = mdp.MimicGripperActionCfg(
         asset_name="robot",
-        joint_names=["hande_left_finger_joint", "hande_right_finger_joint"],
-        leader_joint_name="hande_left_finger_joint",
+        joint_names=["finger_joint", "right_outer_knuckle_joint"],
+        leader_joint_name="finger_joint",
         mimic_multiplier={
-            "hande_right_finger_joint": 1.0,
+            "right_outer_knuckle_joint": 1.0,
         },
-        open_command_expr={"hande_left_finger_joint": 0.025},
-        close_command_expr={"hande_left_finger_joint": 0.0},
+        open_command_expr={"finger_joint": 0.0},
+        close_command_expr={"finger_joint": 0.82},
     )
 
 
@@ -217,7 +220,7 @@ class ObservationsCfg:
             func=mdp.end_effector_pos,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "ee_body_name": "hande_link",
+                "ee_body_name": "robotiq_arg2f_base_link",
             },
         )
         
@@ -227,7 +230,7 @@ class ObservationsCfg:
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
                 "cabinet_cfg": SceneEntityCfg("cabinet"),
-                "ee_body_name": "hande_link",
+                "ee_body_name": "robotiq_arg2f_base_link",
                 "handle_offset": (0.0, 0.3, 0.0),
             },
         )
@@ -237,7 +240,7 @@ class ObservationsCfg:
             func=mdp.gripper_open_amount,
             params={
                 "robot_cfg": SceneEntityCfg("robot"),
-                "gripper_joint_name": "hande_left_finger_joint",
+                "gripper_joint_name": "finger_joint",
             },
         )
         
@@ -294,7 +297,7 @@ class RewardsCfg:
             "threshold": 0.5,
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_body_name": "hande_link",
+            "ee_body_name": "robotiq_arg2f_base_link",
         },
     )
     
@@ -303,11 +306,11 @@ class RewardsCfg:
         func=mdp.grasp_handle,
         weight=15.0,
         params={
-            "open_joint_pos": 0.025,  # Hand-E max opening (meters)
+            "open_joint_pos": 0.82,  # Max gripper opening
             "robot_cfg": SceneEntityCfg("robot"),
             "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_body_name": "hande_link",
-            "gripper_joint_name": "hande_left_finger_joint",
+            "ee_body_name": "robotiq_arg2f_base_link",
+            "gripper_joint_name": "finger_joint",
         },
     )
     
@@ -347,7 +350,7 @@ class RewardsCfg:
         weight=-0.5,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
-            "gripper_joint_name": "hande_left_finger_joint",
+            "gripper_joint_name": "finger_joint",
         },
     )
 
@@ -375,7 +378,7 @@ class TerminationsCfg:
 
 
 @configclass
-class TidybotHandeIsaacEnvCfg(ManagerBasedRLEnvCfg):
+class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
     # Scene settings
     scene: TidybotIsaacSceneCfg = TidybotIsaacSceneCfg(num_envs=4096, env_spacing=4.0)
     # Basic settings
@@ -390,10 +393,10 @@ class TidybotHandeIsaacEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self) -> None:
         """Post initialization."""
         # general settings
-        self.decimation = 2
+        self.decimation = 4
         self.episode_length_s = 5  # Extended from 5s for complex manipulation
         # viewer settings
         self.viewer.eye = (3.0, 3.0, 2.0)
         self.viewer.lookat = (0.0, 0.0, 0.0)
         # simulation settings
-        self.sim.dt = 1 / 120
+        self.sim.dt = 1 / 240
