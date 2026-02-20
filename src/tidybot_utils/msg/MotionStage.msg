@@ -3,7 +3,6 @@ uint8 STAGE_PTP = 0      # Point-to-point motion (free-space)
 uint8 STAGE_LIN = 1      # Linear constraint motion (straight line)
 uint8 STAGE_CIRC = 2     # Circular constraint motion (arc)
 uint8 STAGE_GRIPPER = 3  # Gripper action
-uint8 STAGE_WAIT = 4     # Wait/hold position for duration
 uint8 stage_type
 
 # Target pose (for PTP, LIN, CIRC endpoint)
@@ -21,9 +20,3 @@ float64 gripper_position              # 0.0 = open, 1.0 = closed
 float64 velocity_scaling              # 0.0 to 1.0
 float64 duration                      # estimated duration in seconds
 string description                    # for feedback/logging
-
-# Speed profile for LIN motions (default: constant speed)
-uint8 PROFILE_CONSTANT = 0            # Uniform speed (default)
-uint8 PROFILE_SINUSOIDAL = 1          # Sinusoidal speed variation
-uint8 speed_profile
-float64 speed_profile_freq            # Number of oscillation cycles (e.g. 2.0)

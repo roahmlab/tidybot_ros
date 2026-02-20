@@ -54,31 +54,6 @@ Converts an actions/observations bag pair into a parquet format.
 ros2 run tidybot_episode rosbag_to_parquet input_dir:=episode_bag output:=data.hdf5
 ```
 
-### **Sensor Data Recorder (`sensor_data_recorder.py`)**
-Records contact forces and sensor data to CSV files in Isaac Lab-compatible format. Designed for use with Isaac Sim.
-
-```bash
-ros2 run tidybot_episode sensor_data_recorder.py --ros-args \
-    -p output_dir:=/tmp/sensor_data \
-    -p record_rate:=10.0 \
-    -p drawer_joint_name:=top_drawer_joint
-```
-
-**Subscriptions:**
-- `/tidybot/contact/left_finger` (`geometry_msgs/WrenchStamped`)
-- `/tidybot/contact/right_finger` (`geometry_msgs/WrenchStamped`)
-- `/joint_states` (`sensor_msgs/JointState`)
-
-**Services:**
-- `/sensor_recorder/start` (`std_srvs/Empty`)
-- `/sensor_recorder/stop` (`std_srvs/Empty`)
-- `/sensor_recorder/save` (`std_srvs/SetBool`) — save when `true`, discard when `false`
-
-**Output CSV format** (matches Isaac Lab):
-```
-Time(s), Left_Fx, Left_Fy, Left_Fz, Right_Fx, Right_Fy, Right_Fz, Drawer_Vx, Drawer_Vy, Drawer_Vz
-```
-
 ## 🔧 Usage
 
 ### **Recording from Teleop**

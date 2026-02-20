@@ -9,7 +9,7 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
-from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg, FrameTransformerCfg, OffsetCfg
+from isaaclab.sensors import ContactSensorCfg, FrameTransformerCfg, OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
 from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
@@ -56,26 +56,15 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     # robot
     robot: ArticulationCfg = assets.TIDYBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    # Per-finger contact sensors with filter targeting drawer handle
-    # (matches open_drawer_collect_data.py approach — friction_forces_w only)
-    contact_forces_left = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/left_inner_finger",
+    # contact sensors
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/tidybot/.*_inner_finger.*", 
         update_period=0.0,
-        history_length=6,
+        history_length=3,
+        track_air_time=False,
         debug_vis=True,
-        track_friction_forces=True,
-        filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
-        max_contact_data_count_per_prim=4,
-    )
-
-    contact_forces_right = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/right_inner_finger",
-        update_period=0.0,
-        history_length=6,
-        debug_vis=True,
-        track_friction_forces=True,
-        filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
-        max_contact_data_count_per_prim=16,
+        # filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_top/handle"],
+        visualizer_cfg=FORCE_MARKER_CFG.replace(prim_path="/Visuals/ContactForceArrows"),
     )
 
     # End-effector Frame
@@ -119,47 +108,6 @@ class TidybotIsaacSceneCfg(InteractiveSceneCfg):
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
-    )
-    
-    # Wrist/Arm Camera - mounted on end-effector
-    # Using TiledCameraCfg for efficient batch rendering and regex path support
-    # Orientation from Isaac Sim setup: Gf.Quatf(0.0, -1.0, 0.0, 0.0) in (w,x,y,z)
-    wrist_camera = TiledCameraCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link/end_effector_link/arm_camera_link/sensor",
-        data_types=["rgb"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0,
-            focus_distance=400.0,
-            horizontal_aperture=20.955,
-            clipping_range=(0.1, 100.0),
-        ),
-        offset=TiledCameraCfg.OffsetCfg(
-            pos=(0.0, -0.01, 0.03),
-            rot=(1.0, 0.0, 0.0, 0.0),  # 180° Z-axis rotation applied (identity after composition)
-            convention="ros",
-        ),
-        width=640,
-        height=480,
-    )
-    
-    # Base Camera - mounted on base, looking downward
-    # Orientation from Isaac Sim setup: Gf.Quatf(0.5, 0.5, -0.5, -0.5) in (w,x,y,z)
-    base_camera = TiledCameraCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/tidybot/base/base_camera_link/sensor",
-        data_types=["rgb"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=24.0,
-            focus_distance=400.0,
-            horizontal_aperture=20.955,
-            clipping_range=(0.1, 100.0),
-        ),
-        offset=TiledCameraCfg.OffsetCfg(
-            pos=(0.0, 0.0, 0.0),
-            rot=(0.5, -0.5, 0.5, -0.5),  # 180° Z-axis rotation applied
-            convention="ros",
-        ),
-        width=640,
-        height=480,
     )
     
 
@@ -400,3 +348,4 @@ class TidybotIsaacEnvCfg(ManagerBasedRLEnvCfg):
         self.viewer.lookat = (0.0, 0.0, 0.0)
         # simulation settings
         self.sim.dt = 1 / 240
+        self.sim.render_interval = self.decimation

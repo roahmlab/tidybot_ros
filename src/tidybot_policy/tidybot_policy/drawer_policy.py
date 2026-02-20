@@ -22,7 +22,6 @@ from tidybot_utils.msg import MotionStage
 from geometry_msgs.msg import Pose, Point, Vector3
 from visualization_msgs.msg import Marker, MarkerArray
 from std_msgs.msg import ColorRGBA
-from std_srvs.srv import Empty as EmptySrv, SetBool
 
 import numpy as np
 from scipy.spatial.transform import Rotation as R
@@ -64,71 +63,18 @@ class DrawerPolicyNode(Node):
         # Parameters
         self.declare_parameter('approach_distance', 0.15)  # Distance to approach from
         self.declare_parameter('approach_duration', 3.0)   # PTP motion duration
-        self.declare_parameter('grasp_duration', 3.0)      # LIN motion duration
-        self.declare_parameter('pull_duration', 3.0)       # LIN/CIRC motion duration
+        self.declare_parameter('grasp_duration', 2.0)      # LIN motion duration
+        self.declare_parameter('pull_duration', 2.5)       # LIN/CIRC motion duration
         self.declare_parameter('gripper_duration', 3.0)    # Gripper action duration
-        self.declare_parameter('wait_after_grasp_duration', 1.0)  # Wait after grasp before pull
-        self.declare_parameter('record_sensor_data', True)  # Enable sensor recording
-        
-        # Sensor data recorder service clients
-        self.record_enabled = self.get_parameter('record_sensor_data').value
-        if self.record_enabled:
-            self.recorder_start_client = self.create_client(
-                EmptySrv, '/sensor_recorder/start',
-                callback_group=self.callback_group
-            )
-            self.recorder_stop_client = self.create_client(
-                EmptySrv, '/sensor_recorder/stop',
-                callback_group=self.callback_group
-            )
-            self.recorder_save_client = self.create_client(
-                SetBool, '/sensor_recorder/save',
-                callback_group=self.callback_group
-            )
         
         self.get_logger().info('Drawer Policy Node initialized')
         self.get_logger().info('  Service: /open_drawer_task')
         self.get_logger().info('  Action client: /execute_stages')
-        self.get_logger().info(f'  Sensor recording: {"enabled" if self.record_enabled else "disabled"}')
 
-    async def _call_recorder_start(self):
-        """Start sensor data recording."""
-        if not self.record_enabled:
-            return
-        if not self.recorder_start_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn('Sensor recorder start service not available')
-            return
-        await self.recorder_start_client.call_async(EmptySrv.Request())
-        self.get_logger().info('Sensor recording started')
-
-    async def _call_recorder_stop(self):
-        """Stop sensor data recording."""
-        if not self.record_enabled:
-            return
-        if not self.recorder_stop_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn('Sensor recorder stop service not available')
-            return
-        await self.recorder_stop_client.call_async(EmptySrv.Request())
-        self.get_logger().info('Sensor recording stopped')
-
-    async def _call_recorder_save(self, save: bool):
-        """Save (True) or discard (False) recorded sensor data."""
-        if not self.record_enabled:
-            return
-        if not self.recorder_save_client.wait_for_service(timeout_sec=2.0):
-            self.get_logger().warn('Sensor recorder save service not available')
-            return
-        req = SetBool.Request()
-        req.data = save
-        result = await self.recorder_save_client.call_async(req)
-        action = 'saved' if save else 'discarded'
-        self.get_logger().info(f'Sensor data {action}: {result.message}')
-
-    async def handle_drawer_request(self, request, response):
+    def handle_drawer_request(self, request, response):
         """
         Handle incoming drawer task request.
         Compiles the request into MotionStage sequences and executes them.
-        Controls sensor data recording: start before execution, save/discard after.
         """
         self.get_logger().info(f'Received drawer task request: joint_type={request.joint_type}')
         
@@ -161,9 +107,6 @@ class DrawerPolicyNode(Node):
             response.message = "Executor action server not available"
             return response
         
-        # Start sensor data recording
-        await self._call_recorder_start()
-        
         # Send goal to executor
         goal = ExecuteStages.Goal()
         goal.stages = stages
@@ -176,54 +119,11 @@ class DrawerPolicyNode(Node):
             feedback_callback=self.feedback_callback
         )
         
-        # Wait for the goal to be accepted
-        try:
-            goal_handle = await future
-        except Exception as e:
-            # Stop recording and discard on failure
-            await self._call_recorder_stop()
-            await self._call_recorder_save(save=False)
-            response.accepted = False
-            response.message = f"Action call failed: {str(e)}"
-            return response
+        # Note: For a synchronous service response, we'd need to wait for the result
+        # For now, we return immediately with "accepted" and let execution proceed async
+        response.accepted = True
+        response.message = f"Task accepted, executing {len(stages)} stages"
         
-        if not goal_handle.accepted:
-            # Stop recording and discard on rejection
-            await self._call_recorder_stop()
-            await self._call_recorder_save(save=False)
-            response.accepted = False
-            response.message = "Goal rejected by executor"
-            return response
-            
-        self.get_logger().info("Goal accepted by executor, waiting for result...")
-        
-        # Wait for the result
-        result_future = goal_handle.get_result_async()
-        
-        try:
-            result_wrapper = await result_future
-            result = result_wrapper.result
-            
-            # Stop recording
-            await self._call_recorder_stop()
-            
-            if result.success:
-                # Save recorded data on success
-                await self._call_recorder_save(save=True)
-                response.accepted = True
-                response.message = f"Task completed successfully: {result.message}"
-            else:
-                # Discard recorded data on failure
-                await self._call_recorder_save(save=False)
-                response.accepted = False
-                response.message = f"Task failed: {result.message}"
-        except Exception as e:
-            # Stop recording and discard on error
-            await self._call_recorder_stop()
-            await self._call_recorder_save(save=False)
-            response.accepted = False
-            response.message = f"Failed to get result: {str(e)}"
-            
         return response
 
     def feedback_callback(self, feedback_msg):
@@ -314,19 +214,10 @@ class DrawerPolicyNode(Node):
         # Stage 4: Close gripper
         stage4 = MotionStage()
         stage4.stage_type = MotionStage.STAGE_GRIPPER
-        stage4.gripper_position = 0.8 # Closed (scaled by 0.82 by executor)
+        stage4.gripper_position = 1.0  # Closed (scaled to 0.8 by executor)
         stage4.duration = gripper_dur * 2  # Extra time for gripper to close
         stage4.description = "Close gripper"
         stages.append(stage4)
-        
-        # Stage 4b: Wait after grasp (let grasp stabilize before pulling)
-        wait_dur = self.get_parameter('wait_after_grasp_duration').get_parameter_value().double_value
-        if wait_dur > 0.0:
-            stage_wait = MotionStage()
-            stage_wait.stage_type = MotionStage.STAGE_WAIT
-            stage_wait.duration = wait_dur
-            stage_wait.description = "Wait after grasp"
-            stages.append(stage_wait)
         
         # Stage 5: Pull motion (LIN for prismatic, CIRC for revolute)
         stage5 = MotionStage()
@@ -343,8 +234,6 @@ class DrawerPolicyNode(Node):
             stage5.arc_angle = pull_amount
         stage5.duration = pull_dur
         stage5.velocity_scaling = 0.1
-        stage5.speed_profile = MotionStage.PROFILE_SINUSOIDAL
-        stage5.speed_profile_freq = 1.0  # 1 cycle: smooth accel then decel
         stage5.description = "Pull drawer"
         stages.append(stage5)
         
