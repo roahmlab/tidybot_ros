@@ -340,6 +340,32 @@ private:
         }
     }
 
+    /**
+     * Normalize continuous (unbounded revolute) joint solutions to be nearest
+     * to the reference position. This prevents the robot from spinning the
+     * long way around (±2π) when IK returns an equivalent but distant solution.
+     */
+    void normalize_continuous_joints(
+        std::vector<double>& joint_values,
+        const std::vector<double>& reference,
+        const moveit::core::JointModelGroup* joint_model_group)
+    {
+        const auto& joint_models = joint_model_group->getActiveJointModels();
+        for (size_t i = 0; i < joint_values.size() && i < joint_models.size(); ++i) {
+            if (joint_models[i]->getType() == moveit::core::JointModel::REVOLUTE) {
+                const auto* revolute = dynamic_cast<const moveit::core::RevoluteJointModel*>(joint_models[i]);
+                if (revolute && revolute->isContinuous()) {
+                    // Wrap to nearest equivalent angle to reference
+                    double diff = joint_values[i] - reference[i];
+                    diff = std::fmod(diff + M_PI, 2.0 * M_PI);
+                    if (diff < 0) diff += 2.0 * M_PI;
+                    diff -= M_PI;
+                    joint_values[i] = reference[i] + diff;
+                }
+            }
+        }
+    }
+
     bool execute_ptp(const MotionStage& stage, 
                      std::shared_ptr<moveit::core::RobotState> robot_state,
                      const moveit::core::JointModelGroup* joint_model_group,
@@ -488,7 +514,7 @@ private:
                  RCLCPP_WARN(this->get_logger(), "Large joint jump detected (%.2f rad)", max_jump);
             }
             // Publish smooth interpolation from previous to current joint values
-            publish_trajectory(joint_model_group, prev_joint_values, joint_values, robot_state, dt);
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, dt);
             prev_joint_values = joint_values;
             
             // Wait for exact dt (no buffer) to maintain stream rate
@@ -597,7 +623,7 @@ private:
             }
             
             // Publish trajectory stream
-            publish_trajectory(joint_model_group, prev_joint_values, joint_values, robot_state, dt);
+            publish_trajectory(joint_model_group, prev_joint_values, joint_values, dt);
 
             prev_joint_values = joint_values;
             
@@ -623,7 +649,7 @@ private:
         if (gripper_type_ == "hande") {
             // Hand-E: prismatic, 0.025m = open, 0.0m = closed
             // Map: 0.0 (open) -> 0.025, 1.0 (closed) -> 0.0
-            position = 0.025 * (1.0 - normalized * 0.75);
+            position = 0.025 * (1.0 - normalized);
             msg.data = {position, position};
         } else {
             // 2F-85: revolute, 0.0 rad = open, 0.82 rad = closed

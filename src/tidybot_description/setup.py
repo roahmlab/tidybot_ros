@@ -54,7 +54,6 @@ setup(
             'tf_relay = tidybot_description.tf_relay:main',
             'isaac_sim_bridge = tidybot_description.isaac_sim_bridge:main',
             'isaac_lab_bridge = tidybot_description.isaac_lab_bridge:main',
-            'contact_force_publisher = tidybot_description.contact_force_publisher:main',
         ],
     },
 )
