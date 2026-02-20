@@ -14,6 +14,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.action import ActionClient
 from rclpy.callback_groups import ReentrantCallbackGroup
+from rclpy.executors import MultiThreadedExecutor
 
 from tidybot_utils.srv import OpenDrawerTask
 from tidybot_utils.action import ExecuteStages
@@ -71,7 +72,7 @@ class DrawerPolicyNode(Node):
         self.get_logger().info('  Service: /open_drawer_task')
         self.get_logger().info('  Action client: /execute_stages')
 
-    def handle_drawer_request(self, request, response):
+    async def handle_drawer_request(self, request, response):
         """
         Handle incoming drawer task request.
         Compiles the request into MotionStage sequences and executes them.
@@ -113,16 +114,24 @@ class DrawerPolicyNode(Node):
         
         self.get_logger().info(f'Sending {len(stages)} stages to executor')
         
-        # Send goal and wait for result
-        future = self.executor_client.send_goal_async(
+        # Send goal
+        goal_handle = await self.executor_client.send_goal_async(
             goal,
             feedback_callback=self.feedback_callback
         )
         
-        # Note: For a synchronous service response, we'd need to wait for the result
-        # For now, we return immediately with "accepted" and let execution proceed async
+        if not goal_handle.accepted:
+            self.get_logger().error('Goal rejected by action server!')
+            response.accepted = False
+            response.message = "Goal rejected by executor"
+            return response
+            
+        self.get_logger().info('Goal accepted, waiting for physical execution to finish...')
+        
+        # Block until the physical movement actually finishes
+        action_result = await goal_handle.get_result_async()
         response.accepted = True
-        response.message = f"Task accepted, executing {len(stages)} stages"
+        response.message = f"Task completed, executing {len(stages)} stages. Status: {action_result.status}"
         
         return response
 
@@ -479,15 +488,16 @@ class DrawerPolicyNode(Node):
 def main(args=None):
     rclpy.init(args=args)
     node = DrawerPolicyNode()
+    executor = MultiThreadedExecutor()
     
     try:
-        rclpy.spin(node)
+        executor.add_node(node)
+        executor.spin()
     except KeyboardInterrupt:
         pass
     finally:
         node.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()

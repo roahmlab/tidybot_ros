@@ -21,6 +21,7 @@
 #include <moveit/task_constructor/solvers/pipeline_planner.h>
 #include <moveit/task_constructor/solvers/cartesian_path.h>
 #include <moveit/task_constructor/solvers/joint_interpolation.h>
+#include <moveit/robot_state/cartesian_interpolator.hpp>
 #include <tf2_eigen/tf2_eigen.hpp>
 
 #include <moveit/planning_scene_monitor/planning_scene_monitor.hpp>
@@ -308,13 +309,13 @@ private:
     {
         RCLCPP_INFO(this->get_logger(), "PTP motion to target");
 
-        // Capture current joint state at start of this action stage (for interpolation)
+        // Capture current joint state
         std::vector<double> start_positions;
         robot_state->copyJointGroupPositions(joint_model_group, start_positions);
 
-        // Solve IK with tight tolerance
+        // Solve IK for the target pose
         kinematics::KinematicsQueryOptions ik_options;
-        ik_options.return_approximate_solution = false;  // Require exact solution
+        ik_options.return_approximate_solution = false;
         
         bool found_ik = robot_state->setFromIK(
             joint_model_group, 
@@ -330,18 +331,23 @@ private:
             return false;
         }
         
+        // Capture target joint state
         robot_state->enforceBounds();
-        std::vector<double> joint_values;
-        robot_state->copyJointGroupPositions(joint_model_group, joint_values);
+        std::vector<double> target_positions;
+        robot_state->copyJointGroupPositions(joint_model_group, target_positions);
         
-        // Publish trajectory (interpolate from start to target over duration)
+        // Package waypoints for the unified pipeline
+        std::vector<std::vector<double>> trajectory_waypoints;
+        trajectory_waypoints.push_back(start_positions);
+        trajectory_waypoints.push_back(target_positions);
+        
+        // Publish and execute
         double duration = stage.duration > 0.0 ? stage.duration : 2.0;
-        publish_trajectory(joint_model_group, start_positions, joint_values, robot_state, duration);
+        publish_trajectory(joint_model_group, trajectory_waypoints, robot_state, duration);
         
-        // Wait for execution
         std::this_thread::sleep_for(std::chrono::milliseconds(
-            static_cast<int>(duration * 1000) + 500));
-        
+            static_cast<int>(500)));
+
         return true;
     }
 
@@ -362,110 +368,69 @@ private:
                       const moveit::core::JointModelGroup* joint_model_group,
                       const std::string& tip_link)
     {
-        RCLCPP_INFO(this->get_logger(), "CIRC motion around axis");
+        RCLCPP_INFO(this->get_logger(), "CIRC motion around axis using Cartesian Interpolation");
         
-        // Get arc parameters
-        Eigen::Vector3d arc_center(
-            stage.arc_center.x,
-            stage.arc_center.y,
-            stage.arc_center.z
-        );
-        Eigen::Vector3d arc_axis(
-            stage.arc_axis.x,
-            stage.arc_axis.y,
-            stage.arc_axis.z
-        );
+        Eigen::Vector3d arc_center(stage.arc_center.x, stage.arc_center.y, stage.arc_center.z);
+        Eigen::Vector3d arc_axis(stage.arc_axis.x, stage.arc_axis.y, stage.arc_axis.z);
         arc_axis.normalize();
-        double arc_angle = stage.arc_angle;
         
-        // Get current end-effector pose
         const Eigen::Isometry3d& current_pose = robot_state->getGlobalLinkTransform(tip_link);
-        Eigen::Vector3d current_pos = current_pose.translation();
+        Eigen::Vector3d rel_pos = current_pose.translation() - arc_center;
         Eigen::Quaterniond current_quat(current_pose.rotation());
         
-        // Calculate relative position from arc center
-        Eigen::Vector3d rel_pos = current_pos - arc_center;
+        // Generate sparse Cartesian waypoints (Math only)
+        std::vector<Eigen::Isometry3d, Eigen::aligned_allocator<Eigen::Isometry3d>> cartesian_waypoints;
         
-        // Generate waypoints along the arc
-        // Use more waypoints for smoother motion and better IK continuity
-        int num_waypoints = 30;  // Increased from 10 for smoother arc
-        double angle_step = arc_angle / num_waypoints;
-        double duration_per_waypoint = (stage.duration > 0.0 ? stage.duration : 2.0) / num_waypoints;
-        
-        RCLCPP_INFO(this->get_logger(), "Generating %d waypoints, arc_angle=%.3f rad (%.1f deg)", 
-                    num_waypoints, arc_angle, arc_angle * 180.0 / M_PI);
-        
-        // Store previous joint values for continuity checking
-        std::vector<double> prev_joint_values;
-        robot_state->copyJointGroupPositions(joint_model_group, prev_joint_values);
-        
-        for (int i = 1; i <= num_waypoints; ++i) {
-            double angle = angle_step * i;
-            
-            // Create rotation around arc axis
-            Eigen::AngleAxisd rotation(angle, arc_axis);
-            
-            // Rotate position around arc center
-            Eigen::Vector3d new_rel_pos = rotation * rel_pos;
-            Eigen::Vector3d waypoint_pos = arc_center + new_rel_pos;
-            
-            // Also rotate the gripper orientation
-            Eigen::Quaterniond waypoint_quat = Eigen::Quaterniond(rotation) * current_quat;
-            waypoint_quat.normalize();
-            
-            // Create waypoint pose
+        int num_arc_segments = 30; 
+        double angle_step = stage.arc_angle / num_arc_segments;
+
+        for (int i = 1; i <= num_arc_segments; ++i) {
+            Eigen::AngleAxisd rotation(angle_step * i, arc_axis);
             Eigen::Isometry3d waypoint_pose = Eigen::Isometry3d::Identity();
-            waypoint_pose.translation() = waypoint_pos;
-            waypoint_pose.linear() = waypoint_quat.toRotationMatrix();
-
-            // Solve IK for this waypoint
-            // The robot_state already contains previous solution, which seeds the IK
-            kinematics::KinematicsQueryOptions ik_options;
-            ik_options.return_approximate_solution = false;
-            
-            bool found_ik = robot_state->setFromIK(
-                joint_model_group, 
-                waypoint_pose, 
-                tip_link, 
-                0.5,  // Timeout per waypoint
-                moveit::core::GroupStateValidityCallbackFn(),
-                ik_options
-            );
-            
-            if (!found_ik) {
-                RCLCPP_ERROR(this->get_logger(), "IK failed for arc waypoint %d", i);
-                return false;
-            }
-            
-            // Get joint values
-            std::vector<double> joint_values;
-            robot_state->copyJointGroupPositions(joint_model_group, joint_values);
-            
-            // Check for large joint jumps (discontinuity detection)
-            double max_jump = 0.0;
-            for (size_t j = 0; j < joint_values.size(); ++j) {
-                double jump = std::abs(joint_values[j] - prev_joint_values[j]);
-                if (jump > max_jump) max_jump = jump;
-            }
-            
-            // Warn if jump is too large (> 30 degrees = 0.52 rad)
-            if (max_jump > 0.52) {
-                RCLCPP_WARN(this->get_logger(), 
-                    "Large joint jump detected at waypoint %d (%.2f rad)", i, max_jump);
-            }
-            
-            // Publish trajectory for this waypoint (interpolate from prev to current over duration)
-            publish_trajectory(joint_model_group, prev_joint_values, joint_values, robot_state, duration_per_waypoint);
-
-            // Update previous values for next iteration
-            prev_joint_values = joint_values;
-            
-            // Wait for execution (shorter wait for more waypoints)
-            std::this_thread::sleep_for(std::chrono::milliseconds(
-                static_cast<int>(duration_per_waypoint * 1000) + 100));
+            waypoint_pose.translation() = arc_center + (rotation * rel_pos);
+            waypoint_pose.linear() = (Eigen::Quaterniond(rotation) * current_quat).normalized().toRotationMatrix();
+            cartesian_waypoints.push_back(waypoint_pose);
         }
         
-        RCLCPP_INFO(this->get_logger(), "CIRC motion completed");
+        // Call MoveIt's optimized Cartesian Path solver
+        std::vector<std::shared_ptr<moveit::core::RobotState>> trajectory_states;
+        const moveit::core::LinkModel* link_model = robot_state->getLinkModel(tip_link);
+        moveit::core::MaxEEFStep max_step(0.005);
+        moveit::core::CartesianPrecision precision;
+        
+        auto fraction_result = moveit::core::CartesianInterpolator::computeCartesianPath(
+            robot_state.get(),      
+            joint_model_group,
+            trajectory_states,
+            link_model,
+            cartesian_waypoints,
+            true,                   // Use global reference frame
+            max_step,
+            precision               // Pass the new precision struct
+        );
+        
+        double fraction = fraction_result.value;
+        
+        // Verify the trajectory was successfully solved
+        if (fraction < 0.95) {
+            RCLCPP_ERROR(this->get_logger(), "Cartesian path failed. Only computed %.1f%% of the arc.", fraction * 100.0);
+            return false;
+        }
+        
+        // Map the MoveIt RobotStates back to nested vector format
+        std::vector<std::vector<double>> trajectory_waypoints;
+        for (const auto& state : trajectory_states) {
+            std::vector<double> joint_values;
+            state->copyJointGroupPositions(joint_model_group, joint_values);
+            trajectory_waypoints.push_back(joint_values);
+        }
+
+        // Execute
+        double total_duration = stage.duration > 0.0 ? stage.duration : 2.0;
+        publish_trajectory(joint_model_group, trajectory_waypoints, robot_state, total_duration);
+        
+        RCLCPP_INFO(this->get_logger(), "CIRC motion completed successfully (Computed %.1f%%, %zu points)", 
+                    fraction * 100.0, trajectory_waypoints.size());
         return true;
     }
 
@@ -539,60 +504,68 @@ private:
     }
 
     void publish_trajectory(const moveit::core::JointModelGroup* joint_model_group,
-                            const std::vector<double>& start_positions,
-                            const std::vector<double>& target_positions,
-                            std::shared_ptr<moveit::core::RobotState> robot_state,
-                            double duration)
+                                 const std::vector<std::vector<double>>& waypoints,
+                                 std::shared_ptr<moveit::core::RobotState> robot_state,
+                                 double total_duration)
     {
+        if (waypoints.size() < 2) return;
+
         const auto& joint_names = joint_model_group->getVariableNames();
         trajectory_msgs::msg::JointTrajectory traj;
         traj.joint_names = joint_names;
 
-        trajectory_msgs::msg::JointTrajectoryPoint start_pt;
-        start_pt.positions = start_positions;
-        start_pt.time_from_start = rclcpp::Duration::from_seconds(0.0);
-        traj.points.push_back(start_pt);
+        double duration_per_segment = total_duration / (waypoints.size() - 1);
 
-        trajectory_msgs::msg::JointTrajectoryPoint end_pt;
-        end_pt.positions = target_positions;
-        end_pt.time_from_start = rclcpp::Duration::from_seconds(duration);
-        traj.points.push_back(end_pt);
-
+        // Build the standard ROS Trajectory message
+        for (size_t i = 0; i < waypoints.size(); ++i) {
+            trajectory_msgs::msg::JointTrajectoryPoint pt;
+            pt.positions = waypoints[i];
+            pt.time_from_start = rclcpp::Duration::from_seconds(i * duration_per_segment);
+            traj.points.push_back(pt);
+        }
         arm_traj_pub_->publish(traj);
 
-        // Hardware: linearly interpolate with angle wrapping for continuous joints
-        const double publish_rate_hz = 30.0;
-        const int num_points = std::max(1, static_cast<int>(std::round(duration * publish_rate_hz)));
-        const double dt = duration / num_points;
+        // Hardware: Smooth high-frequency interpolation across trajectory
+        const double publish_rate_hz = 50.0;
+        const int total_hz_steps = std::max(1, static_cast<int>(std::round(total_duration * publish_rate_hz)));
+        const double dt = total_duration / total_hz_steps;
 
         sensor_msgs::msg::JointState joint_state_msg;
         joint_state_msg.name = joint_names;
 
-        for (int i = 0; i <= num_points; ++i) {
-            const double alpha = (num_points > 0) ? static_cast<double>(i) / num_points : 1.0;
+        for (int step = 0; step <= total_hz_steps; ++step) {
+            double current_time = step * dt;
+            
+            // Find which two waypoints we are currently between
+            size_t segment_idx = std::min(static_cast<size_t>(current_time / duration_per_segment), waypoints.size() - 2);
+            double segment_start_time = segment_idx * duration_per_segment;
+            double alpha = (current_time - segment_start_time) / duration_per_segment;
+            
+            // Clamp alpha to [0.0, 1.0] to prevent floating point overshoot
+            alpha = std::max(0.0, std::min(1.0, alpha));
+
             joint_state_msg.header.stamp = this->get_clock()->now();
-            joint_state_msg.position.resize(target_positions.size());
-            for (size_t j = 0; j < target_positions.size(); ++j) {
+            joint_state_msg.position.resize(joint_names.size());
+            
+            for (size_t j = 0; j < joint_names.size(); ++j) {
                 joint_state_msg.position[j] = interpolate_joint_angle(
-                    start_positions[j], target_positions[j], alpha, joint_names[j]);
+                    waypoints[segment_idx][j], waypoints[segment_idx + 1][j], alpha, joint_names[j]);
             }
             
             robot_state->setJointGroupPositions(joint_model_group, joint_state_msg.position);
             robot_state->update();
-            const Eigen::Isometry3d& end_effector_state = robot_state->getGlobalLinkTransform(this->get_parameter("tip_link").as_string());
-            geometry_msgs::msg::Pose pose_msg = tf2::toMsg(end_effector_state);
-
+            const Eigen::Isometry3d& ee_state = robot_state->getGlobalLinkTransform(this->get_parameter("tip_link").as_string());
+            
             arm_traj_hardware_pub_->publish(joint_state_msg);
-            arm_target_pose_pub_->publish(pose_msg);
+            arm_target_pose_pub_->publish(tf2::toMsg(ee_state));
 
-            if (i < num_points) {
-                std::this_thread::sleep_for(
-                    std::chrono::microseconds(static_cast<int64_t>(dt * 1e6)));
+            if (step < total_hz_steps) {
+                std::this_thread::sleep_for(std::chrono::microseconds(static_cast<int64_t>(dt * 1e6)));
             }
         }
 
-        RCLCPP_INFO(this->get_logger(), "Published trajectory with %zu joints, duration=%.2fs (%d points)",
-                    target_positions.size(), duration, num_points + 1);
+        RCLCPP_INFO(this->get_logger(), "Published continuous trajectory: %zu waypoints over %.2fs", 
+                    waypoints.size(), total_duration);
     }
 };
 
