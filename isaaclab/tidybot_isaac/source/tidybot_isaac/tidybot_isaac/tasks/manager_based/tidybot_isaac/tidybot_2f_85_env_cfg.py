@@ -11,23 +11,22 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.sensors import TiledCameraCfg, ContactSensorCfg, FrameTransformerCfg, OffsetCfg
 from isaaclab.markers.config import FRAME_MARKER_CFG
-from isaaclab.markers import VisualizationMarkersCfg
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
-import isaaclab.sim as sim_utils
 
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
 
-from . import mdp
+# Standard IsaacLab MDP imports for joint/action observation terms
+import isaaclab.envs.mdp as standard_mdp
+# Your custom MDP functions from the script above
+from . import mdp as custom_mdp
 from tidybot_isaac import assets
 
 ##
 # Scene definition
 ##
 
-
-# Define Marker Configs (Standalone)
 FRAME_MARKER_SMALL_CFG = FRAME_MARKER_CFG.copy()
 FRAME_MARKER_SMALL_CFG.markers["frame"].scale = (0.10, 0.10, 0.10)
 
@@ -35,7 +34,7 @@ FORCE_MARKER_CFG = VisualizationMarkersCfg(
     markers={
         "arrow": sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/arrow_x.usd",
-            scale=(0.02, 0.02, 0.02),  # Scale down the arrow
+            scale=(0.02, 0.02, 0.02),
             visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(1.0, 0.0, 0.0)),
         )
     }
@@ -45,19 +44,13 @@ FORCE_MARKER_CFG = VisualizationMarkersCfg(
 class Tidybot2F85SceneCfg(InteractiveSceneCfg):
     """Configuration for the TidyBot drawer opening scene."""
     
-    # ... assets ...
-
-    # ground plane
     ground = AssetBaseCfg(
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
     )
 
-    # robot
     robot: ArticulationCfg = assets.TIDYBOT_2F85_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
-    # Per-finger contact sensors with filter targeting drawer handle
-    # (matches open_drawer_collect_data.py approach — friction_forces_w only)
     contact_forces_left = ContactSensorCfg(
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/left_inner_finger",
         update_period=0.0,
@@ -78,10 +71,8 @@ class Tidybot2F85SceneCfg(InteractiveSceneCfg):
         max_contact_data_count_per_prim=16,
     )
 
-    # End-effector Frame
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
-        # debug_vis=True,
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/EEFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
@@ -89,117 +80,61 @@ class Tidybot2F85SceneCfg(InteractiveSceneCfg):
                 name="ee_tcp",
                 offset=OffsetCfg(
                     pos=(0.0, 0.0, -0.1815),
-                    rot=(0.0, 1.0, 0.0, 0.0), # w, x, y, z
+                    rot=(0.0, 1.0, 0.0, 0.0),
                 ),
             ),
         ],
     )
 
-    # cabinet
     cabinet: ArticulationCfg = assets.CABINET_CFG.replace(prim_path="{ENV_REGEX_NS}/Cabinet")
     
-    # Cabinet Frame (Handle Target)
     cabinet_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
-        # debug_vis=True,
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
         target_frames=[
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/Cabinet/drawer_handle_top",
-                name="handle", # simplified name
+                name="handle",
                 offset=OffsetCfg(
                     pos=(0.305, 0.0, 0.01),
-                    rot=(0.5, 0.5, -0.5, -0.5),  # align with end-effector frame
+                    rot=(0.5, 0.5, -0.5, -0.5), 
                 ),
             ),
         ],
     )
 
-    # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
     )
-    
-    # Wrist/Arm Camera - mounted on end-effector (disabled for now)
-    # Using TiledCameraCfg for efficient batch rendering and regex path support
-    # Orientation from Isaac Sim setup: Gf.Quatf(0.0, -1.0, 0.0, 0.0) in (w,x,y,z)
-    # wrist_camera = TiledCameraCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link/end_effector_link/arm_camera_link/sensor",
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0,
-    #         focus_distance=400.0,
-    #         horizontal_aperture=20.955,
-    #         clipping_range=(0.1, 100.0),
-    #     ),
-    #     offset=TiledCameraCfg.OffsetCfg(
-    #         pos=(0.0, -0.01, 0.03),
-    #         rot=(1.0, 0.0, 0.0, 0.0),  # 180° Z-axis rotation applied (identity after composition)
-    #         convention="ros",
-    #     ),
-    #     width=640,
-    #     height=480,
-    # )
-    
-    # Base Camera - mounted on base, looking downward (disabled for now)
-    # Orientation from Isaac Sim setup: Gf.Quatf(0.5, 0.5, -0.5, -0.5) in (w,x,y,z)
-    # base_camera = TiledCameraCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/tidybot/base/base_camera_link/sensor",
-    #     data_types=["rgb"],
-    #     spawn=sim_utils.PinholeCameraCfg(
-    #         focal_length=24.0,
-    #         focus_distance=400.0,
-    #         horizontal_aperture=20.955,
-    #         clipping_range=(0.1, 100.0),
-    #     ),
-    #     offset=TiledCameraCfg.OffsetCfg(
-    #         pos=(0.0, 0.0, 0.0),
-    #         rot=(0.5, -0.5, 0.5, -0.5),  # 180° Z-axis rotation applied
-    #         convention="ros",
-    #     ),
-    #     width=640,
-    #     height=480,
-    # )
-    
-
 
 
 ##
 # MDP settings
 ##
 
-
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    # Position control for base
-    base_pos = mdp.JointPositionActionCfg(
-        asset_name="robot", 
-        joint_names=["joint_x", "joint_y", "joint_th"], 
-        scale=0.5,
-        use_default_offset=True, # Relative to initial spawn?
-    )
-    
-    # Position control for arm
-    arm_pos = mdp.JointPositionActionCfg(
+    arm_pos = standard_mdp.RelativeJointPositionActionCfg(
         asset_name="robot",
         joint_names=["joint_[1-7]"],
-        scale=0.1,
-        use_default_offset=True,
+        scale=0.02, 
     )
 
-    # Position control for gripper (Continuous with mimic)
-    gripper = mdp.MimicGripperActionCfg(
+    # Replaced continuous mimic with discrete binary actions
+    gripper = standard_mdp.BinaryJointPositionActionCfg(
         asset_name="robot",
         joint_names=["finger_joint", "right_outer_knuckle_joint"],
-        leader_joint_name="finger_joint",
-        mimic_multiplier={
-            "right_outer_knuckle_joint": 1.0,
+        open_command_expr={
+            "finger_joint": 0.0,
+            "right_outer_knuckle_joint": 0.0,
         },
-        open_command_expr={"finger_joint": 0.0},
-        close_command_expr={"finger_joint": 0.82},
+        close_command_expr={
+            "finger_joint": 0.82,
+            "right_outer_knuckle_joint": 0.82,
+        },
     )
 
 
@@ -209,52 +144,30 @@ class ObservationsCfg:
 
     @configclass
     class PolicyCfg(ObsGroup):
-        """Observations for policy group."""
-
-        # Robot proprioception
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
+        # 1. Arm State
+        joint_pos = ObsTerm(func=standard_mdp.joint_pos_rel)
+        joint_vel = ObsTerm(func=standard_mdp.joint_vel_rel)
         
-        # End-effector position (3D) - where the gripper is
-        ee_pos = ObsTerm(
-            func=mdp.end_effector_pos,
-            params={
-                "robot_cfg": SceneEntityCfg("robot"),
-                "ee_body_name": "robotiq_arg2f_base_link",
-            },
-        )
-        
-        # EE to handle vector (3D) - CRITICAL: tells policy where to go
-        ee_to_handle = ObsTerm(
-            func=mdp.ee_to_handle_vector,
-            params={
-                "robot_cfg": SceneEntityCfg("robot"),
-                "cabinet_cfg": SceneEntityCfg("cabinet"),
-                "ee_body_name": "robotiq_arg2f_base_link",
-                "handle_offset": (0.0, 0.3, 0.0),
-            },
-        )
-        
-        # Gripper state (1D) - how open/closed the gripper is
-        gripper_pos = ObsTerm(
-            func=mdp.gripper_open_amount,
-            params={
-                "robot_cfg": SceneEntityCfg("robot"),
-                "gripper_joint_name": "finger_joint",
-            },
-        )
-        
-        # Drawer state (1D) - how open the drawer is
-        drawer_pos = ObsTerm(
-            func=mdp.joint_pos_rel,
+        # 2. Cabinet State
+        cabinet_joint_pos = ObsTerm(
+            func=standard_mdp.joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
         )
+        cabinet_joint_vel = ObsTerm(
+            func=standard_mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"])},
+        )
+        
+        # 3. Geometric Target (3D Vector directly from EE to Handle)
+        rel_ee_drawer_distance = ObsTerm(func=custom_mdp.rel_ee_drawer_distance)
+        
+        # 4. Previous Action
+        actions = ObsTerm(func=standard_mdp.last_action)
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
             self.concatenate_terms = True
 
-    # observation groups
     policy: PolicyCfg = PolicyCfg()
 
 
@@ -262,96 +175,64 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    # reset
-    reset_robot = EventTerm(
-        func=mdp.reset_joints_by_offset,
+    reset_robot_base = EventTerm(
+        func=standard_mdp.reset_joints_by_offset,
         mode="reset",
         params={
-            "asset_cfg": SceneEntityCfg("robot", joint_names=".*"),
-            "position_range": (0.0, 0.0), # Reset to default init_state
+            "asset_cfg": SceneEntityCfg("robot", joint_names=["joint_x", "joint_y", "joint_th"]),
+            "position_range": (0.0, 0.0),
+            "velocity_range": (0.0, 0.0),
+        },
+    )
+
+    reset_robot_arm = EventTerm(
+        func=standard_mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=["joint_[1-7]"]),
+            "position_range": (-0.5, 0.5), 
             "velocity_range": (0.0, 0.0),
         },
     )
 
     reset_cabinet = EventTerm(
-        func=mdp.reset_joints_by_offset,
+        func=standard_mdp.reset_joints_by_offset,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=".*"),
-            "position_range": (0.0, 0.0), # Reset closed
+            "position_range": (0.0, 0.0),
             "velocity_range": (0.0, 0.0),
         },
     )
 
 
-
 @configclass
 class RewardsCfg:
-    """Reward terms for the MDP - Based on IsaacLab cabinet example."""
-
-    # (1) Approach: Inverse-square reward for reaching handle (smoother gradient)
+    """Reward terms mathematically balanced for standard RL paradigms."""
+    
     approach = RewTerm(
-        func=mdp.approach_ee_handle,
-        weight=3.0,
-        params={
-            "threshold": 0.5,
-            "robot_cfg": SceneEntityCfg("robot"),
-            "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_body_name": "robotiq_arg2f_base_link",
-        },
-    )
-    
-    # (2) Grasp: Reward closing gripper when near handle
-    grasp = RewTerm(
-        func=mdp.grasp_handle,
-        weight=15.0,
-        params={
-            "open_joint_pos": 0.82,  # Max gripper opening
-            "robot_cfg": SceneEntityCfg("robot"),
-            "cabinet_cfg": SceneEntityCfg("cabinet"),
-            "ee_body_name": "robotiq_arg2f_base_link",
-            "gripper_joint_name": "finger_joint",
-        },
-    )
-    
-    # (3) Drawer progress: Direct reward for drawer position
-    drawer_progress = RewTerm(
-        func=mdp.open_drawer_bonus,
-        weight=10.0,  # Strong weight - main objective
-        params={
-            "cabinet_cfg": SceneEntityCfg("cabinet"),
-        },
-    )
-    
-    # (4) Multi-stage bonus: Progressive rewards for opening stages
-    multi_stage = RewTerm(
-        func=mdp.multi_stage_open_drawer,
-        weight=10.0,
-        params={
-            "cabinet_cfg": SceneEntityCfg("cabinet"),
-        },
-    )
-    
-    # (5) Action regularization: Small penalty for jerky actions
-    action_rate = RewTerm(
-        func=mdp.action_rate_penalty,
-        weight=0.005,
-    )
-    
-    # (6) Alignment: Align tool frame with handle frame
-    align_handle = RewTerm(
-        func=mdp.align_ee_handle,
-        weight=2.0,
+        func=custom_mdp.approach_ee_handle,
+        weight=2.0, 
     )
 
-    # (7) Penalty: Avoid closing gripper early
-    early_close_penalty = RewTerm(
-        func=mdp.avoid_early_close,
-        weight=-0.5,
+    grasp = RewTerm(
+        func=custom_mdp.grasp_handle,
+        weight=4.0,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "gripper_joint_name": "finger_joint",
         },
+    )
+    
+    drawer_progress = RewTerm(
+        func=custom_mdp.open_drawer_bonus,
+        weight=10.0,
+        params={"cabinet_cfg": SceneEntityCfg("cabinet")},
+    )
+    
+    action_rate = RewTerm(
+        func=custom_mdp.action_rate_penalty,
+        weight=0.005,
     )
 
 
@@ -359,12 +240,10 @@ class RewardsCfg:
 class TerminationsCfg:
     """Termination terms for the MDP."""
 
-    # (1) Time out
-    time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    time_out = DoneTerm(func=standard_mdp.time_out, time_out=True)
     
-    # (2) Success: Drawer opened
     success = DoneTerm(
-        func=mdp.drawer_opened,
+        func=custom_mdp.drawer_opened,
         params={
             "threshold": 0.35,
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
@@ -376,27 +255,21 @@ class TerminationsCfg:
 # Environment configuration
 ##
 
-
 @configclass
 class Tidybot2F85EnvCfg(ManagerBasedRLEnvCfg):
-    # Scene settings
     scene: Tidybot2F85SceneCfg = Tidybot2F85SceneCfg(num_envs=4096, env_spacing=4.0)
-    # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
     events: EventCfg = EventCfg()
-    # MDP settings
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
 
-    # Post initialization
     def __post_init__(self) -> None:
-        """Post initialization."""
-        # general settings
-        self.decimation = 2
-        self.episode_length_s = 5  # Extended from 5s for complex manipulation
-        # viewer settings
+        self.decimation = 4
+        self.episode_length_s = 30
         self.viewer.eye = (3.0, 3.0, 2.0)
         self.viewer.lookat = (0.0, 0.0, 0.0)
-        # simulation settings
-        self.sim.dt = 1 / 120
+        self.sim.dt = 1 / 240
+        self.sim.substeps = 1
+        self.sim.physx.solver_iterations = 8
+        self.sim.physx.num_position_iterations = 8

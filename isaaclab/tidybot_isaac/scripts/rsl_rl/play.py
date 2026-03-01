@@ -186,6 +186,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             # env stepping
             obs, _, dones, _ = env.step(actions)
+
+            actual_dt = time.time() - start_time
+            target_dt = env.unwrapped.step_dt
+            rt_factor = target_dt / actual_dt
+            print(f"Timescale: {rt_factor:.2f}x | " 
+                f"Target: {target_dt*1000:.1f}ms | "
+                f"Actual: {actual_dt*1000:.1f}ms", end="\r")
+
             # reset recurrent states for episodes that have terminated
             policy_nn.reset(dones)
         if args_cli.video:

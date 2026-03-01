@@ -14,11 +14,7 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 
-def end_effector_pos(
-    env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg,
-    ee_body_name: str = "robotiq_arg2f_base_link",
-) -> torch.Tensor:
+def end_effector_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
     """End-effector world position (3D).
     
     Returns the world position of the end-effector body.
@@ -27,28 +23,16 @@ def end_effector_pos(
     return env.scene["ee_frame"].data.target_pos_w[..., 0, :]
 
 
-def handle_pos(
-    env: ManagerBasedRLEnv,
-    cabinet_cfg: SceneEntityCfg,
-    handle_offset: tuple[float, float, float] = (0.0, 0.3, 0.0),
-) -> torch.Tensor:
+def handle_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Drawer handle world position (3D).
-    
     Returns the world position of the drawer handle (drawer_top link + offset).
     """
     # Use canonical frame if available
     return env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
 
 
-def ee_to_handle_vector(
-    env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg,
-    cabinet_cfg: SceneEntityCfg,
-    ee_body_name: str = "robotiq_arg2f_base_link",
-    handle_offset: tuple[float, float, float] = (0.0, 0.3, 0.0),
-) -> torch.Tensor:
+def ee_to_handle_vector(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Vector from end-effector to drawer handle (3D).
-    
     This is the most useful observation for reaching - it directly tells
     the policy which direction and how far to move.
     """

@@ -66,7 +66,7 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
-            stiffness=1e5,
+            stiffness=1e6,
             damping=100.0,
             effort_limit=180.0,   # Force limit (N)
             velocity_limit=0.15,  # Velocity limit (m/s) — Hand-E spec
@@ -173,11 +173,12 @@ CABINET_CFG = ArticulationCfg(
         pos=(1.3, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
         rot=(0.0, 0.0, 0.0, 1.0),  # Original verified rotation
     ),
-    actuators={
+actuators={
         "drawer": ImplicitActuatorCfg(
             joint_names_expr=["drawer_top_joint"],
             stiffness=0.0,
-            damping=1.0,  # Some friction
+            damping=1.0,      # Viscous resistance (force scales with velocity)
+            friction=0.2,     # Coulomb friction (constant resistance force in Newtons)
         ),
     },
 )

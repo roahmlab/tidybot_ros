@@ -15,6 +15,30 @@ if TYPE_CHECKING:
 
 from isaaclab.utils.math import quat_apply
 
+# ==========================================
+# OBSERVATIONS
+# ==========================================
+
+def rel_ee_drawer_distance(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Returns the 3D relative vector from the end-effector to the handle."""
+    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
+    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
+    return handle_pos - ee_pos
+
+# ==========================================
+# REWARDS
+# ==========================================
+
+def approach_ee_handle(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Dense reward for moving the EE towards the handle using an exponential kernel."""
+    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
+    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
+    
+    # Compute Euclidean distance
+    distance = torch.norm(handle_pos - ee_pos, dim=-1, p=2)
+    
+    # Sharp exponential curve: high reward only when very close (< 10cm)
+    return torch.exp(-distance / 0.1)
 
 def align_ee_handle(
     env: ManagerBasedRLEnv,
@@ -72,111 +96,33 @@ def align_ee_handle(
     
     return alignment * scaling
 
-
-def approach_ee_handle(
-    env: ManagerBasedRLEnv, 
-    threshold: float,
-    robot_cfg: SceneEntityCfg,
-    cabinet_cfg: SceneEntityCfg,
-    ee_body_name: str = "robotiq_arg2f_base_link",
-) -> torch.Tensor:
-    """Reward for approaching the handle.
-    
-    Smoothed inverse-square reward with bonuses for being close.
-    """
-    robot: Articulation = env.scene[robot_cfg.name]
-    # cabinet: Articulation = env.scene[cabinet_cfg.name] # Not needed for frame lookup
-    
-    # Get end-effector position from FrameTransformer
-    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-
-    # Get handle position from FrameTransformer (Canonical Way)
-    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
-
-    # Compute distance
-    distance = torch.norm(handle_pos - ee_pos, dim=-1, p=2)
-    
-    # Inverse-square reward (smoother gradient)
-    base_reward = 1.0 / (1.0 + distance**2)
-    base_reward = torch.pow(base_reward, 2)
-    
-    # Smooth Multi-stage bonuses
-    # Instead of hard steps, use exponential scaling
-    # scaling approaches 1.0 when far, and 3.0 when close (d=0)
-    # decay constant 0.1 means scaling is significant within 10cm
-    scaling = 1.0 + 2.0 * torch.exp(-distance / 0.1)
-    
-    return base_reward * scaling
-
-
-def avoid_early_close(
-    env: ManagerBasedRLEnv,
-    robot_cfg: SceneEntityCfg,
-    # cabinet_cfg: SceneEntityCfg,
-    ee_body_name: str = "robotiq_arg2f_base_link",
-    gripper_joint_name: str = "finger_joint",
-) -> torch.Tensor:
-    """Penalize closing the gripper when far from the handle.
-    
-    Penalty = joint_pos (closed amount) if distance > 0.05m
-    """
-    robot: Articulation = env.scene[robot_cfg.name]
-    
-    # Get gripper position (0=open, 0.8=closed)
-    joint_pos = robot.data.joint_pos[:, robot.find_joints(gripper_joint_name)[0][0]]
-    
-    # Get end-effector position from FrameTransformer
-    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-    
-    # Get handle position from FrameTransformer (Canonical Way)
-    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
-
-    # Compute distance
-    distance = torch.norm(handle_pos - ee_pos, dim=-1, p=2)
-    
-    # Penalize if far (> 10cm) and gripper is substantially closed (> 0.0)
-    # 0.0 is open, 0.82 is closed
-    is_far = distance > 0.05
-    
-    # Return gripper position (amount closed) masked by is_far
-    return is_far.float() * joint_pos
-
-
 def grasp_handle(
     env: ManagerBasedRLEnv,
-    # threshold: float, # Removed
-    open_joint_pos: float,
     robot_cfg: SceneEntityCfg,
-    cabinet_cfg: SceneEntityCfg,
-    ee_body_name: str = "robotiq_arg2f_base_link",
-    gripper_joint_name: str = "finger_joint",
+    gripper_joint_name: str = "hande_left_finger_joint",
 ) -> torch.Tensor:
-    """Reward for closing the fingers when being close to the handle.
-    
-    Scales reward by proximity: Close -> Reward closing. Far -> Less reward.
-    Combined with early_close penalty, this guides the robot to grasp only when near.
-    """
     robot: Articulation = env.scene[robot_cfg.name]
     
-    # Get end-effector position from FrameTransformer
+    # 1. Distance check (using your existing frames)
     ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-    
-    # Get handle position
     handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
+    distance = torch.norm(handle_pos - ee_pos, dim=-1)
     
-    # Compute distance
-    distance = torch.norm(handle_pos - ee_pos, dim=-1, p=2)
-    
-    # Continuous Proximity (Smoother falloff, wider basin ~2.5cm)
-    proximity = 1.0 / (1.0 + (distance / 0.025)**2)
-    
-    # Get gripper joint position
+    # 2. Gripper State (Check your specific USD limits!)
+    # Let's assume 0.025 is open and 0.0 is closed.
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
     gripper_pos = robot.data.joint_pos[:, gripper_joint_idx]
     
-    # Reward closing gripper weighted by proximity
-    return proximity * gripper_pos
-
+    # 3. Normalized "Closedness" (1.0 = fully closed, 0.0 = fully open)
+    # This creates a "Slope" for the agent to follow
+    closedness = 1.0 - (gripper_pos / 0.025)
+    closedness = torch.clamp(closedness, 0.0, 1.0)
+    
+    # 4. Only reward closing if we are within 5cm of the handle
+    # This prevents the robot from just standing in the air and opening/closing for points
+    proximity_gate = torch.where(distance < 0.05, 1.0, 0.0)
+    
+    return proximity_gate * closedness
 
 def open_drawer_bonus(
     env: ManagerBasedRLEnv, 
@@ -188,32 +134,39 @@ def open_drawer_bonus(
     drawer_pos = cabinet.data.joint_pos[:, drawer_joint_idx]
     return drawer_pos
 
+def action_rate_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Penalize the change between current and previous actions for smoothness."""
+    current_action = env.action_manager.action
+    previous_action = env.action_manager.prev_action
+    
+    # Calculate the squared difference
+    # Penalizing (a_t - a_{t-1})^2
+    return -torch.sum(torch.square(current_action - previous_action), dim=1)
 
-def multi_stage_open_drawer(
+def hold_open_bonus(
     env: ManagerBasedRLEnv, 
+    threshold: float, 
     cabinet_cfg: SceneEntityCfg,
 ) -> torch.Tensor:
-    """Multi-stage bonus for opening the drawer.
-
-    Provides progressive rewards at different stages:
-    - 0.5 bonus when drawer > 0.01 (any movement)
-    - 1.0 bonus when drawer > 0.15 (medium open)
-    - 1.0 bonus when drawer > 0.30 (fully open)
-    """
+    """Provides a continuous stream of points every timestep the drawer is held open."""
     cabinet: Articulation = env.scene[cabinet_cfg.name]
     drawer_joint_idx = cabinet.find_joints("drawer_top_joint")[0][0]
     drawer_pos = cabinet.data.joint_pos[:, drawer_joint_idx]
     
-    # Progressive bonuses
-    open_easy = (drawer_pos > 0.01).float() * 0.5
-    open_medium = (drawer_pos > 0.15).float() * 1.0
-    open_hard = (drawer_pos > 0.30).float() * 1.0
+    # Returns 1.0 EVERY timestep the drawer is > threshold, 0.0 otherwise
+    return (drawer_pos > threshold).float()
     
-    return open_easy + open_medium + open_hard
+# ==========================================
+# TERMINATIONS
+# ==========================================
 
-
-def action_rate_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Penalize large changes in actions for smoother motion."""
-    # Penalize action magnitude
-    actions = env.action_manager.action
-    return -torch.sum(torch.square(actions), dim=1)
+def drawer_opened(
+    env: ManagerBasedRLEnv, 
+    threshold: float, 
+    asset_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+    """Termination condition for successfully opening the drawer."""
+    cabinet: Articulation = env.scene[asset_cfg.name]
+    drawer_joint_idx = cabinet.find_joints("drawer_top_joint")[0][0]
+    drawer_pos = cabinet.data.joint_pos[:, drawer_joint_idx]
+    return drawer_pos > threshold
