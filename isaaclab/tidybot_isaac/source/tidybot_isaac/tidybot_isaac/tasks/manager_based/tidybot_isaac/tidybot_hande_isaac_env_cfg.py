@@ -44,7 +44,7 @@ FORCE_MARKER_CFG = VisualizationMarkersCfg(
 @configclass
 class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     """Configuration for the TidyBot drawer opening scene using the Hand-E Gripper."""
-    
+
     ground = AssetBaseCfg(
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
@@ -57,7 +57,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/hande_left_finger",
         update_period=0.0,
         history_length=6,
-        debug_vis=True,
+        # debug_vis=True,
         track_friction_forces=True,
         filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
         max_contact_data_count_per_prim=4,
@@ -67,7 +67,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/hande_right_finger",
         update_period=0.0,
         history_length=6,
-        debug_vis=True,
+        # debug_vis=True,
         track_friction_forces=True,
         filter_prim_paths_expr=["{ENV_REGEX_NS}/Cabinet/drawer_handle_top"],
         max_contact_data_count_per_prim=16,
@@ -76,12 +76,13 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     ee_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/EEFrameTransformer"),
+        # debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/Robot/tidybot/bracelet_link",
                 name="ee_tcp",
                 offset=OffsetCfg(
-                    pos=(0.0, 0.0, -0.1815),
+                    pos=(0.0, 0.0, -0.2015),
                     rot=(0.0, 1.0, 0.0, 0.0),
                 ),
             ),
@@ -93,6 +94,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     cabinet_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Cabinet/sektion",
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/CabinetFrameTransformer"),
+        # debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
                 prim_path="{ENV_REGEX_NS}/Cabinet/drawer_handle_top",
@@ -122,7 +124,7 @@ class ActionsCfg:
     arm_pos = standard_mdp.RelativeJointPositionActionCfg(
         asset_name="robot",
         joint_names=["joint_[1-7]"],
-        scale=0.003, 
+        scale=0.01, 
     )
 
     gripper = standard_mdp.BinaryJointPositionActionCfg(
@@ -148,9 +150,23 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # Robot proprioception
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel)
-        
+        joint_pos = ObsTerm(
+            func=standard_mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["joint_[1-7]"])}
+        )
+        joint_vel = ObsTerm(
+            func=standard_mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=["joint_[1-7]"])}
+        )
+        gripper_pos = ObsTerm(
+            func=custom_mdp.gripper_open_amount, 
+            params={
+                "robot_cfg": SceneEntityCfg("robot"),
+                "gripper_joint_name": "hande_left_finger_joint",
+                "open_pos": 0.025,  # Hand-E limit
+                "close_pos": 0.0,   # Hand-E limit
+            },
+        )
         # Geometric Target
         rel_ee_drawer_distance = ObsTerm(
             func=custom_mdp.rel_ee_drawer_distance,
@@ -198,7 +214,7 @@ class EventCfg:
         params={
             "asset_cfg": SceneEntityCfg("cabinet"),  # Targets the root of the cabinet asset
             "pose_range": {
-                "x": (-0.15, 0.05),  # +/- 5 cm forward/backward from x=1.3m
+                "x": (-0.03, 0.1),  # +/- 5 cm forward/backward from x=1.3m
                 "y": (-0.1, 0.1),  # +/- 5 cm left/right from y=0.0m
                 "z": (0.0, 0.0),     # Keep height fixed at z=0.39m
                 "roll": (0.0, 0.0),
@@ -259,24 +275,40 @@ class RewardsCfg:
         },
     )
     
-    drawer_progress = RewTerm(
-        func=custom_mdp.open_drawer_bonus,
-        weight=4.0,
-        params={"cabinet_cfg": SceneEntityCfg("cabinet")},
-    )
-    
-    action_rate = RewTerm(
-        func=custom_mdp.action_rate_penalty,
-        weight=0.1,
+    drawer_progress_gated = RewTerm(
+        func=custom_mdp.gated_open_drawer,
+        weight=15.0,
+        params={
+            "threshold": 0.25,
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint"
+        },
     )
 
     hold_open = RewTerm(
         func=custom_mdp.hold_open_bonus,
-        weight=25.0, # 25 points EVERY timestep it holds the drawer open
+        weight=10.0, 
         params={
             "threshold": 0.25, 
-            "cabinet_cfg": SceneEntityCfg("cabinet")
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint",
         },
+    )
+
+    action_rate = RewTerm(
+        func=custom_mdp.action_rate_penalty,
+        weight=0.05, 
+    )
+    
+    # Add the new velocity penalty
+    smooth_pull = RewTerm(
+        func=custom_mdp.ee_velocity_penalty,
+        params={
+            "robot_cfg": SceneEntityCfg("robot"),
+        },
+        weight=5.0, 
     )
 
 @configclass

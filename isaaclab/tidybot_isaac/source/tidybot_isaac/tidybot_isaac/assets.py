@@ -16,7 +16,7 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         usd_path=TIDYBOT_HANDE_USD_PATH,
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
+            disable_gravity=True,
             retain_accelerations=False,
             linear_damping=0.0,
             angular_damping=0.0,
@@ -61,8 +61,20 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         ),
         "arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-7]"],
-            stiffness=1e7,
-            damping=1e4,
+            # Taken from tidybot_driver/arm_controller
+            stiffness={
+                "joint_1": 400.0, "joint_2": 400.0, "joint_3": 300.0,
+                "joint_4": 300.0, "joint_5": 300.0, "joint_6": 300.0, "joint_7": 300.0,
+            },
+            damping={
+                "joint_1": 15.0, "joint_2": 15.0, "joint_3": 10.0,
+                "joint_4": 10.0, "joint_5": 8.0, "joint_6": 8.0, "joint_7": 8.0,
+            },
+            armature={
+                "joint_1": 0.3, "joint_2": 0.3, "joint_3": 0.3, 
+                "joint_4": 0.3, "joint_5": 0.18, "joint_6": 0.18, "joint_7": 0.18
+            },
+            friction=1.0
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
@@ -173,7 +185,7 @@ CABINET_CFG = ArticulationCfg(
         pos=(1.3, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
         rot=(0.0, 0.0, 0.0, 1.0),  # Original verified rotation
     ),
-actuators={
+    actuators={
         "drawer": ImplicitActuatorCfg(
             joint_names_expr=["drawer_top_joint"],
             stiffness=0.0,

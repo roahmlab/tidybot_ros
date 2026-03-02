@@ -46,16 +46,24 @@ def ee_to_handle_vector(env: ManagerBasedRLEnv) -> torch.Tensor:
     # Return vector from EE to handle
     return handle_pos - ee_pos
 
-
 def gripper_open_amount(
     env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg,
-    gripper_joint_name: str = "finger_joint",
+    gripper_joint_name: str,
+    open_pos: float,
+    close_pos: float,
 ) -> torch.Tensor:
-    """Gripper opening amount (1D).
+    """Normalized gripper opening amount (1D).
     
-    Returns the leader finger joint position (0 = open, 0.82 = closed for 2F-85).
+    Normalizes any hardware's raw joint position into a [0.0, 1.0] scale, 
+    where 1.0 is fully CLOSED and 0.0 is fully OPEN.
     """
     robot: Articulation = env.scene[robot_cfg.name]
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
-    return robot.data.joint_pos[:, gripper_joint_idx:gripper_joint_idx+1]
+    
+    raw_pos = robot.data.joint_pos[:, gripper_joint_idx:gripper_joint_idx+1]
+    
+    # 1.0 is Closed, 0.0 is Open
+    normalized_pos = (raw_pos - open_pos) / (close_pos - open_pos)
+    
+    return torch.clamp(normalized_pos, min=0.0, max=1.0)
