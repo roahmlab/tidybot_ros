@@ -78,10 +78,10 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
-            stiffness=1e6,
+            stiffness=1e7,
             damping=100.0,
             effort_limit=180.0,   # Force limit (N)
-            velocity_limit=0.15,  # Velocity limit (m/s) — Hand-E spec
+            velocity_limit=0.08,  # Velocity limit (m/s) — Hand-E spec
         ),
     },
 )
@@ -175,11 +175,13 @@ TIDYBOT_2F85_CFG = ArticulationCfg(
 # Cabinet Asset
 ##
 
-CABINET_USD_URL = "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/Sektion_Cabinet/sektion_cabinet_instanceable.usd"
+CABINET_USD_URL = "/workspace/tidybot_isaac/cabinet_locked.usd"
 
 CABINET_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=CABINET_USD_URL,
+        # Force the root of the cabinet to be fixed to the world
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(1.3, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
@@ -190,7 +192,7 @@ CABINET_CFG = ArticulationCfg(
             joint_names_expr=["drawer_top_joint"],
             stiffness=0.0,
             damping=1.0,      # Viscous resistance (force scales with velocity)
-            friction=0.2,     # Coulomb friction (constant resistance force in Newtons)
+            friction=1.0,     # Coulomb friction (constant resistance force in Newtons)
         ),
     },
 )

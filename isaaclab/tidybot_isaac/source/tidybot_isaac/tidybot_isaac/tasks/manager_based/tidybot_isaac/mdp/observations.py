@@ -13,38 +13,31 @@ from isaaclab.managers import SceneEntityCfg
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
+# ==========================================
+# OBSERVATIONS
+# ==========================================
 
-def end_effector_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """End-effector world position (3D).
-    
-    Returns the world position of the end-effector body.
+def rel_ee_drawer_transform(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Returns the relative translation (3D) and rotation (4D quat) from EE to handle.
+    Output shape: [num_envs, 7]
     """
-    # Use canonical frame if available
-    return env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-
-
-def handle_pos(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Drawer handle world position (3D).
-    Returns the world position of the drawer handle (drawer_top link + offset).
-    """
-    # Use canonical frame if available
-    return env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
-
-
-def ee_to_handle_vector(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Vector from end-effector to drawer handle (3D).
-    This is the most useful observation for reaching - it directly tells
-    the policy which direction and how far to move.
-    """
-    # Get end-effector position from FrameTransformer
+    # Get positions
     ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-    
-    # Get handle position
-    # Get handle position from FrameTransformer
     handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
     
-    # Return vector from EE to handle
-    return handle_pos - ee_pos
+    # Get orientations
+    ee_quat = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
+    handle_quat = env.scene["cabinet_frame"].data.target_quat_w[..., 0, :]
+    
+    # Relative translation (World frame difference)
+    pos_error = handle_pos - ee_pos
+    
+    # Relative rotation (q_rel = q_ee_inv * q_handle)
+    ee_quat_inv = math_utils.quat_conjugate(ee_quat)
+    rot_error = math_utils.quat_mul(ee_quat_inv, handle_quat)
+    
+    # Concatenate into a single tensor: [x, y, z, qw, qx, qy, qz]
+    return torch.cat([pos_error, rot_error], dim=-1)
 
 def gripper_open_amount(
     env: ManagerBasedRLEnv,

@@ -47,7 +47,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
 
     ground = AssetBaseCfg(
         prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
+        spawn=sim_utils.GroundPlaneCfg(size=(300.0, 300.0)),
     )
 
     # Robot Asset (Hand-E)
@@ -168,8 +168,8 @@ class ObservationsCfg:
             },
         )
         # Geometric Target
-        rel_ee_drawer_distance = ObsTerm(
-            func=custom_mdp.rel_ee_drawer_distance,
+        rel_ee_drawer_transform = ObsTerm(
+            func=custom_mdp.rel_ee_drawer_transform,
             noise=GaussianNoiseCfg(mean=0.0, std=0.005) 
         )
 
@@ -216,7 +216,7 @@ class EventCfg:
             "pose_range": {
                 "x": (-0.03, 0.1),  # +/- 5 cm forward/backward from x=1.3m
                 "y": (-0.1, 0.1),  # +/- 5 cm left/right from y=0.0m
-                "z": (0.0, 0.0),     # Keep height fixed at z=0.39m
+                "z": (-0.3, 0.05),  # Keep height fixed at z=0.39m
                 "roll": (0.0, 0.0),
                 "pitch": (0.0, 0.0),
                 "yaw": (-0.16, 0.16), # Optional: Slight rotation (+/- ~4.5 degrees)
@@ -239,18 +239,29 @@ class EventCfg:
         },
     )
 
-    # Domain randomization: Drawer track friction
+    # Randomize Coulomb Friction
     randomize_cabinet_friction = EventTerm(
         func=standard_mdp.randomize_joint_parameters,
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "friction_distribution_params": (0.1, 1.5), # Scales friction by 0.5x to 1.5x
+            "friction_distribution_params": (0.1, 2.0), 
             "operation": "scale",
             "distribution": "uniform",
         },
     )
 
+    # Randomize Actuator Damping
+    randomize_cabinet_damping = EventTerm(
+        func=standard_mdp.randomize_actuator_gains,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+            "damping_distribution_params": (0.5, 2.0),
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
 
 @configclass
 class RewardsCfg:
@@ -275,6 +286,10 @@ class RewardsCfg:
         },
     )
     
+    # debug_pos = RewTerm(func=custom_mdp.debug_drawer_pos, weight=0.001, params={"cabinet_cfg": SceneEntityCfg("cabinet")})
+    # debug_inserted = RewTerm(func=custom_mdp.debug_is_inserted, weight=0.001)
+    # debug_aligned = RewTerm(func=custom_mdp.debug_is_aligned, weight=0.001)
+
     drawer_progress_gated = RewTerm(
         func=custom_mdp.gated_open_drawer,
         weight=15.0,
@@ -302,28 +317,33 @@ class RewardsCfg:
         weight=0.05, 
     )
     
-    # Add the new velocity penalty
     smooth_pull = RewTerm(
         func=custom_mdp.ee_velocity_penalty,
         params={
             "robot_cfg": SceneEntityCfg("robot"),
         },
-        weight=5.0, 
+        weight=2.0, 
+    )
+
+    unaligned_approach = RewTerm(
+        func=custom_mdp.unaligned_approach_penalty,
+        weight=1.5, 
+    )
+
+    rest_at_goal = RewTerm(
+        func=custom_mdp.rest_at_goal_penalty,
+        weight=1.5, 
+        params={
+            "threshold": 0.25, 
+            "cabinet_cfg": SceneEntityCfg("cabinet"),
+            "robot_cfg": SceneEntityCfg("robot"),
+        },
     )
 
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
-
     time_out = DoneTerm(func=standard_mdp.time_out, time_out=True)
-    
-    # success = DoneTerm(
-    #     func=custom_mdp.drawer_opened,
-    #     params={
-    #         "threshold": 0.25,
-    #         "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-    #     },
-    # )
 
 ##
 # Environment configuration
@@ -340,9 +360,9 @@ class TidybotHandeIsaacEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 4
-        self.episode_length_s = 25
-        self.viewer.eye = (3.0, 3.0, 2.0)
-        self.viewer.lookat = (0.0, 0.0, 0.0)
+        self.episode_length_s = 16
+        self.viewer.eye = (3.0, 6.0, 3.5)
+        self.viewer.lookat = (-100.0, -200.0, -125.0)
         self.sim.dt = 1 / 240
         self.sim.substeps = 1
         self.sim.physx.solver_iterations = 8

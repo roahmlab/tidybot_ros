@@ -13,16 +13,7 @@ if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
 from isaaclab.utils.math import quat_apply, quat_apply_inverse
-
-# ==========================================
-# OBSERVATIONS
-# ==========================================
-
-def rel_ee_drawer_distance(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Returns the 3D relative vector from the end-effector to the handle."""
-    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
-    return handle_pos - ee_pos
+import isaaclab.utils.math as math_utils
 
 # ==========================================
 # REWARDS
@@ -48,8 +39,8 @@ def align_ee_handle(
     """Reward for aligning EE tool frame with handle frame.
     
     Conditions:
-    1. Z_ee aligns with Z_handle
-    2. X_ee aligns with Y_handle
+    1. Z_ee aligns with Z_handle (pointing direction)
+    2. X_ee aligns with Y_handle (pinch orientation)
     
     Scaled by proximity to the handle.
     """
@@ -76,14 +67,18 @@ def align_ee_handle(
     # Combined scalar
     scaling = proximity + boost_close + boost_very_close
     
+    # Expand base vectors for batching
     vec_z = VEC_Z.to(env.device).expand(env.num_envs, 3)
     vec_x = VEC_X.to(env.device).expand(env.num_envs, 3)    
+    vec_y = VEC_Y.to(env.device).expand(env.num_envs, 3)
     
     # Rotate Basis Vectors to World
     ee_z = quat_apply(ee_quat, vec_z)
     ee_x = quat_apply(ee_quat, vec_x)
     handle_z = quat_apply(handle_quat, vec_z)
-    handle_y = quat_apply(handle_quat, vec_x)
+    
+    # Extract the Y-axis of the handle
+    handle_y = quat_apply(handle_quat, vec_y)
 
     # Compute Dot Products
     dot_z = torch.sum(ee_z * handle_z, dim=-1)
@@ -91,8 +86,8 @@ def align_ee_handle(
 
     # Reward only starts to matter when alignment is > 0.9 (approx 25 degrees)
     # and hits 1.0 only at 1.0.
-    align_z = torch.clamp(dot_z, min=0.0)**12 
-    align_x = torch.clamp(dot_x, min=0.0)**12
+    align_z = torch.clamp(dot_z, min=0.0)**8
+    align_x = torch.clamp(dot_x, min=0.0)**8
 
     total_alignment = align_z * align_x
     
@@ -117,13 +112,17 @@ def grasp_handle(
     vec_to_handle = handle_pos - ee_pos
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
     
-    # Red (X) is PINCH gap. 1.0 if perfectly centered, 0.0 if > 3cm off.
-    centering_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 0]) / 0.03), 0.0, 1.0)
-    # Blue (Z) is APPROACH. 1.0 if inside jaws, 0.0 if > 3cm away.
-    insertion_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 2]) / 0.03), 0.0, 1.0)
+    # X (Pinch/Centered)
+    centering_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 0]) / 0.015), 0.0, 1.0)
     
-    # Combined spatial quality (The "Magnetic" pull toward the handle)
-    spatial_quality = centering_factor * insertion_factor
+    # Y (Elevation)
+    elevation_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 1]) / 0.01), 0.0, 1.0)
+    
+    # Z (Approach/Insertion)
+    insertion_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 2]) / 0.02), 0.0, 1.0)
+    
+    # Require all three dimensions to be good
+    spatial_quality = centering_factor * elevation_factor * insertion_factor
 
     # Gripper Logic
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
@@ -146,7 +145,7 @@ def _is_properly_grasping(
     robot_cfg: SceneEntityCfg, 
     gripper_joint_name: str
 ) -> torch.Tensor:
-    """The Gate: Now requires spatial AND orientation precision."""
+    """Checks proper spatial and orientation position."""
     # Get Frames
     ee_tcp_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
     ee_tcp_quat = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
@@ -158,7 +157,7 @@ def _is_properly_grasping(
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
     is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.008).float()
     is_inserted = (torch.abs(local_handle_pos[:, 2]) < 0.01).float()
-    
+
     # Orientation check
     ee_z = quat_apply(ee_tcp_quat, VEC_Z.to(env.device).expand(env.num_envs, 3))
     h_z = quat_apply(handle_quat, VEC_Z.to(env.device).expand(env.num_envs, 3))
@@ -172,13 +171,13 @@ def _is_properly_grasping(
     dot_x = torch.sum(ee_x * h_y, dim=-1)
     
     # 0.996 for both means gripper must be within ~5 degrees of perfect
-    is_aligned = ((dot_z > 0.996) & (dot_x > 0.996)).float()
+    is_aligned = ((dot_z > 0.925) & (dot_x > 0.925)).float()
     
     # Gripper Check
     robot = env.scene[robot_cfg.name]
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
     gripper_pos = robot.data.joint_pos[:, gripper_joint_idx]
-    is_closed = (gripper_pos <= 0.017).float()
+    is_closed = (gripper_pos <= 0.02).float()
     
     return is_centered * is_inserted * is_closed * is_aligned
 
@@ -221,6 +220,10 @@ def hold_open_bonus(
     
     return is_open * is_grasping
 
+# ==========================================
+# PENALTIES
+# ==========================================
+
 def action_rate_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the change between current and previous actions for smoothness."""
     current_action = env.action_manager.action
@@ -253,6 +256,68 @@ def ee_velocity_penalty(
     
     return -excess_vel
     
+def unaligned_approach_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Penalize the robot for being close to the handle without being aligned.
+    Added because policy was knocking into the drawer while aligning its grasp.
+    """
+    # Get positions and distance
+    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
+    handle_pos = env.scene["cabinet_frame"].data.target_pos_w[..., 0, :]
+    distance = torch.norm(handle_pos - ee_pos, dim=-1)
+    
+    is_close = (distance < 0.10).float()
+
+    # Get Orientations
+    ee_quat = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
+    handle_quat = env.scene["cabinet_frame"].data.target_quat_w[..., 0, :]
+    
+    # Check Z-Axis (Pointing) Alignment
+    vec_z = VEC_Z.to(env.device).expand(env.num_envs, 3)
+    ee_z = quat_apply(ee_quat, vec_z)
+    handle_z = quat_apply(handle_quat, vec_z)
+    dot_z = torch.sum(ee_z * handle_z, dim=-1)
+    
+    # If the alignment is poor (less than ~25 degrees from perfect)
+    # dot_z of 0.9 is roughly 25 degrees.
+    is_badly_aligned = (dot_z < 0.9).float()
+    
+    # Scale the penalty so it gets worse the closer you are while unaligned
+    # (0.10 - distance) gives a linear scale that gets larger as distance approaches 0
+    severity = torch.clamp(0.10 - distance, min=0.0) * 10.0 # Scales from 0.0 to 1.0
+    
+    # Apply penalty
+    return -1.0 * is_close * is_badly_aligned * severity
+
+def rest_at_goal_penalty(
+    env: ManagerBasedRLEnv, 
+    threshold: float, 
+    cabinet_cfg: SceneEntityCfg,
+    robot_cfg: SceneEntityCfg
+) -> torch.Tensor:
+    """Penalize the robot for continuing to move its arm after the drawer is successfully open.
+    """
+    # Check if the task is complete (Drawer is Open)
+    cabinet = env.scene[cabinet_cfg.name]
+    drawer_joint_idx = cabinet.find_joints("drawer_top_joint")[0][0]
+    drawer_pos = cabinet.data.joint_pos[:, drawer_joint_idx]
+    
+    is_open = (drawer_pos >= threshold).float()
+    
+    # Get the velocities of the robot's arm joints
+    robot: Articulation = env.scene[robot_cfg.name]
+    
+    # Only want to penalize arm joints 
+    arm_joint_indices, _ = robot.find_joints("joint_[1-7]") 
+    
+    # Get the velocities of those specific joints
+    arm_velocities = robot.data.joint_vel[:, arm_joint_indices]
+    
+    # Calculate the sum of squared velocities (L2 norm squared)
+    velocity_penalty = torch.sum(torch.square(arm_velocities), dim=-1)
+    
+    # Apply penalty only if the drawer is open
+    return -1.0 * is_open * velocity_penalty
+
 # ==========================================
 # TERMINATIONS
 # ==========================================

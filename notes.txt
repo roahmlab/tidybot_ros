@@ -1,0 +1,17 @@
+Remove relative joint position to ensure full operational space is reachable
+Domain randomize drawer pos/yaw and friction
+
+Update joint stiff/damping to match tidybot controller
+Disable gravity to imitate hardware gravity compensation
+
+Decrease action scaling, increase action rate penalty
+Add gating terms for drawer open rewards to ensure handle is properly grasped
+
+Restructure alignment reward to more heavily penalize misalignment in either x or z
+Remove closedness gate in grasp_handle reward to incentive gripper closing
+
+Add relative rotation observation
+Add z domain randomization
+Switch revolute joints to fixed to avoid numerical issues and clipping
+Increase HandE fingertip friction and stiffness
+**** INCREASE GROUND PLANE SIZE TO STOP OBJECTS FROM FALLING INTO VOID
