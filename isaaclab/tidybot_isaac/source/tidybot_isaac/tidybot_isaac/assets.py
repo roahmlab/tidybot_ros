@@ -2,6 +2,7 @@
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.sim.spawners.wrappers import MultiUsdFileCfg
 
 ##
 # TidyBot Assets — Dual Gripper Configurations
@@ -58,6 +59,7 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
             joint_names_expr=["joint_x", "joint_y", "joint_th"],
             stiffness=1e7,
             damping=1e4,
+            armature=1000.0,
         ),
         "arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-7]"],
@@ -78,10 +80,10 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
-            stiffness=1e7,
-            damping=100.0,
-            effort_limit=180.0,   # Force limit (N)
-            velocity_limit=0.08,  # Velocity limit (m/s) — Hand-E spec
+            effort_limit=12000.0,  # Simulates mechanical gear lock and prevents backdrive.
+            stiffness=10000.0,
+            damping=1000.0,        # High damping to absorb the pulling shocks.
+            armature=0.1,
         ),
     },
 )
@@ -195,4 +197,30 @@ CABINET_CFG = ArticulationCfg(
             friction=1.0,     # Coulomb friction (constant resistance force in Newtons)
         ),
     },
+)
+
+##
+# Door Asset
+##
+door_usd_paths = [f"/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/door_{i}.usd" for i in range(20)]
+DOOR_CFG = ArticulationCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=MultiUsdFileCfg(
+        usd_path=door_usd_paths,
+        random_choice=True,
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(0.0, 0.0, 0.0, 1.0),
+        joint_pos={"HingeJoint": 0.0},
+    ),
+    actuators={
+        "hinge": ImplicitActuatorCfg(
+            joint_names_expr=["HingeJoint"],
+            stiffness=0.0, 
+            damping=0.5, 
+            friction=1.0,
+        )
+    }
 )

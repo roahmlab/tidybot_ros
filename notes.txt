@@ -15,3 +15,9 @@ Add z domain randomization
 Switch revolute joints to fixed to avoid numerical issues and clipping
 Increase HandE fingertip friction and stiffness
 **** INCREASE GROUND PLANE SIZE TO STOP OBJECTS FROM FALLING INTO VOID
+
+Door opening:
+Increase gripper max effort to prevent backdrive
+Remove alignment gate for door opening reward
+Add ungated door opening reward
+Reduce init noise std, entropy
