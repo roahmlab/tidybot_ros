@@ -22,8 +22,8 @@ def generate_procedural_doors(output_dir, num_doors=20):
         width = min_width + i * (max_width - min_width) / (num_doors - 1)
         height = 0.2
         thickness = 0.02
-        handle_radius = 0.0125
-        handle_gap = 0.015
+        handle_radius = 0.0075
+        handle_gap = 0.025
         handle_edge_margin = handle_radius 
         clearance = 0.005 
         

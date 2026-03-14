@@ -211,6 +211,10 @@ class ObservationsCfg:
                 "close_pos": 0.0,  
             },
         )
+        gripper_cooldown = ObsTerm(
+            func=custom_mdp.gripper_cooldown_state,
+            params={"action_term_name": "gripper"}
+        )
 
         # Geometric Task State
         rel_ee_handle_transform = ObsTerm(
@@ -258,6 +262,11 @@ class ObservationsCfg:
                 "close_pos": 0.0,  
             },
         )
+        gripper_cooldown = ObsTerm(
+            func=custom_mdp.gripper_cooldown_state,
+            params={"action_term_name": "gripper"}
+        )
+
 
         # Clean Geometric Task State
         rel_ee_handle_transform_clean = ObsTerm(
@@ -413,6 +422,17 @@ class EventCfg:
         },
     )
 
+    randomize_door_mass = EventTerm(
+        func=standard_mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("door", body_names="DoorPanel"), 
+            "mass_distribution_params": (0.1, 2),
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
     # Randomize Coulomb Friction
     randomize_door_friction = EventTerm(
         func=standard_mdp.randomize_joint_parameters,
@@ -431,7 +451,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"]),
-            "damping_distribution_params": (0.5, 2.0),
+            "damping_distribution_params": (0.1, 2.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -465,7 +485,7 @@ class RewardsCfg:
 
     grasp = RewTerm(
         func=custom_mdp.grasp_handle,
-        weight=0.3,   # Was 3.0
+        weight=1.0,   # Was 3.0
         params={
             "robot_cfg": SceneEntityCfg("robot"),
             "gripper_joint_name": "hande_left_finger_joint", 
@@ -496,9 +516,14 @@ class RewardsCfg:
 
     action_rate = RewTerm(
         func=custom_mdp.action_rate_penalty,
-        weight=0.0005, # Was 0.005
+        weight=0.01, # Was 0.005
     )
-    
+
+    action_l2 = RewTerm(
+        func=custom_mdp.action_l2_penalty,
+        weight=0.01,
+    )
+
     gripper_chatter = RewTerm(
         func=custom_mdp.gripper_chatter_penalty,
         weight=0.005  # Was 0.05
@@ -556,7 +581,7 @@ class TerminationsCfg:
     time_out = DoneTerm(func=standard_mdp.time_out, time_out=True)
     success = DoneTerm(
         func=custom_mdp.success_at_timeout,
-        time_out=False,
+        time_out=True,
         params={
             "threshold": 1.25, 
             "door_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"]),

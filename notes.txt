@@ -21,3 +21,9 @@ Increase gripper max effort to prevent backdrive
 Remove alignment gate for door opening reward
 Add ungated door opening reward
 Reduce init noise std, entropy
+
+Door Sim to Real:
+Increase gripper parameters to match 0.8 second open/closing time
+Rate limit gripper actions to eliminate ability to oscillate
+Modify grasping reward to encourage opened gripper until handle is in position
+Add total mechanical work and success time metrics

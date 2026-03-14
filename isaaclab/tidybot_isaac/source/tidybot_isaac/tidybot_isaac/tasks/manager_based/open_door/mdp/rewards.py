@@ -85,47 +85,47 @@ def grasp_handle(
     robot_cfg: SceneEntityCfg,
     gripper_joint_name: str = "hande_left_finger_joint",
 ) -> torch.Tensor:
-    """Reward for closing the gripper, scaled by how well the handle is centered in the jaws."""
+    """Rewards approaching with an OPEN gripper, and only closing when properly inserted."""
     robot: Articulation = env.scene[robot_cfg.name]
     
-    # Get Positions for Proximity
+    # Distance & Local Frame
     ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
     handle_pos = env.scene["handle_frame"].data.target_pos_w[..., 0, :]
     distance = torch.norm(handle_pos - ee_pos, dim=-1)
     
-    # Local Frame Transformation
-    # Instead of a 0/1 gate, see how centered the handle is.
     ee_tcp_quat = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
     vec_to_handle = handle_pos - ee_pos
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
     
-    # X (Pinch/Centered)
-    centering_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 0]) / 0.0125), 0.0, 1.0)
+    # Is the handle physically between the fingers?
+    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.015).float()  # Pinch Axis
+    is_inserted = (torch.abs(local_handle_pos[:, 2]) < 0.01).float()   # Insertion Axis
+    ready_to_close = is_centered * is_inserted
     
-    # Y (Elevation)
-    elevation_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 1]) / 0.02), 0.0, 1.0)
-    
-    # Z (Approach/Insertion)
-    insertion_factor = torch.clamp(1.0 - (torch.abs(local_handle_pos[:, 2]) / 0.02), 0.0, 1.0)
-    
-    # Require all three dimensions to be good on average
-    spatial_quality = (centering_factor + elevation_factor + insertion_factor) / 3.0
-
-    # Gripper Logic
+    # Gripper State Calculations
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
     gripper_pos = robot.data.joint_pos[:, gripper_joint_idx]
     
-    # Constants from Hand-E spec
     target_width = 0.020  # Handle thickness
     max_open = 0.025      # Fully open state
     
-    # Normalized Closedness (Ramp hits 1.0 at handle thickness)
+    # Calculate both closedness and openness
     closedness = (max_open - gripper_pos) / (max_open - target_width)
     closedness = torch.clamp(closedness, 0.0, 1.0) 
+    openness = 1.0 - closedness
+
+    # 15cm funnel to encourage opening the gripper early during the approach
+    approach_open_slope = torch.clamp(1.0 - (distance / 0.15), 0.0, 1.0)
+
+    # If the handle is inside the jaws -> Maximize Closedness (Value 1.0)
+    # If the handle is outside the jaws -> Maximize Openness, scaled by the 15cm funnel
+    correct_gripper_state = torch.where(
+        ready_to_close > 0.5, 
+        closedness, 
+        openness * approach_open_slope
+    )
     
-    proximity_slope = torch.clamp(1.0 - (distance / 0.10), 0.0, 1.0)
-    
-    return proximity_slope * spatial_quality * closedness
+    return correct_gripper_state
 
 def _is_properly_grasping(
     env: ManagerBasedRLEnv, 
@@ -141,7 +141,7 @@ def _is_properly_grasping(
     # Local Position Check (Using X for pinch and Z for insertion)
     vec_to_handle = handle_pos - ee_tcp_pos
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
-    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.0125).float() # Pinch Axis
+    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.015).float()  # Pinch Axis
     is_inserted = (torch.abs(local_handle_pos[:, 2]) < 0.01).float()   # Insertion Axis
 
     vec_x = VEC_X.to(env.device).expand(env.num_envs, 3)
@@ -220,6 +220,10 @@ def action_rate_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     # Calculate the squared difference
     # Penalizing (a_t - a_{t-1})^2
     return -torch.sum(torch.square(current_action - previous_action), dim=1)
+
+def action_l2_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Penalize the absolute magnitude of the actions to force STD down."""
+    return -torch.sum(torch.square(env.action_manager.action), dim=1)
 
 def gripper_chatter_penalty(
     env: ManagerBasedRLEnv, 
@@ -446,7 +450,7 @@ def track_and_log_time_to_success(
         # Only log if there was at least one success in the resetting batch
         if successful_resets.any():
             avg_time_steps = env._success_step_buf[successful_resets].mean().item()
-            env.extras["episode"]["Metric/Time_to_Success_Seconds"] = avg_time_steps * env.step_dt
+            env.extras["log"]["Metric/Time_to_Success_Seconds"] = avg_time_steps * env.step_dt
             
         # Reset internal buffers for the next episode
         env._success_step_buf[reset_ids] = 0.0

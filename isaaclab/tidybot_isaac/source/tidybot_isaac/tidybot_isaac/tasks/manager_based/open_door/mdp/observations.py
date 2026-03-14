@@ -62,6 +62,17 @@ def gripper_open_amount(
     
     return torch.clamp(normalized_pos, min=0.0, max=1.0)
 
+def gripper_cooldown_state(env: ManagerBasedRLEnv, action_term_name: str = "gripper") -> torch.Tensor:
+    """Returns the normalized remaining cooldown time [0.0 to 1.0]. 0.0 means ready."""
+    action_term = env.action_manager.get_term(action_term_name)
+    
+    # Normalize the timer so the neural network digests it easily
+    max_steps = action_term.cooldown_steps
+    current_timers = action_term.cooldown_timers.float()
+    
+    # Add a dimension so it concatenates properly in the observation vector
+    return (current_timers / max_steps).unsqueeze(-1)
+
 def hinge_origin_position(env, door_cfg) -> torch.Tensor:
     """
     Returns the exact hinge origin and opening axis in the world frame.
