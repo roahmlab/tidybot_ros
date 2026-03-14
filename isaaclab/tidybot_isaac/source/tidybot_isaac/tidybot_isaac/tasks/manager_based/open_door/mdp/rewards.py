@@ -169,20 +169,6 @@ def _is_properly_grasping(
     
     return is_centered * is_inserted * is_closed * alignment_multiplier
 
-def ungated_open_door(
-    env: ManagerBasedRLEnv, 
-    threshold: float,
-    door_cfg: SceneEntityCfg,
-) -> torch.Tensor:
-    """Reward for door position up to a threshold."""
-    # Get door position
-    door = env.scene[door_cfg.name]
-    door_joint_idx = door.find_joints("HingeJoint")[0][0]
-    door_pos = torch.abs(door.data.joint_pos[:, door_joint_idx]) # Changed to abs
-    # Saturate position reward
-    reward_pos = torch.clamp(door_pos, min=0.0, max=threshold)
-    return reward_pos 
-
 def gated_open_door(
     env: ManagerBasedRLEnv, 
     threshold: float,
@@ -249,29 +235,66 @@ def gripper_chatter_penalty(
     
     return -torch.square(curr_binary - prev_binary)
 
+def illegal_gripper_command_penalty(
+    env: ManagerBasedRLEnv, 
+    action_term_name: str = "gripper"
+) -> torch.Tensor:
+    """Penalizes the policy for trying to change gripper state during cooldown."""
+    
+    # 1. Access the custom action term
+    action_term = env.action_manager.get_term(action_term_name)
+    
+    # 2. Calculate the slice indices (Safe, version-agnostic way)
+    start_idx = 0
+    for name, term in env.action_manager._terms.items():
+        if name == action_term_name:
+            break
+        start_idx += term.action_dim
+    end_idx = start_idx + action_term.action_dim
+    
+    # 3. Get the policy's raw intended action
+    current_policy_action = torch.sign(env.action_manager.action[:, start_idx:end_idx])
+    
+    # 4. Use the buffers already in your CooldownBinaryAction class
+    is_locked = action_term.cooldown_timers > 0
+    # Check if the policy wants to flip vs what the wrapper has committed
+    wants_change = (current_policy_action != action_term.committed_actions).any(dim=-1)
+    
+    # Return 1.0 for the violation
+    return -(is_locked & wants_change).float()
+
 def ee_velocity_penalty(
     env: ManagerBasedRLEnv,
     robot_cfg: SceneEntityCfg,
     ee_body_name: str = "bracelet_link",
 ) -> torch.Tensor:
-    """Penalize high linear velocity of the end-effector body to encourage smooth pulls."""
-    # Get the robot articulation
+    """Distance-scaled velocity penalty: Forces the robot to decelerate as it approaches the handle."""
     robot: Articulation = env.scene[robot_cfg.name]
-    
-    # Find the index of the end-effector link in the physics engine
     body_idx = robot.find_bodies(ee_body_name)[0][0]
     
-    # Get the linear velocity of that specific body in the world frame
+    # Get current velocity
     ee_vel = robot.data.body_lin_vel_w[:, body_idx, :]
-    
-    # Compute the magnitude of the velocity
     vel_mag = torch.norm(ee_vel, dim=-1)
     
-    # Penalize velocities above a safe threshold (0.2 m/s)
-    excess_vel = torch.clamp(vel_mag - 0.2, min=0.0)
+    # Get distance to the handle
+    ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
+    handle_pos = env.scene["handle_frame"].data.target_pos_w[..., 0, :]
+    distance = torch.norm(handle_pos - ee_pos, dim=-1)
     
-    return -excess_vel
+    # Create a dynamic speed limit
+    # Max speed: 0.20 m/s (when distance >= 0.10m)
+    # Min speed: 0.05 m/s (when distance approaches 0.0m)
+    speed_limit = torch.clamp(distance, min=0.0, max=0.10) / 0.10 * (0.20 - 0.05) + 0.05
     
+    # Calculate how much the robot is exceeding its current speed limit
+    excess_vel = torch.clamp(vel_mag - speed_limit, min=0.0)
+    
+    # Multiply the penalty severity when very close to heavily discourage "bouncing/flailing" 
+    # right at the target location.
+    severity_multiplier = torch.where(distance < 0.05, 5.0, 1.0)
+    
+    return -excess_vel * severity_multiplier
+
 def unaligned_approach_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the robot for being close to the handle without being aligned.
     Updated to match correct axes: EE Z to Handle X, EE X to Handle Y.
@@ -356,3 +379,77 @@ def door_opened(
     door_joint_idx = door.find_joints("HingeJoint")[0][0]
     door_pos = door.data.joint_pos[:, door_joint_idx]
     return door_pos > threshold
+
+def success_at_timeout(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    door_cfg: SceneEntityCfg,
+    robot_cfg: SceneEntityCfg,
+    gripper_joint_name: str,
+) -> torch.Tensor:
+    """Logs success only at the end of the episode if conditions are met."""
+    is_timeout = env.episode_length_buf >= env.max_episode_length - 1
+
+    # Check if the door is open past the threshold
+    door = env.scene[door_cfg.name]
+    door_joint_idx = door.find_joints(door_cfg.joint_names[0])[0][0]
+    door_pos = door.data.joint_pos[:, door_joint_idx]
+    is_open = door_pos > threshold
+    grasp_score = _is_properly_grasping(env, robot_cfg, gripper_joint_name)
+    is_grasping = grasp_score > 0.5
+
+    return is_timeout & is_open & is_grasping
+
+def track_and_log_time_to_success(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    door_cfg: SceneEntityCfg,
+    robot_cfg: SceneEntityCfg,
+    gripper_joint_name: str,
+) -> torch.Tensor:
+    # Initialize buffers
+    if not hasattr(env, "_success_step_buf"):
+        env._success_step_buf = torch.zeros(env.num_envs, dtype=torch.float, device=env.device)
+        env._already_succeeded_buf = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+
+    # Success Logic
+    door = env.scene[door_cfg.name]
+    door_joint_idx = door.find_joints(door_cfg.joint_names[0])[0][0]
+    door_pos = door.data.joint_pos[:, door_joint_idx]
+    
+    is_open = door_pos > threshold
+    grasp_score = _is_properly_grasping(env, robot_cfg, gripper_joint_name)
+    is_grasping = grasp_score > 0.5
+    
+    current_success = is_open & is_grasping
+
+    # Record first-time success step
+    new_success = current_success & ~env._already_succeeded_buf
+    env._success_step_buf[new_success] = env.episode_length_buf[new_success].float()
+    env._already_succeeded_buf |= current_success
+
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        # Determine who succeeded vs who failed
+        successful_resets = env.reset_buf & env._already_succeeded_buf
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # SUCCESS RATE: (Number of successful resets / Total resets)
+        # We MUST log this every time any env resets to get a true average
+        success_rate = successful_resets[reset_ids].float().mean().item()
+        env.extras["log"]["Metric/Success_Rate"] = success_rate
+
+        # TIME TO SUCCESS: 
+        # Only log if there was at least one success in the resetting batch
+        if successful_resets.any():
+            avg_time_steps = env._success_step_buf[successful_resets].mean().item()
+            env.extras["episode"]["Metric/Time_to_Success_Seconds"] = avg_time_steps * env.step_dt
+            
+        # Reset internal buffers for the next episode
+        env._success_step_buf[reset_ids] = 0.0
+        env._already_succeeded_buf[reset_ids] = False
+
+    return torch.zeros(env.num_envs, device=env.device)

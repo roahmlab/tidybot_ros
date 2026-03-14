@@ -21,6 +21,8 @@ from isaaclab.utils.noise import GaussianNoiseCfg
 
 # Standard IsaacLab MDP imports for joint/action observation terms
 import isaaclab.envs.mdp as standard_mdp
+from isaaclab.envs.mdp.actions.binary_joint_actions import BinaryJointPositionAction
+from isaaclab.envs.mdp.actions.actions_cfg import BinaryJointPositionActionCfg
 # Custom MDP functions
 from . import mdp as custom_mdp
 from tidybot_isaac import assets
@@ -84,6 +86,17 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
             ),
         ],
     )
+    hinge_frame = FrameTransformerCfg(
+        prim_path="{ENV_REGEX_NS}/Door/Base",
+        visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/HingeFrameTransformer"),
+        debug_vis=True,
+        target_frames=[
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Door/HingeOrigin", # The specific frame to track
+                name="hinge_origin"
+            ),
+        ],
+    )
 
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -95,6 +108,56 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
 # MDP settings
 ##
 
+class CooldownBinaryAction(BinaryJointPositionAction):
+    def __init__(self, cfg: "CooldownBinaryActionCfg", env):
+        super().__init__(cfg, env)
+        self.cooldown_steps = int(cfg.cooldown_time / env.step_dt)
+        self.cooldown_timers = torch.zeros(env.num_envs, dtype=torch.long, device=env.device)
+        self.committed_actions = torch.ones((env.num_envs, self.action_dim), dtype=torch.float, device=env.device)
+
+    def process_actions(self, actions: torch.Tensor):
+        desired_actions = torch.sign(actions)
+        
+        # Determine who is allowed to change their gripper state
+        can_change = self.cooldown_timers <= 0
+        wants_to_change = (desired_actions != self.committed_actions).any(dim=-1)
+        
+        # Envs that are legally flipping state this step
+        flipping_envs = can_change & wants_to_change
+        
+        # Update committed actions for those allowed to change
+        self.committed_actions = torch.where(
+            flipping_envs.unsqueeze(1), 
+            desired_actions, 
+            self.committed_actions
+        )
+        
+        # Update timers (Reset to max if flipping, otherwise subtract 1)
+        self.cooldown_timers = torch.where(
+            flipping_envs,
+            torch.tensor(self.cooldown_steps, device=self.device),
+            torch.clamp(self.cooldown_timers - 1, min=0)
+        )
+
+        # Pass the filtered actions to the original Isaac Lab handler
+        super().process_actions(self.committed_actions)
+
+    def reset(self, env_ids: torch.Tensor | None = None) -> None:
+        super().reset(env_ids)
+        if env_ids is None:
+            self.cooldown_timers.fill_(0)
+            self.committed_actions.fill_(1.0) # Assume Open
+        else:
+            self.cooldown_timers[env_ids] = 0
+            self.committed_actions[env_ids] = 1.0
+            
+@configclass
+class CooldownBinaryActionCfg(BinaryJointPositionActionCfg):
+    """Configuration for a binary action with a hardware lockout timer."""
+    class_type: type = CooldownBinaryAction
+    cooldown_time: float = 0.8  # Lockout time in seconds
+    
+            
 @configclass
 class ActionsCfg:
     """Action specifications for the MDP."""
@@ -102,12 +165,13 @@ class ActionsCfg:
     arm_pos = standard_mdp.RelativeJointPositionActionCfg(
         asset_name="robot",
         joint_names=["joint_[1-7]"],
-        scale=0.01, 
+        scale=0.005, 
     )
 
-    gripper = standard_mdp.BinaryJointPositionActionCfg(
+    gripper = CooldownBinaryActionCfg(
         asset_name="robot",
         joint_names=["hande_left_finger_joint", "hande_right_finger_joint"],
+        cooldown_time=0.8,
         open_command_expr={
             "hande_left_finger_joint": 0.025,
             "hande_right_finger_joint": 0.025,
@@ -117,18 +181,6 @@ class ActionsCfg:
             "hande_right_finger_joint": 0.0,
         },
     )
-
-def frame_transformer_pose_w(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """The pose (position and orientation) of a frame transformer's target in world frame."""
-    source_entity = env.scene[asset_cfg.name]
-    if asset_cfg.body_ids is None:
-        raise ValueError(f"Could not resolve body_ids for '{asset_cfg.name}'. Check that 'ee_tcp' exists in your SceneCfg!")
-        
-    target_idx = asset_cfg.body_ids[0]
-    pos = source_entity.data.target_pos_w[:, target_idx]
-    quat = source_entity.data.target_quat_w[:, target_idx]
-    
-    return torch.cat([pos, quat], dim=-1)
 
 @configclass
 class ObservationsCfg:
@@ -145,7 +197,6 @@ class ObservationsCfg:
             func=standard_mdp.joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=["joint_[1-7]"])}
         )
-        
         joint_vel = ObsTerm(
             func=standard_mdp.joint_vel_rel,
             noise=GaussianNoiseCfg(mean=0.0, std=0.015), 
@@ -160,17 +211,11 @@ class ObservationsCfg:
                 "close_pos": 0.0,  
             },
         )
-        
-        # Explicit End-Effector Pose
-        ee_position = ObsTerm(
-            func=frame_transformer_pose_w,
-            params={"asset_cfg": SceneEntityCfg("ee_frame", body_names="ee_tcp")}
-        )
 
         # Geometric Task State
         rel_ee_handle_transform = ObsTerm(
             func=custom_mdp.rel_ee_handle_transform,
-            noise=GaussianNoiseCfg(mean=0.0, std=0.01), # 1cm of vision noise
+            noise=GaussianNoiseCfg(mean=0.0, std=0.0025),
         )
         handle_initial_pos = ObsTerm(
             func=custom_mdp.handle_initial_position,
@@ -180,7 +225,7 @@ class ObservationsCfg:
         hinge_origin = ObsTerm(
             func=custom_mdp.hinge_origin_position,
             noise=GaussianNoiseCfg(mean=0.0, std=0.01),
-            params={"door_cfg": SceneEntityCfg("door", body_names="Base")}
+            params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
         actions = ObsTerm(func=standard_mdp.last_action)
 
@@ -213,11 +258,6 @@ class ObservationsCfg:
                 "close_pos": 0.0,  
             },
         )
-        
-        ee_position = ObsTerm(
-            func=frame_transformer_pose_w,
-            params={"asset_cfg": SceneEntityCfg("ee_frame", body_names="ee_tcp")}
-        )
 
         # Clean Geometric Task State
         rel_ee_handle_transform_clean = ObsTerm(
@@ -229,7 +269,7 @@ class ObservationsCfg:
         )
         hinge_origin_clean = ObsTerm(
             func=custom_mdp.hinge_origin_position,
-            params={"door_cfg": SceneEntityCfg("door", body_names="Base")}
+            params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
 
         # Privileged Data: Exact door state
@@ -348,6 +388,19 @@ class EventCfg:
         },
     )
     
+    reset_gripper = EventTerm(
+        func=standard_mdp.reset_joints_by_offset,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot", 
+                joint_names=["hande_left_finger_joint", "hande_right_finger_joint"]
+            ),
+            "position_range": (0.025, 0.025), 
+            "velocity_range": (0.0, 0.0),
+        },
+    )
+
     reset_door = EventTerm(
         func=reset_door_state,
         mode="reset",
@@ -355,7 +408,7 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg("door"), 
             "x_range": (-0.1, 0.0),
             "y_range": (-0.1, 0.1), 
-            "z_range": (-0.15, 0.10),
+            "z_range": (-0.25, 0.10),
             "yaw_range": (-0.085, 0.085),
         },
     )
@@ -384,41 +437,44 @@ class EventCfg:
         },
     )
 
+    randomize_door_stiffness = EventTerm(
+        func=standard_mdp.randomize_actuator_gains,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"]),
+            "stiffness_distribution_params": (0.0, 10.0),
+            "operation": "add", 
+            "distribution": "uniform",
+        },
+    )
+
 @configclass
 class RewardsCfg:
-    """Reward terms mathematically balanced for standard RL paradigms."""
+    """Reward terms scaled down to stabilize the PPO Value Network."""
     
     approach = RewTerm(
         func=custom_mdp.approach_ee_handle,
-        weight=2.0, 
+        weight=0.2,   # Was 2.0
     )
+    approach.log = True
 
     alignment = RewTerm(
         func=custom_mdp.align_ee_handle,
-        weight=5.0,
+        weight=0.5,   # Was 5.0
     )
 
     grasp = RewTerm(
         func=custom_mdp.grasp_handle,
-        weight=3.0,
+        weight=0.3,   # Was 3.0
         params={
             "robot_cfg": SceneEntityCfg("robot"),
-            "gripper_joint_name": "hande_left_finger_joint", # Explicitly reference the Hand-E joint
-        },
-    )
-    
-    door_progress_ungated = RewTerm(
-        func=custom_mdp.ungated_open_door,
-        weight=0.03,
-        params={
-            "threshold": 1.25,
-            "door_cfg": SceneEntityCfg("door"),
+            "gripper_joint_name": "hande_left_finger_joint", 
         },
     )
 
     door_progress_gated = RewTerm(
         func=custom_mdp.gated_open_door,
-        weight=20.0,
+        weight=2.0,   # Was 20.0
         params={
             "threshold": 1.25,
             "door_cfg": SceneEntityCfg("door"),
@@ -429,7 +485,7 @@ class RewardsCfg:
 
     hold_open = RewTerm(
         func=custom_mdp.hold_open_bonus,
-        weight=10.0, 
+        weight=1.0,   # Was 10.0
         params={
             "threshold": 1.25, 
             "door_cfg": SceneEntityCfg("door"),
@@ -440,12 +496,18 @@ class RewardsCfg:
 
     action_rate = RewTerm(
         func=custom_mdp.action_rate_penalty,
-        weight=0.005, 
+        weight=0.0005, # Was 0.005
     )
     
     gripper_chatter = RewTerm(
         func=custom_mdp.gripper_chatter_penalty,
-        weight=0.01
+        weight=0.005  # Was 0.05
+    )
+
+    illegal_gripper_flip = RewTerm(
+        func=custom_mdp.illegal_gripper_command_penalty,
+        weight=0.0025, 
+        params={"action_term_name": "gripper"},
     )
 
     smooth_pull = RewTerm(
@@ -453,17 +515,17 @@ class RewardsCfg:
         params={
             "robot_cfg": SceneEntityCfg("robot"),
         },
-        weight=0.5, 
+        weight=0.2,  # Was 0.5
     )
 
     unaligned_approach = RewTerm(
         func=custom_mdp.unaligned_approach_penalty,
-        weight=0.01, 
+        weight=0.001, # Was 0.01
     )
 
     rest_at_goal = RewTerm(
         func=custom_mdp.rest_at_goal_penalty,
-        weight=0.001, 
+        weight=0.0005, # Was 0.005
         params={
             "threshold": 1.25, 
             "door_cfg": SceneEntityCfg("door"),
@@ -471,10 +533,37 @@ class RewardsCfg:
         },
     )
 
+    track_energy_used = RewTerm(
+        func=custom_mdp.log_cumulative_mechanical_work,
+        weight=1e-10, # Keeps it purely diagnostic
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    track_success_time = RewTerm(
+        func=custom_mdp.track_and_log_time_to_success,
+        weight=1e-10,
+        params={
+            "threshold": 1.25, 
+            "door_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"]),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint",
+        }
+    )
+    
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
     time_out = DoneTerm(func=standard_mdp.time_out, time_out=True)
+    success = DoneTerm(
+        func=custom_mdp.success_at_timeout,
+        time_out=False,
+        params={
+            "threshold": 1.25, 
+            "door_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"]),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint",
+        }
+    )
 
 ##
 # Environment configuration
@@ -491,7 +580,7 @@ class TidybotHandeIsaacEnvCfg(ManagerBasedRLEnvCfg):
 
     def __post_init__(self) -> None:
         self.decimation = 2
-        self.episode_length_s = 8
+        self.episode_length_s = 10
         self.viewer.eye = (3.0, 6.0, 3.5)
         self.viewer.lookat = (-100.0, -200.0, -125.0)
         self.sim.dt = 1 / 120

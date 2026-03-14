@@ -80,9 +80,9 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
-            effort_limit=12000.0,  # Simulates mechanical gear lock and prevents backdrive.
-            stiffness=10000.0,
-            damping=1000.0,        # High damping to absorb the pulling shocks.
+            effort_limit=12000.0,   
+            stiffness=10000.0,      # Kept high for a strong, locked grip
+            damping=2500.0,         # Increased 2.5x to stretch the close time to ~0.8s
             armature=0.1,
         ),
     },

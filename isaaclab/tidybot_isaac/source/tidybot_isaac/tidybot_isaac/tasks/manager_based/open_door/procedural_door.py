@@ -102,6 +102,29 @@ def generate_procedural_doors(output_dir, num_doors=20):
         hinge.CreateUpperLimitAttr(upper_limit)
 
         # ==========================================
+        # 3.5 Hinge Tracking Site (Invisible Frame)
+        # ==========================================
+        site_path = f"{prim_path}/HingeOrigin"
+        site_geom = UsdGeom.Sphere.Define(stage, site_path)
+        site_geom.CreateRadiusAttr(0.001) # 1mm sphere
+        site_geom.GetPrim().GetAttribute("visibility").Set("invisible") # Hide it
+        
+        # Position it exactly at the dynamically calculated hinge offset
+        site_geom.AddTranslateOp().Set(Gf.Vec3d(hinge_local_x_base, hinge_local_y, 0.0))
+        site_geom.AddOrientOp().Set(Gf.Quatf(1.0))
+        
+        # Apply physics APIs so Isaac Lab parses it as a valid tracked body
+        UsdPhysics.RigidBodyAPI.Apply(site_geom.GetPrim())
+        UsdPhysics.MassAPI.Apply(site_geom.GetPrim()).CreateMassAttr(1e-5) # Negligible mass
+        
+        # Weld it rigidly to the Base
+        site_weld = UsdPhysics.FixedJoint.Define(stage, f"{prim_path}/HingeOriginWeld")
+        site_weld.CreateBody0Rel().SetTargets([base_path])
+        site_weld.CreateBody1Rel().SetTargets([site_path])
+        site_weld.CreateLocalPos0Attr(Gf.Vec3f(hinge_local_x_base, hinge_local_y, 0.0))
+        site_weld.CreateLocalPos1Attr(Gf.Vec3f(0.0, 0.0, 0.0))
+
+        # ==========================================
         # 4. Handle Link (Xform) + Geometry Child
         # ==========================================
         handle_x = - (thickness/2) - handle_gap - handle_radius

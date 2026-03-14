@@ -23,7 +23,7 @@ class TidybotPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         clip_param=0.2,
         entropy_coef=0.010, # LOWERED FROM 0.02
         num_learning_epochs=5,
-        num_mini_batches=16,
+        num_mini_batches=32,
         learning_rate=4.0e-4,
         schedule="adaptive",
         gamma=0.99,

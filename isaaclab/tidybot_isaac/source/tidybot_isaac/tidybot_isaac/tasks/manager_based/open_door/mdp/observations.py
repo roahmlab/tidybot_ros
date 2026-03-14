@@ -62,26 +62,25 @@ def gripper_open_amount(
     
     return torch.clamp(normalized_pos, min=0.0, max=1.0)
 
-def hinge_origin_position(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) -> torch.Tensor:
+def hinge_origin_position(env, door_cfg) -> torch.Tensor:
     """
-    Returns the hinge origin and the opening axis in the world frame.
+    Returns the exact hinge origin and opening axis in the world frame.
     Outputs a 6D tensor: [origin_x, origin_y, origin_z, axis_x, axis_y, axis_z]
     """
     door = env.scene[door_cfg.name]
     
-    # Hinge Origin (Anchor)
-    root_pos_w = door.data.root_pos_w  # Shape: (num_envs, 3)
-    root_quat_w = door.data.root_quat_w  # Shape: (num_envs, 4)
+    # 1. Get the world position/orientation of the tracked HingeSite body
+    hinge_pos_w = door.data.body_pos_w[:, door_cfg.body_ids[0]]
+    hinge_quat_w = door.data.body_quat_w[:, door_cfg.body_ids[0]]
     
-    # Opening Axis
-    # The canonical door hinge rotates on the local Z-axis [0, 0, 1].
-    # We rotate this local Z-axis by the root's quaternion to get the world-frame axis.
+    # 2. Opening Axis
     local_z_axis = torch.zeros((env.num_envs, 3), device=env.device)
     local_z_axis[:, 2] = 1.0
-    hinge_axis_w = math_utils.quat_apply(root_quat_w, local_z_axis)
     
-    # Concatenate origin and axis into a 6D observation
-    return torch.cat([root_pos_w, hinge_axis_w], dim=-1)
+    # Rotate the local Z axis into the world frame based on the hinge site's orientation
+    hinge_axis_w = math_utils.quat_apply(hinge_quat_w, local_z_axis)
+    
+    return torch.cat([hinge_pos_w, hinge_axis_w], dim=-1)
 
 
 def handle_initial_position(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) -> torch.Tensor:
@@ -120,3 +119,30 @@ def handle_initial_position(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) ->
     handle_initial_pos_w = root_pos_w + v_initial
     
     return handle_initial_pos_w
+
+def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Tracks total mechanical work per episode and logs it to TensorBoard."""
+    if not hasattr(env, "_episode_energy_buf"):
+        env._episode_energy_buf = torch.zeros(env.num_envs, device=env.device)
+
+    robot = env.scene[asset_cfg.name]
+    
+    # torques * velocities = Power
+    power = torch.sum(torch.abs(robot.data.applied_torque * robot.data.joint_vel), dim=-1)
+    env._episode_energy_buf += power * env.step_dt
+
+    # When environments reset, calculate the mean and ship to extras
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # Log the average energy of all resetting environments
+        env.extras["log"]["Metric/Total_Energy"] = torch.mean(env._episode_energy_buf[reset_ids]).item()
+
+        # Wipe the buffer for the new episode
+        env._episode_energy_buf[reset_ids] = 0.0
+
+    # Weight of 1e-8 ensures this runs every step
+    return torch.zeros(env.num_envs, device=env.device)
