@@ -73,63 +73,74 @@ def gripper_cooldown_state(env: ManagerBasedRLEnv, action_term_name: str = "grip
     # Add a dimension so it concatenates properly in the observation vector
     return (current_timers / max_steps).unsqueeze(-1)
 
-def hinge_origin_position(env, door_cfg) -> torch.Tensor:
+def hinge_origin(env, door_cfg) -> torch.Tensor:
     """
-    Returns the exact hinge origin and opening axis in the world frame.
+    Returns the exact hinge origin and opening axis in the environment-local frame.
     Outputs a 6D tensor: [origin_x, origin_y, origin_z, axis_x, axis_y, axis_z]
     """
     door = env.scene[door_cfg.name]
     
-    # 1. Get the world position/orientation of the tracked HingeSite body
+    # Get the world position/orientation of the tracked HingeSite body
     hinge_pos_w = door.data.body_pos_w[:, door_cfg.body_ids[0]]
     hinge_quat_w = door.data.body_quat_w[:, door_cfg.body_ids[0]]
     
-    # 2. Opening Axis
+    # Convert the position to the Environment-Local frame
+    hinge_pos_env = hinge_pos_w - env.scene.env_origins
+    
+    # Opening Axis
     local_z_axis = torch.zeros((env.num_envs, 3), device=env.device)
     local_z_axis[:, 2] = 1.0
     
     # Rotate the local Z axis into the world frame based on the hinge site's orientation
-    hinge_axis_w = math_utils.quat_apply(hinge_quat_w, local_z_axis)
+    hinge_axis = math_utils.quat_apply(hinge_quat_w, local_z_axis)
     
-    return torch.cat([hinge_pos_w, hinge_axis_w], dim=-1)
+    return torch.cat([hinge_pos_env, hinge_axis], dim=-1)
 
-
-def handle_initial_position(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) -> torch.Tensor:
+def handle_initial_position(
+    env: ManagerBasedRLEnv, 
+    handle_cfg: SceneEntityCfg,
+    hinge_cfg: SceneEntityCfg
+) -> torch.Tensor:
     """
-    Calculates the 'closed' position of the handle dynamically by rotating 
-    the current handle position backwards around the hinge axis by -theta.
+    Calculates the exact 'closed' position of the handle by pivoting the current 
+    handle position backwards around the true hinge origin by the joint angle (-theta).
+    Returns the coordinates in the environment-local frame.
     """
-    door = env.scene[door_cfg.name]
+    door = env.scene[handle_cfg.name]
     
-    # Get current Handle position using the body_ids resolved by SceneEntityCfg
-    handle_idx = door_cfg.body_ids[0]
-    handle_pos_w = door.data.body_pos_w[:, handle_idx, :]  # Shape: (num_envs, 3)
+    # Get exact World Positions for Handle and HingeOrigin
+    handle_idx = handle_cfg.body_ids[0]
+    hinge_idx = hinge_cfg.body_ids[0]
+    
+    handle_pos_w = door.data.body_pos_w[:, handle_idx, :]   # Shape: (num_envs, 3)
+    hinge_pos_w = door.data.body_pos_w[:, hinge_idx, :]     # Shape: (num_envs, 3)
     
     # Get current Joint angle (theta)
     theta = door.data.joint_pos[:, 0]  # Shape: (num_envs,)
     
-    # Get Origin and Axis
-    root_pos_w = door.data.root_pos_w
-    root_quat_w = door.data.root_quat_w
-    
+    # Determine the Hinge Axis in the World Frame
+    # The hinge rotates around the Z-axis.
+    # We rotate the local Z-axis [0, 0, 1] by the door's root quaternion 
+    # in case the door itself is rotated (e.g., yaw randomization).
     local_z_axis = torch.zeros((env.num_envs, 3), device=env.device)
     local_z_axis[:, 2] = 1.0
-    axis_w = math_utils.quat_apply(root_quat_w, local_z_axis)
+    axis_w = math_utils.quat_apply(door.data.root_quat_w, local_z_axis)
     
-    # Perform the reverse rotation
-    # Vector from hinge origin to current handle
-    v_current = handle_pos_w - root_pos_w
+    # Perform the geometrically perfect reverse rotation
+    # Vector from the actual hinge pin to the current handle
+    v_current = handle_pos_w - hinge_pos_w
     
-    # Create a quaternion representing the reverse rotation (-theta) around the axis
+    # Create reverse rotation (-theta) around the derived Z-axis
     q_rot_reverse = math_utils.quat_from_angle_axis(-theta, axis_w)
-    
-    # Apply the rotation to the vector
     v_initial = math_utils.quat_apply(q_rot_reverse, v_current)
     
-    # Translate the rotated vector back to the world frame origin
-    handle_initial_pos_w = root_pos_w + v_initial
+    # Translate back to world frame using the HINGE as the origin point
+    handle_initial_pos_w = hinge_pos_w + v_initial
     
-    return handle_initial_pos_w
+    # Convert to Environment-Local Frame
+    handle_initial_pos_env = handle_initial_pos_w - env.scene.env_origins
+    
+    return handle_initial_pos_env
 
 def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Tracks total mechanical work per episode and logs it to TensorBoard."""
@@ -156,4 +167,27 @@ def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntit
         env._episode_energy_buf[reset_ids] = 0.0
 
     # Weight of 1e-8 ensures this runs every step
+    return torch.zeros(env.num_envs, device=env.device)
+
+def log_squared_torque_effort(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Tracks squared joint torque to expose wasted isometric pulling effort."""
+    if not hasattr(env, "_episode_effort_buf"):
+        env._episode_effort_buf = torch.zeros(env.num_envs, device=env.device)
+
+    robot = env.scene[asset_cfg.name]
+    
+    # Torque squared represents electrical heat loss / wasted isometric strain
+    effort = torch.sum(torch.square(robot.data.applied_torque), dim=-1)
+    env._episode_effort_buf += effort * env.step_dt
+
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # Log the average wasted effort of all resetting environments
+        env.extras["log"]["Metric/Wasted_Motor_Effort"] = torch.mean(env._episode_effort_buf[reset_ids]).item()
+        env._episode_effort_buf[reset_ids] = 0.0
+
     return torch.zeros(env.num_envs, device=env.device)

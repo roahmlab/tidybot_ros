@@ -33,8 +33,8 @@ from tidybot_isaac import assets
 
 FRAME_MARKER_SMALL_CFG = FRAME_MARKER_CFG.copy()
 FRAME_MARKER_SMALL_CFG.markers["frame"].scale = (0.10, 0.10, 0.10)
-
 FORCE_MARKER_CFG = VisualizationMarkersCfg(
+    prim_path="/Visuals/RadialForceArrow",
     markers={
         "arrow": sim_utils.UsdFileCfg(
             usd_path=f"{ISAAC_NUCLEUS_DIR}/Props/UIElements/arrow_x.usd",
@@ -43,6 +43,8 @@ FORCE_MARKER_CFG = VisualizationMarkersCfg(
         )
     }
 )
+DOOR_WITH_SENSORS_CFG = assets.DOOR_CFG.copy()
+DOOR_WITH_SENSORS_CFG.spawn.activate_contact_sensors = True
 
 @configclass
 class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
@@ -73,8 +75,8 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     replicate_physics: bool = False # Allows randomly selected door assets
-    door: ArticulationCfg = assets.DOOR_CFG.replace(prim_path="{ENV_REGEX_NS}/Door")
-    
+    door: ArticulationCfg = DOOR_WITH_SENSORS_CFG.replace(prim_path="{ENV_REGEX_NS}/Door")
+
     handle_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Door/Base", 
         visualizer_cfg=FRAME_MARKER_SMALL_CFG.replace(prim_path="/Visuals/HandleFrameTransformer"),
@@ -97,7 +99,13 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
             ),
         ],
     )
-
+    handle_contact = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Door/Handle", 
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"], 
+        update_period=0.0,
+        history_length=6,
+        track_air_time=False,
+    )
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
@@ -219,16 +227,19 @@ class ObservationsCfg:
         # Geometric Task State
         rel_ee_handle_transform = ObsTerm(
             func=custom_mdp.rel_ee_handle_transform,
-            noise=GaussianNoiseCfg(mean=0.0, std=0.0025),
+            noise=GaussianNoiseCfg(mean=0.0, std=0.005),
         )
         handle_initial_pos = ObsTerm(
             func=custom_mdp.handle_initial_position,
-            noise=GaussianNoiseCfg(mean=0.0, std=0.01),
-            params={"door_cfg": SceneEntityCfg("door", body_names="Handle")}
+            noise=GaussianNoiseCfg(mean=0.0, std=0.002),
+            params={
+                "handle_cfg": SceneEntityCfg("door", body_names="Handle"),
+                "hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")
+            }
         )
         hinge_origin = ObsTerm(
-            func=custom_mdp.hinge_origin_position,
-            noise=GaussianNoiseCfg(mean=0.0, std=0.01),
+            func=custom_mdp.hinge_origin,
+            noise=GaussianNoiseCfg(mean=0.0, std=0.002),
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
         actions = ObsTerm(func=standard_mdp.last_action)
@@ -274,10 +285,13 @@ class ObservationsCfg:
         )
         handle_initial_pos_clean = ObsTerm(
             func=custom_mdp.handle_initial_position,
-            params={"door_cfg": SceneEntityCfg("door", body_names="Handle")}
+            params={
+                "handle_cfg": SceneEntityCfg("door", body_names="Handle"),
+                "hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")
+            }
         )
         hinge_origin_clean = ObsTerm(
-            func=custom_mdp.hinge_origin_position,
+            func=custom_mdp.hinge_origin,
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
 
@@ -516,12 +530,12 @@ class RewardsCfg:
 
     action_rate = RewTerm(
         func=custom_mdp.action_rate_penalty,
-        weight=0.01, # Was 0.005
+        weight=0.001, # Was 0.005
     )
 
     action_l2 = RewTerm(
         func=custom_mdp.action_l2_penalty,
-        weight=0.01,
+        weight=0.001,
     )
 
     gripper_chatter = RewTerm(
@@ -561,6 +575,12 @@ class RewardsCfg:
     track_energy_used = RewTerm(
         func=custom_mdp.log_cumulative_mechanical_work,
         weight=1e-10, # Keeps it purely diagnostic
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    track_squared_torque_effort = RewTerm(
+        func=custom_mdp.log_squared_torque_effort,
+        weight=1e-10,
         params={"asset_cfg": SceneEntityCfg("robot")},
     )
 
