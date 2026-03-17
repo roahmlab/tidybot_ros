@@ -20,14 +20,14 @@ The TidyBot Isaac Lab extension enables training RL policies for a mobile manipu
 From the main `tidybot_platform` directory:
 
 ```bash
-# Start container and run random agent
-./docker/isaac-lab/run.sh restart python.sh scripts/random_agent.py --task Isaac-TidyBot-Drawer-v0 --num_envs 1
+# Start container and run random agent (Hand-E)
+./docker/isaac-lab/run.sh restart python.sh scripts/random_agent.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 1
 
-# Run training with RSL-RL
-./docker/isaac-lab/run.sh python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-Drawer-v0 --num_envs 4096
+# Run training with RSL-RL (Hand-E)
+./docker/isaac-lab/run.sh python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 4096
 
 # Run training with headless mode
-./docker/isaac-lab/run.sh python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-Drawer-v0 --num_envs 4096 --headless
+./docker/isaac-lab/run.sh python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 4096 --headless
 ```
 
 ---
@@ -51,7 +51,8 @@ tidybot_isaac/
 │       ├── assets.py                 # Robot and object asset configurations
 │       └── tasks/manager_based/
 │           └── tidybot_isaac/
-│               ├── tidybot_isaac_env_cfg.py  # Environment configuration
+│               ├── tidybot_hande_isaac_env_cfg.py  # Hand-E environment config
+│               ├── tidybot_2f_85_env_cfg.py        # 2F-85 environment config
 │               └── mdp/
 │                   ├── actions.py    # Custom action terms (MimicGripperAction)
 │                   ├── rewards.py    # Custom reward functions
@@ -67,7 +68,7 @@ tidybot_isaac/
 Runs the environment with random actions. Useful for testing environment setup and gripper behavior.
 
 ```bash
-python.sh scripts/random_agent.py --task Isaac-TidyBot-Drawer-v0 --num_envs 1
+python.sh scripts/random_agent.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 1
 ```
 
 **Key Features:**
@@ -78,7 +79,7 @@ python.sh scripts/random_agent.py --task Isaac-TidyBot-Drawer-v0 --num_envs 1
 Runs the environment with zero actions. Useful for observing initial state and physics behavior.
 
 ```bash
-python.sh scripts/zero_agent.py --task Isaac-TidyBot-Drawer-v0 --num_envs 1
+python.sh scripts/zero_agent.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 1
 ```
 
 ### `list_envs.py`
@@ -92,7 +93,7 @@ python.sh scripts/list_envs.py
 Train RL policies using RSL-RL library.
 
 ```bash
-python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-Drawer-v0 --num_envs 4096 --headless
+python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 4096 --headless
 ```
 
 ---
@@ -101,31 +102,41 @@ python.sh scripts/rsl_rl/train.py --task Isaac-TidyBot-Drawer-v0 --num_envs 4096
 
 ### `isaac_lab_sim.py`
 
-This script runs the Isaac Lab simulation and bridges it with the TidyBot ROS2 stack. It allows deployment of high-level policies (e.g., `drawer_policy`) while publishing camera feeds and collecting sensor data.
+This script runs the Isaac Lab simulation and bridges it with the TidyBot ROS2 stack. It allows deployment of high-level policies (e.g., `drawer_policy`) while publishing camera feeds and collecting sensor data. **The script automatically detects the gripper type from the task name.**
 
-**Usage**:
+**Usage (Hand-E):**
 ```bash
 # Terminal 1: Isaac Lab Simulation
 cd isaaclab && ./isaaclab.sh -p tidybot_isaac/scripts/isaac_lab_sim.py \
-    --task Isaac-TidyBot-Drawer-v0 --num_envs 1 --real-time
+    --task Isaac-TidyBot-HandE-Drawer-v0 --num_envs 1 --real-time
 
 # Terminal 2: ROS2 Bridge + RViz
-ros2 launch tidybot_description launch_isaac_lab.launch.py
+ros2 launch tidybot_description launch_isaac_lab.launch.py gripper_type:=hande
 
 # Terminal 3: Drawer Policy
-ros2 launch tidybot_policy launch_drawer_policy.launch.py use_sim_time:=true
+ros2 launch tidybot_policy launch_drawer_policy.launch.py use_sim_time:=true gripper_type:=hande
+```
 
-# Terminal 4: Send Drawer Command
-ros2 service call /open_drawer_task tidybot_utils/srv/OpenDrawerTask "{...}"
+**Usage (2F-85):**
+```bash
+# Terminal 1: Isaac Lab Simulation
+cd isaaclab && ./isaaclab.sh -p tidybot_isaac/scripts/isaac_lab_sim.py \
+    --task Isaac-TidyBot-2F85-Drawer-v0 --num_envs 1 --real-time
+
+# Terminal 2: ROS2 Bridge + RViz
+ros2 launch tidybot_description launch_isaac_lab.launch.py gripper_type:=2f85
+
+# Terminal 3: Drawer Policy
+ros2 launch tidybot_policy launch_drawer_policy.launch.py use_sim_time:=true gripper_type:=2f85
 ```
 
 **Features**:
 | Feature | Description |
 |---------|-------------|
-| **ROS2 Subscribers** | `/gen3_7dof_controller/joint_trajectory`, `/robotiq_2f_85_controller/commands` |
-| **ROS2 Publishers** | `/joint_states`, `/clock`, `/wrist_camera/rgb`, `/base_camera/rgb` |
-| **Sensor Logging** | Contact forces, drawer velocity → CSV |
-| **Camera Publishing** | Wrist and base cameras via Replicator writers (640x480 @ 10Hz) |
+| **ROS2 Subscribers** | `/gen3_7dof_controller/joint_trajectory`, gripper topic (auto-detected) |
+| **ROS2 Publishers** | `/joint_states`, `/clock`, `/tidybot/contact/{left,right}_finger`, `/tidybot/drawer/state` |
+| **Gripper Detection** | Automatically selects gripper config from task name (`HandE` or `2F85`) |
+| **Camera Publishing** | Wrist and base cameras via Isaac Lab sensors (640x480 @ ~24Hz) |
 
 **Architecture**:
 ```
@@ -149,11 +160,9 @@ ros2 service call /open_drawer_task tidybot_utils/srv/OpenDrawerTask "{...}"
 **Command-line Options**:
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--task` | `Isaac-TidyBot-Drawer-v0` | Environment name |
+| `--task` | `Isaac-TidyBot-HandE-Drawer-v0` | Environment name (determines gripper type) |
 | `--num_envs` | `1` | Number of parallel environments |
 | `--real-time` | `false` | Run at real-time speed |
-| `--no-cameras` | `false` | Disable camera publishing |
-| `--save_path` | `logs/ros2_bridge/sensor_data_<timestamp>.csv` | Sensor log path |
 
 ---
 
@@ -168,14 +177,13 @@ Defines the TidyBot robot and cabinet assets with:
 | `TIDYBOT_CFG` | TidyBot mobile manipulator configuration |
 | `CABINET_CFG` | Sektion cabinet with drawer for manipulation task |
 
-**TidyBot Actuator Groups:**
+**TidyBot Actuator Groups (varies by gripper):**
 
-| Group | Joints | Stiffness | Damping | Description |
-|-------|--------|-----------|---------|-------------|
-| `base` | `joint_x`, `joint_y`, `joint_th` | 1e7 | 1e4 | Mobile base (prismatic x/y, revolute yaw) |
-| `arm` | `joint_[1-7]` | 1e7 | 1e4 | 7-DOF Kinova arm |
-| `gripper` | `finger_joint`, `right_outer_knuckle_joint` | 1e5 | 1.0 | Active gripper drivers (Hybrid Control) |
-| `gripper_passive` | `*_inner_finger_joint`, `*_inner_finger_knuckle_joint` | 0.0 | 0.0 | Passive compliant linkages |
+| Group | Joints (Hand-E) | Joints (2F-85) | Stiffness | Damping | Description |
+|-------|-----------------|----------------|-----------|---------|-------------|
+| `base` | `joint_x`, `joint_y`, `joint_th` | same | 1e7 | 1e4 | Mobile base |
+| `arm` | `joint_[1-7]` | same | 1e7 | 1e4 | 7-DOF Kinova arm |
+| `gripper` | `hande_left_finger_joint`, `hande_right_finger_joint` | `finger_joint`, `right_outer_knuckle_joint` | 1e5 | 1.0 | Active gripper drivers |
 
 ### `tidybot_isaac_env_cfg.py` - Environment Configuration
 
@@ -218,9 +226,10 @@ This implements **Hybrid Passive Control** where:
 
 ## Registered Environments
 
-| Task Name | Description |
-|-----------|-------------|
-| `Isaac-TidyBot-Drawer-v0` | Drawer opening task with TidyBot |
+| Task Name | Gripper | Description |
+|-----------|---------|-------------|
+| `Isaac-TidyBot-HandE-Drawer-v0` | Hand-E | Drawer opening task with Robotiq Hand-E gripper |
+| `Isaac-TidyBot-2F85-Drawer-v0` | 2F-85 | Drawer opening task with Robotiq 2F-85 gripper |
 
 ---
 
@@ -230,7 +239,7 @@ This implements **Hybrid Passive Control** where:
 
 ```bash
 ./docker/isaac-lab/run.sh restart python.sh scripts/rsl_rl/train.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 4096
 ```
 
@@ -239,13 +248,13 @@ This implements **Hybrid Passive Control** where:
 ```bash
 # Use the ssh mode for headless training
 ./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/train.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 4096 \
     --headless
 
 # Select specific GPU (if multiple GPUs available)
 CUDA_VISIBLE_DEVICES=1 ./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/train.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 4096 \
     --headless
 ```
@@ -273,7 +282,7 @@ Checkpoints are saved to `logs/rsl_rl/tidybot_drawer/<timestamp>/`:
 
 ```bash
 ./docker/isaac-lab/run.sh restart python.sh scripts/rsl_rl/play.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 1 \
     --checkpoint logs/rsl_rl/tidybot_drawer/<timestamp>/model_400.pt
 ```
@@ -285,7 +294,7 @@ Use `docker exec` to run play script without stopping training:
 ```bash
 # In a new terminal
 docker exec -it isaac-lab-tidybot python.sh scripts/rsl_rl/play.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 1 \
     --checkpoint /workspace/tidybot_isaac/logs/rsl_rl/tidybot_drawer/<timestamp>/model_400.pt
 ```
@@ -294,7 +303,7 @@ docker exec -it isaac-lab-tidybot python.sh scripts/rsl_rl/play.py \
 
 ```bash
 CUDA_VISIBLE_DEVICES=0 ./docker/isaac-lab/run.sh ssh python.sh scripts/rsl_rl/play.py \
-    --task Isaac-TidyBot-Drawer-v0 \
+    --task Isaac-TidyBot-HandE-Drawer-v0 \
     --num_envs 1 \
     --headless \
     --video \
@@ -347,7 +356,7 @@ This warning is expected when using Hybrid Passive Control. The passive gripper 
 ```bash
 # Force remove and restart container
 docker rm -f isaac-lab-tidybot
-./docker/isaac-lab/run.sh restart python.sh scripts/random_agent.py --task Isaac-TidyBot-Drawer-v0
+./docker/isaac-lab/run.sh restart python.sh scripts/random_agent.py --task Isaac-TidyBot-HandE-Drawer-v0
 ```
 
 ### USD File Not Found (Server)

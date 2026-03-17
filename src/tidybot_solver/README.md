@@ -54,6 +54,17 @@ ros2 run tidybot_solver multi_stage_planner
 |-----------|---------|-------------|
 | `arm_group` | `gen3_7dof` | MoveIt planning group name |
 | `tip_link` | `tool_frame` | End-effector link for IK |
+| `gripper_type` | `hande` | Gripper type (`hande` or `2f85`). Controls scaling of normalized gripper commands to hardware-specific values and selects the correct gripper controller topic. |
+
+**Gripper Command Normalization:**
+
+The planner receives normalized gripper commands (`0.0` = open, `1.0` = closed) from policies and scales them based on `gripper_type`:
+- **Hand-E**: `position = 0.025 * (1 - normalized)` (meters, 0.025 = open, 0.0 = closed)
+- **2F-85**: `position = 0.82 * normalized` (radians, 0.0 = open, 0.82 = closed)
+
+**IK Continuous Joint Handling:**
+
+For continuous (unbounded) revolute joints (`joint_1`, `joint_3`, `joint_5`, `joint_7`), the planner normalizes IK solutions to be nearest to the current joint position. This prevents the robot from spinning ±2π the wrong way when the IK solver returns an equivalent but distant solution.
 
 
 ## 🚀 Keyboard Teleoperation Demo in Gazebo

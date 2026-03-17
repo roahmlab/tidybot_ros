@@ -16,7 +16,7 @@
 
 ### **End Effectors**
 - Robotiq Hand-E parallel-jaw gripper (2 prismatic fingers, no closed loop)
-- Legacy Robotiq 2F-85 xacro macros retained for reference
+- Robotiq 2F-85 adaptive gripper (multi-joint with mimic linkage)
 
 ### **Vision & Sensors**
 - Wrist camera frame hierarchy and extrinsics
@@ -106,14 +106,19 @@ ros2 launch tidybot_description launch_sim_robot.launch.py base_mode:=velocity
 Launch TidyBot ROS 2 stack for use with Isaac Sim (instead of Gazebo).
 
 ```bash
+# Hand-E gripper (default)
 ros2 launch tidybot_description launch_isaac_sim.launch.py
+
+# 2F-85 gripper
+ros2 launch tidybot_description launch_isaac_sim.launch.py gripper_type:=2f85
 ```
 
 **Parameters:**
+- `gripper_type` (string): Gripper type — `hande` or `2f85` (default: hande). Selects the correct URDF and RViz config.
 - `use_rviz` (bool): Launch RViz for visualization (default: true)
 - `publish_rate` (float): Isaac Sim bridge publishing rate in Hz (default: 50.0)
 - `use_velocity_control` (bool): Use velocity control for base instead of position (default: false)
-- `rviz_config` (string): Path to RViz config file (default: tidybot.rviz)
+- `rviz_config` (string): Path to RViz config file (default: auto-selected based on gripper_type)
 
 > **Note:** Isaac Sim must be running separately with the ROS 2 Action Graph configured. See the [Isaac Sim Integration](#-isaac-sim-integration) section below.
 
@@ -162,7 +167,8 @@ This section describes how to use TidyBot with NVIDIA Isaac Sim instead of Gazeb
 
 2. **Import the URDF:**
    - Go to `File` → `Import`
-   - Select `/workspace/src/tidybot_description/urdf/tidybot_isaac.urdf` (pre-configured URDF with Robotiq Hand-E gripper)
+   - For Hand-E: select `/workspace/src/tidybot_description/urdf/tidybot_hande_isaac.urdf`
+   - For 2F-85: select `/workspace/src/tidybot_description/urdf/tidybot_2f_85_isaac.urdf`
    - **Important settings:**
      - ✅ Static Base (checked)
      - Output directory: `/tmp` or similar writable path
@@ -486,7 +492,7 @@ After executing, press **Play** to start the simulation. Or you can save the sce
 
 ### Step 3.5: Contact Force & Drawer State Publisher (Optional)
 
-To publish **friction forces** and **drawer joint state** (position, velocity, acceleration) to ROS2, run the `contact_force_publisher.py` script. This script uses `omni.physx.tensors.RigidContactView.get_friction_data(dt)` to measure precise friction forces (tangential forces, world frame) on each gripper finger against the drawer handle.
+To publish **friction forces** and **drawer joint state** (position, velocity, acceleration) to ROS2, run the gripper-specific `contact_force_publisher` script. This script uses `omni.physx.tensors.RigidContactView.get_friction_data(dt)` to measure precise friction forces (tangential forces, world frame) on each gripper finger against the drawer handle.
 
 > **Note:** The `RigidContactView` is initialized lazily on the first physics step (after pressing **Play**), because the PhysX GPU pipeline must be ready before the view can be created.
 
@@ -506,22 +512,32 @@ To publish **friction forces** and **drawer joint state** (position, velocity, a
 
 ### Running Setup Scripts from CLI
 
-The Step 3 and Step 3.5 scripts are also available as standalone Python files in `tidybot_description/`, so you can run them with Isaac Sim's `--exec` flag instead of pasting into the Script Editor:
+The Step 3 and Step 3.5 scripts are also available as standalone Python files in `tidybot_description/`, so you can run them with Isaac Sim's `--exec` flag instead of pasting into the Script Editor. **Use the script matching your gripper type:**
 
-| Script | Source | Purpose |
-|--------|--------|---------|
-| [`isaac_sim_setup.py`](tidybot_description/isaac_sim_setup.py) | Step 3 | Joint home positions, cameras, ROS2 action graph |
-| [`contact_force_publisher.py`](tidybot_description/contact_force_publisher.py) | Step 3.5 | Friction forces + drawer state publisher |
+| Script | Gripper | Purpose |
+|--------|---------|--------|
+| [`isaac_sim_setup_hande.py`](tidybot_description/isaac_sim_setup_hande.py) | Hand-E | Joint home positions, cameras, ROS2 action graph |
+| [`isaac_sim_setup_2f_85.py`](tidybot_description/isaac_sim_setup_2f_85.py) | 2F-85 | Joint home positions, cameras, ROS2 action graph |
+| [`contact_force_publisher_hande.py`](tidybot_description/contact_force_publisher_hande.py) | Hand-E | Friction forces + drawer state publisher |
+| [`contact_force_publisher_2f_85.py`](tidybot_description/contact_force_publisher_2f_85.py) | 2F-85 | Friction forces + drawer state publisher |
 
-**Basic usage:**
+**Basic usage (Hand-E example):**
 
 ```bash
 ./isaac-sim.sh \
-  --exec "/workspace/src/tidybot_description/tidybot_description/isaac_sim_setup.py" \
-  --exec "/workspace/src/tidybot_description/tidybot_description/contact_force_publisher.py"
+  --exec "/workspace/src/tidybot_description/tidybot_description/isaac_sim_setup_hande.py" \
+  --exec "/workspace/src/tidybot_description/tidybot_description/contact_force_publisher_hande.py"
 ```
 
-**Configurable settings** — `contact_force_publisher.py` supports Carbonite settings overrides via `--/` flags:
+**Basic usage (2F-85 example):**
+
+```bash
+./isaac-sim.sh \
+  --exec "/workspace/src/tidybot_description/tidybot_description/isaac_sim_setup_2f_85.py" \
+  --exec "/workspace/src/tidybot_description/tidybot_description/contact_force_publisher_2f_85.py"
+```
+
+**Configurable settings** — both `contact_force_publisher_*.py` scripts support Carbonite settings overrides via `--/` flags:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
@@ -533,8 +549,8 @@ The Step 3 and Step 3.5 scripts are also available as standalone Python files in
 
 ```bash
 ./isaac-sim.sh \
-  --exec "/workspace/.../isaac_sim_setup.py" \
-  --exec "/workspace/.../contact_force_publisher.py" \
+  --exec "/workspace/.../isaac_sim_setup_hande.py" \
+  --exec "/workspace/.../contact_force_publisher_hande.py" \
   --/app/tidybot/drawer_joint_path="/World/my_cabinet/drawer_top/handle_joint" \
   --/app/tidybot/drawer_handle_path="/World/my_cabinet/drawer_handle_top"
 ```
