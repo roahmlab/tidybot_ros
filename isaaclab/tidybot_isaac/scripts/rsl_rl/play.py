@@ -34,6 +34,7 @@ parser.add_argument(
     help="Use the pre-trained checkpoint from Nucleus.",
 )
 parser.add_argument("--real-time", action="store_true", default=False, help="Run in real-time, if possible.")
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -43,14 +44,36 @@ args_cli, hydra_args = parser.parse_known_args()
 # always enable cameras to record video
 if args_cli.video:
     args_cli.enable_cameras = True
-
 # clear out sys.argv for Hydra
 sys.argv = [sys.argv[0]] + hydra_args
 
-# launch omniverse app
+kit_args = []
+if args_cli.headless:
+    # --- TEMPORARY KIT ARGS INJECTION ---
+    kit_args = [
+        "--/app/livestream/publicEndpointAddress=100.107.14.98",
+        "--/app/livestream/fabricEnabled=false",
+        "--/app/window/enabled=false",
+        "--/app/asyncRendering=false",
+        "--/renderer/multithreading/enabled=false",
+        "--/physics/useGpuPicking=false",
+        "--/physics/useGpuSceneQueries=false",
+        "--/omni.physx.plugin/useDirectApi=false",
+        "--/rtx/hydra/picking/enabled=true",
+        "--/app/livestream/forceGpuCapture=false"
+    ]
+    sys.argv.extend(kit_args)
+
+# launch omniverse app (It reads sys.argv, sees our flags, and configures rendering perfectly)
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+
+if args_cli.headless:
+    # Clean up: Remove the flags so Hydra doesn't crash when the RL loop starts
+    for arg in kit_args:
+        sys.argv.remove(arg)
+    
 """Rest everything follows."""
 
 import os
@@ -186,6 +209,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             # env stepping
             obs, _, dones, _ = env.step(actions)
+
+            actual_dt = time.time() - start_time
+            target_dt = env.unwrapped.step_dt
+            rt_factor = target_dt / actual_dt
+            print(f"Timescale: {rt_factor:.2f}x | " 
+                f"Target: {target_dt*1000:.1f}ms | "
+                f"Actual: {actual_dt*1000:.1f}ms", end="\r")
+
             # reset recurrent states for episodes that have terminated
             policy_nn.reset(dones)
         if args_cli.video:

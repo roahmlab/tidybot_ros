@@ -1,7 +1,8 @@
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
+from isaaclab.sim.spawners.wrappers import MultiUsdFileCfg
 
 ##
 # TidyBot Assets — Dual Gripper Configurations
@@ -16,7 +17,7 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
         usd_path=TIDYBOT_HANDE_USD_PATH,
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
-            disable_gravity=False,
+            disable_gravity=True,
             retain_accelerations=False,
             linear_damping=0.0,
             angular_damping=0.0,
@@ -58,18 +59,35 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
             joint_names_expr=["joint_x", "joint_y", "joint_th"],
             stiffness=1e7,
             damping=1e4,
+            armature=10000.0,
         ),
         "arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-7]"],
-            stiffness=1e7,
-            damping=1e4,
+            # Taken from tidybot_driver/arm_controller
+            stiffness={
+                "joint_1": 400.0, "joint_2": 400.0, "joint_3": 300.0,
+                "joint_4": 300.0, "joint_5": 300.0, "joint_6": 300.0, "joint_7": 300.0,
+            },
+            damping={
+                "joint_1": 15.0, "joint_2": 15.0, "joint_3": 10.0,
+                "joint_4": 10.0, "joint_5": 8.0, "joint_6": 8.0, "joint_7": 8.0,
+            },
+            armature={
+                "joint_1": 0.3, "joint_2": 0.3, "joint_3": 0.3, 
+                "joint_4": 0.3, "joint_5": 0.18, "joint_6": 0.18, "joint_7": 0.18
+            },
+            effort_limit={
+                "joint_1": 39.0, "joint_2": 39.0, "joint_3": 39.0, "joint_4": 39.0,
+                "joint_5": 9.0,  "joint_6": 9.0,  "joint_7": 9.0,
+            },
+            friction=1.0
         ),
         "gripper": ImplicitActuatorCfg(
             joint_names_expr=["hande_left_finger_joint", "hande_right_finger_joint"],
-            stiffness=1e5,
-            damping=100.0,
-            effort_limit=180.0,   # Force limit (N)
-            velocity_limit=0.15,  # Velocity limit (m/s) — Hand-E spec
+            effort_limit=12000.0,   
+            stiffness=10000.0,      # Kept high for a strong, locked grip
+            damping=2500.0,         # Increased 2.5x to stretch the close time to ~0.8s
+            armature=0.1,
         ),
     },
 )
@@ -163,11 +181,13 @@ TIDYBOT_2F85_CFG = ArticulationCfg(
 # Cabinet Asset
 ##
 
-CABINET_USD_URL = "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Props/Sektion_Cabinet/sektion_cabinet_instanceable.usd"
+CABINET_USD_URL = "/workspace/tidybot_isaac/cabinet_locked.usd"
 
 CABINET_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=CABINET_USD_URL,
+        # Force the root of the cabinet to be fixed to the world
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(1.3, 0.0, 0.39),  # Farther away (was 0.7m, requested 1.2m)
@@ -177,7 +197,68 @@ CABINET_CFG = ArticulationCfg(
         "drawer": ImplicitActuatorCfg(
             joint_names_expr=["drawer_top_joint"],
             stiffness=0.0,
-            damping=1.0,  # Some friction
+            damping=1.0,      # Viscous resistance (force scales with velocity)
+            friction=1.0,     # Coulomb friction (constant resistance force in Newtons)
         ),
     },
+)
+
+##
+# Door Asset
+##
+door_usd_paths = [f"/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/door_{i}.usd" for i in range(20)]
+DOOR_CFG = ArticulationCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=MultiUsdFileCfg(
+        usd_path=door_usd_paths,
+        random_choice=True,
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(0.0, 0.0, 0.0, 1.0),
+        joint_pos={"HingeJoint": 0.0},
+    ),
+    actuators={
+        "hinge": ImplicitActuatorCfg(
+            joint_names_expr=["HingeJoint"],
+            stiffness=0.0, 
+            damping=0.5, 
+            friction=1.0,
+            effort_limit=1.0,
+        )
+    }
+)
+
+RECONSTRUCTED_OVEN = ArticulationCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=sim_utils.UsdFileCfg(
+        usd_path="/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/reconstructed_oven.usd",
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(1.0, 0.0, 0.0, 0.0),
+        joint_pos={"HingeJoint": 0.0}, 
+    ),
+    actuators={
+        "hinge": ImplicitActuatorCfg(
+            joint_names_expr=["HingeJoint"],
+            stiffness=24.0,
+            damping=1.0, 
+            friction=0.05,
+            effort_limit=5.0,
+        ),
+    },
+)
+
+DEBUG_DOOR_CFG = RigidObjectCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=sim_utils.UsdFileCfg(
+        usd_path="/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/door_debug.usd",
+    ),
+    init_state=RigidObjectCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(0.0, 0.0, 0.0, 1.0),
+    ),
 )
