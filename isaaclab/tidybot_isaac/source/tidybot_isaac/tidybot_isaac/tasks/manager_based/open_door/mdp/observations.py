@@ -170,14 +170,15 @@ def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntit
     return torch.zeros(env.num_envs, device=env.device)
 
 def log_squared_torque_effort(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
-    """Tracks squared joint torque to expose wasted isometric pulling effort."""
+    """Tracks squared joint torque to expose wasted isometric pulling effort for specific joints."""
     if not hasattr(env, "_episode_effort_buf"):
         env._episode_effort_buf = torch.zeros(env.num_envs, device=env.device)
 
     robot = env.scene[asset_cfg.name]
+    joint_ids = asset_cfg.joint_ids
+    arm_torques = robot.data.applied_torque[:, joint_ids]
     
-    # Torque squared represents electrical heat loss / wasted isometric strain
-    effort = torch.sum(torch.square(robot.data.applied_torque), dim=-1)
+    effort = torch.sum(torch.square(arm_torques), dim=-1)
     env._episode_effort_buf += effort * env.step_dt
 
     if env.reset_buf.any():

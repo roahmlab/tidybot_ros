@@ -43,8 +43,6 @@ FORCE_MARKER_CFG = VisualizationMarkersCfg(
         )
     }
 )
-DOOR_WITH_SENSORS_CFG = assets.DOOR_CFG.copy()
-DOOR_WITH_SENSORS_CFG.spawn.activate_contact_sensors = True
 
 @configclass
 class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
@@ -75,7 +73,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     replicate_physics: bool = False # Allows randomly selected door assets
-    door: ArticulationCfg = DOOR_WITH_SENSORS_CFG.replace(prim_path="{ENV_REGEX_NS}/Door")
+    door: ArticulationCfg = assets.RECONSTRUCTED_OVEN.replace(prim_path="{ENV_REGEX_NS}/Door")
 
     handle_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Door/Base", 
@@ -98,13 +96,6 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
                 name="hinge_origin"
             ),
         ],
-    )
-    handle_contact = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Door/Handle", 
-        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/.*"], 
-        update_period=0.0,
-        history_length=6,
-        track_air_time=False,
     )
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -315,13 +306,14 @@ class ObservationsCfg:
     critic: CriticCfg = CriticCfg()
 
 def reset_door_state(
-    env: ManagerBasedRLEnv, 
+    env: "ManagerBasedRLEnv", 
     env_ids: torch.Tensor, 
-    asset_cfg: SceneEntityCfg, 
+    asset_cfg: "SceneEntityCfg", 
     x_range: tuple[float, float],
     y_range: tuple[float, float],
     z_range: tuple[float, float],
     yaw_range: tuple[float, float],
+    allowed_orientations: tuple[str, ...] = ("right", "left", "bottom", "top"),
 ):
     door = env.scene[asset_cfg.name]
     num_resets = len(env_ids)
@@ -342,20 +334,22 @@ def reset_door_state(
     local_positions[:, 2] += noise_z
     world_positions = local_positions + env.scene.env_origins[env_ids]
 
-    # --- Choose  Door Configuration (Roll around X) ---
-    # 0: Hinge Right  -> 0 deg
-    # 1: Hinge Left   -> 180 deg
-    # 2: Hinge Bottom -> -90 deg
-    # 3: Hinge Top    -> +90 deg
-    base_quats = torch.tensor([
-        [1.0, 0.0, 0.0, 0.0],                
-        [0.0, 1.0, 0.0, 0.0],                
-        [0.7071068, -0.7071068, 0.0, 0.0],   
-        [0.7071068, 0.7071068, 0.0, 0.0]     
-    ], device=env.device)
+    # --- Choose Door Configuration (Roll around X) ---
+    quat_mapping = {
+        "right": [1.0, 0.0, 0.0, 0.0],                # 0 deg
+        "left": [0.0, 1.0, 0.0, 0.0],                 # 180 deg
+        "bottom": [0.7071068, -0.7071068, 0.0, 0.0],  # -90 deg
+        "top": [0.7071068, 0.7071068, 0.0, 0.0]       # +90 deg
+    }
     
-    # Randomly select 1 of the 4 states per environment
-    choices = torch.randint(0, 4, (num_resets,), device=env.device)
+    selected_quats = [quat_mapping[k.lower()] for k in allowed_orientations if k.lower() in quat_mapping]
+    if not selected_quats:
+        raise ValueError(f"No valid orientations provided in {allowed_orientations}. Must be from {list(quat_mapping.keys())}")
+        
+    base_quats = torch.tensor(selected_quats, device=env.device)
+    
+    # Randomly select 1 of the allowed states per environment
+    choices = torch.randint(0, len(base_quats), (num_resets,), device=env.device)
     state_quats = base_quats[choices]
 
     # --- Apply Random Yaw (Rotation around World Z) ---
@@ -431,8 +425,9 @@ class EventCfg:
             "asset_cfg": SceneEntityCfg("door"), 
             "x_range": (-0.1, 0.0),
             "y_range": (-0.1, 0.1), 
-            "z_range": (-0.25, 0.10),
+            "z_range": (-0.15, 0.10),
             "yaw_range": (-0.085, 0.085),
+            "allowed_orientations": ["right", "left", "bottom", "top"],
         },
     )
 
@@ -581,7 +576,11 @@ class RewardsCfg:
     track_squared_torque_effort = RewTerm(
         func=custom_mdp.log_squared_torque_effort,
         weight=1e-10,
-        params={"asset_cfg": SceneEntityCfg("robot")},
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot", joint_names=["joint_[1-7]"]
+            )
+        }
     )
 
     track_success_time = RewTerm(

@@ -1,7 +1,7 @@
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg
-from isaaclab.assets import ArticulationCfg, AssetBaseCfg
+from isaaclab.assets import ArticulationCfg, AssetBaseCfg, RigidObjectCfg
 from isaaclab.sim.spawners.wrappers import MultiUsdFileCfg
 
 ##
@@ -59,7 +59,7 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
             joint_names_expr=["joint_x", "joint_y", "joint_th"],
             stiffness=1e7,
             damping=1e4,
-            armature=1000.0,
+            armature=10000.0,
         ),
         "arm": ImplicitActuatorCfg(
             joint_names_expr=["joint_[1-7]"],
@@ -75,6 +75,10 @@ TIDYBOT_HANDE_CFG = ArticulationCfg(
             armature={
                 "joint_1": 0.3, "joint_2": 0.3, "joint_3": 0.3, 
                 "joint_4": 0.3, "joint_5": 0.18, "joint_6": 0.18, "joint_7": 0.18
+            },
+            effort_limit={
+                "joint_1": 39.0, "joint_2": 39.0, "joint_3": 39.0, "joint_4": 39.0,
+                "joint_5": 9.0,  "joint_6": 9.0,  "joint_7": 9.0,
             },
             friction=1.0
         ),
@@ -221,6 +225,40 @@ DOOR_CFG = ArticulationCfg(
             stiffness=0.0, 
             damping=0.5, 
             friction=1.0,
+            effort_limit=1.0,
         )
     }
+)
+
+RECONSTRUCTED_OVEN = ArticulationCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=sim_utils.UsdFileCfg(
+        usd_path="/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/reconstructed_oven.usd",
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(1.0, 0.0, 0.0, 0.0),
+        joint_pos={"HingeJoint": 0.0}, 
+    ),
+    actuators={
+        "hinge": ImplicitActuatorCfg(
+            joint_names_expr=["HingeJoint"],
+            stiffness=24.0,
+            damping=1.0, 
+            friction=0.05,
+            effort_limit=5.0,
+        ),
+    },
+)
+
+DEBUG_DOOR_CFG = RigidObjectCfg(
+    prim_path="{ENV_REGEX_NS}/Door",
+    spawn=sim_utils.UsdFileCfg(
+        usd_path="/workspace/tidybot_isaac/source/tidybot_isaac/tidybot_isaac/tasks/manager_based/open_door/assets/door_debug.usd",
+    ),
+    init_state=RigidObjectCfg.InitialStateCfg(
+        pos=(1.0, 0.0, 0.7),
+        rot=(0.0, 0.0, 0.0, 1.0),
+    ),
 )

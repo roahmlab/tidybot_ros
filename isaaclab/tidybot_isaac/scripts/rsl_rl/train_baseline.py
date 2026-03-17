@@ -216,7 +216,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     print(f"\n[INFO] Starting Entropy Curriculum from Stage {starting_stage + 1}/{stages}")
     for stage in range(starting_stage, stages):
-        decay_factor = [1.0, 0.5, 0.25, 0.1]
+        decay_factor = [1.0, 1.0, 0.5, 0.1]
         current_entropy = base_entropy * decay_factor[stage]
         
         # Your original successful injection
