@@ -228,18 +228,20 @@ class ObservationsCfg:
             func=custom_mdp.rel_ee_handle_transform,
             noise=GaussianNoiseCfg(mean=0.0, std=0.005),
         )
-        handle_initial_pos = ObsTerm(
-            func=custom_mdp.handle_initial_position,
+        ee_to_hinge_vector = ObsTerm(
+            func=custom_mdp.ee_to_hinge_in_ee_frame,
             noise=GaussianNoiseCfg(mean=0.0, std=0.002),
-            params={
-                "handle_cfg": SceneEntityCfg("door", body_names="Handle"),
-                "hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")
-            }
+            params={"hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")}
         )
-        hinge_origin = ObsTerm(
-            func=custom_mdp.hinge_origin,
+        hinge_axis = ObsTerm(
+            func=custom_mdp.hinge_axis_in_ee_frame,
             noise=GaussianNoiseCfg(mean=0.0, std=0.002),
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
+        )
+        door_pos = ObsTerm(
+            func=custom_mdp.door_position,
+            noise=GaussianNoiseCfg(mean=0.0, std=0.002),
+            params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
         )
         actions = ObsTerm(func=standard_mdp.last_action)
 
@@ -282,17 +284,19 @@ class ObservationsCfg:
         rel_ee_handle_transform_clean = ObsTerm(
             func=custom_mdp.rel_ee_handle_transform,
         )
-        handle_initial_pos_clean = ObsTerm(
-            func=custom_mdp.handle_initial_position,
-            params={
-                "handle_cfg": SceneEntityCfg("door", body_names="Handle"),
-                "hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")
-            }
+        ee_to_hinge_vector = ObsTerm(
+            func=custom_mdp.ee_to_hinge_in_ee_frame,
+            params={"hinge_cfg": SceneEntityCfg("door", body_names="HingeOrigin")}
         )
-        hinge_origin_clean = ObsTerm(
-            func=custom_mdp.hinge_origin,
+        hinge_axis = ObsTerm(
+            func=custom_mdp.hinge_axis_in_ee_frame,
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
+        door_pos = ObsTerm(
+            func=custom_mdp.door_position,
+            params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
+        )
+
 
         # Privileged Data: Exact door state
         door_joint_pos = ObsTerm(
