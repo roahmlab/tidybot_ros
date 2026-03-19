@@ -81,11 +81,11 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         # debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Door/Handle",
+                prim_path="{ENV_REGEX_NS}/Door/DoorPanel", 
                 name="handle",
                 offset=OffsetCfg(
-                    pos=(0.0, 0.0, 0.0),
-                    rot=(1, 0.0, 0.0, 0.0), 
+                    pos=(-0.01002, 0.10008, -0.12115),
+                    rot=(0.73041, -0.23612, -0.61067, 0.19451), 
                 ),
             ),
         ],
@@ -96,11 +96,11 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Door/HingeOrigin", 
+                prim_path="{ENV_REGEX_NS}/Door/Base", 
                 name="hinge_origin",
                 offset=OffsetCfg(
-                    pos=(0.0, 0.0, 0.0),
-                    rot=(0.7071, 0.0, -0.7071, 0.0), 
+                    pos=(-0.09134295582771303, 0.0037685483694076516, 0.18321457505226135),
+                    rot=(0.70711, -0.70711, 0.0, 0.0), 
                 ),
             ),
         ],
@@ -292,11 +292,6 @@ class ObservationsCfg:
             func=custom_mdp.hinge_axis_in_ee_frame,
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
-        door_pos = ObsTerm(
-            func=custom_mdp.door_position,
-            params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
-        )
-
 
         # Privileged Data: Exact door state
         door_joint_pos = ObsTerm(
@@ -566,7 +561,7 @@ class RewardsCfg:
 
     unaligned_approach = RewTerm(
         func=custom_mdp.unaligned_approach_penalty,
-        weight=0.001, # Was 0.01
+        weight=0.1,
     )
 
     rest_at_goal = RewTerm(

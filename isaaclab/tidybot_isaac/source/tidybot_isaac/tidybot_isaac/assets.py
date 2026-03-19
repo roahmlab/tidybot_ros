@@ -237,7 +237,7 @@ RECONSTRUCTED_OVEN = ArticulationCfg(
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(1.1, 0.0, 0.67),
+        pos=(1.1, 0.0, 0.6),
         rot=(0.0, 0.0, 0.0, 1.0),
         joint_pos={"HingeJoint": 0.0}, 
     ),

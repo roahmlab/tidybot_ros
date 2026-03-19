@@ -84,7 +84,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
                 prim_path="{ENV_REGEX_NS}/Door/DoorPanel", 
                 name="handle",
                 offset=OffsetCfg(
-                    pos=(-0.0112, 0.0963, -0.12643),
+                    pos=(-0.01002, 0.10008, -0.12115),
                     rot=(0.73041, -0.23612, -0.61067, 0.19451), 
                 ),
             ),
