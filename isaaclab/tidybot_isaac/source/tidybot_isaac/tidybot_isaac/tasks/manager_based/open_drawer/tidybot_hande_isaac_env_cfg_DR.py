@@ -245,7 +245,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "friction_distribution_params": (1, 1), 
+            "friction_distribution_params": (0.1, 2.0), 
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -257,7 +257,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "damping_distribution_params": (1, 1),
+            "damping_distribution_params": (0.5, 2.0),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -268,7 +268,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "mass_distribution_params": (1, 1),
+            "mass_distribution_params": (0.1, 2),
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -279,7 +279,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "stiffness_distribution_params": (5.0, 5.0),
+            "stiffness_distribution_params": (0.0, 10.0),
             "operation": "add", 
             "distribution": "uniform",
         },

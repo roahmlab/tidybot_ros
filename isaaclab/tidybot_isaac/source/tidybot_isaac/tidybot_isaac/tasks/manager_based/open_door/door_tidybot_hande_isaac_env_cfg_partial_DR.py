@@ -73,7 +73,7 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
     )
 
     replicate_physics: bool = False # Allows randomly selected door assets
-    door: ArticulationCfg = assets.DOOR_CFG.replace(prim_path="{ENV_REGEX_NS}/Door")
+    door: ArticulationCfg = assets.RECONSTRUCTED_OVEN.replace(prim_path="{ENV_REGEX_NS}/Door")
 
     handle_frame = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Door/Base", 
@@ -81,8 +81,12 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         # debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Door/Handle",
-                name="handle"
+                prim_path="{ENV_REGEX_NS}/Door/DoorPanel", 
+                name="handle",
+                offset=OffsetCfg(
+                    pos=(-0.01002, 0.10008, -0.12115),
+                    rot=(0.73041, -0.23612, -0.61067, 0.19451), 
+                ),
             ),
         ],
     )
@@ -92,8 +96,12 @@ class TidybotHandeIsaacSceneCfg(InteractiveSceneCfg):
         debug_vis=True,
         target_frames=[
             FrameTransformerCfg.FrameCfg(
-                prim_path="{ENV_REGEX_NS}/Door/HingeOrigin", # The specific frame to track
-                name="hinge_origin"
+                prim_path="{ENV_REGEX_NS}/Door/Base", 
+                name="hinge_origin",
+                offset=OffsetCfg(
+                    pos=(-0.09134295582771303, 0.0037685483694076516, 0.18321457505226135),
+                    rot=(0.70711, -0.70711, 0.0, 0.0), 
+                ),
             ),
         ],
     )
@@ -284,12 +292,12 @@ class ObservationsCfg:
             func=custom_mdp.hinge_axis_in_ee_frame,
             params={"door_cfg": SceneEntityCfg("door", body_names="HingeOrigin")} 
         )
-        door_pos = ObsTerm(
-            func=custom_mdp.door_position,
-            params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
-        )
 
         # Privileged Data: Exact door state
+        door_joint_pos = ObsTerm(
+            func=standard_mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
+        )
         door_joint_vel = ObsTerm(
             func=standard_mdp.joint_vel_rel,
             params={"asset_cfg": SceneEntityCfg("door", joint_names=["HingeJoint"])}
@@ -426,7 +434,7 @@ class EventCfg:
             "y_range": (-0.1, 0.1), 
             "z_range": (-0.15, 0.10),
             "yaw_range": (-0.085, 0.085),
-            "allowed_orientations": ["right", "left", "bottom", "top"],
+            "allowed_orientations": ["right"],
         },
     )
 
@@ -553,7 +561,7 @@ class RewardsCfg:
 
     unaligned_approach = RewTerm(
         func=custom_mdp.unaligned_approach_penalty,
-        weight=0.1, # Was 0.01
+        weight=0.1,
     )
 
     rest_at_goal = RewTerm(

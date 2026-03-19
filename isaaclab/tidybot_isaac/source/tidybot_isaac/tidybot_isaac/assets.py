@@ -199,6 +199,7 @@ CABINET_CFG = ArticulationCfg(
             stiffness=0.0,
             damping=1.0,      # Viscous resistance (force scales with velocity)
             friction=1.0,     # Coulomb friction (constant resistance force in Newtons)
+            effort_limit=1.0,
         ),
     },
 )

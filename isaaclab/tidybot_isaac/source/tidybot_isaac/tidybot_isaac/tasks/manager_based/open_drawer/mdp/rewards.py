@@ -332,3 +332,88 @@ def drawer_opened(
     drawer_joint_idx = cabinet.find_joints("drawer_top_joint")[0][0]
     drawer_pos = cabinet.data.joint_pos[:, drawer_joint_idx]
     return drawer_pos > threshold
+
+def drawer_opened(
+    env: ManagerBasedRLEnv, 
+    threshold: float, 
+    asset_cfg: SceneEntityCfg,
+) -> torch.Tensor:
+    """Termination condition for successfully opening the drawer."""
+    drawer: Articulation = env.scene[asset_cfg.name]
+    drawer_joint_idx = drawer.find_joints("drawer_top_joint")[0][0]
+    drawer_pos = drawer.data.joint_pos[:, drawer_joint_idx]
+    return drawer_pos > threshold
+
+def success_at_timeout(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    drawer_cfg: SceneEntityCfg,
+    robot_cfg: SceneEntityCfg,
+    gripper_joint_name: str,
+) -> torch.Tensor:
+    """Logs success only at the end of the episode if conditions are met."""
+    is_timeout = env.episode_length_buf >= env.max_episode_length - 1
+
+    # Check if the drawer is open past the threshold
+    drawer = env.scene[drawer_cfg.name]
+    drawer_joint_idx = drawer.find_joints(drawer_cfg.joint_names[0])[0][0]
+    drawer_pos = drawer.data.joint_pos[:, drawer_joint_idx]
+    is_open = drawer_pos > threshold
+    grasp_score = _is_properly_grasping(env, robot_cfg, gripper_joint_name)
+    is_grasping = grasp_score > 0.5
+
+    return is_timeout & is_open & is_grasping
+
+def track_and_log_time_to_success(
+    env: ManagerBasedRLEnv,
+    threshold: float,
+    drawer_cfg: SceneEntityCfg,
+    robot_cfg: SceneEntityCfg,
+    gripper_joint_name: str,
+) -> torch.Tensor:
+    # Initialize buffers
+    if not hasattr(env, "_success_step_buf"):
+        env._success_step_buf = torch.zeros(env.num_envs, dtype=torch.float, device=env.device)
+        env._already_succeeded_buf = torch.zeros(env.num_envs, dtype=torch.bool, device=env.device)
+
+    # Success Logic
+    drawer = env.scene[drawer_cfg.name]
+    drawer_joint_idx = drawer.find_joints(drawer_cfg.joint_names[0])[0][0]
+    drawer_pos = drawer.data.joint_pos[:, drawer_joint_idx]
+    
+    is_open = drawer_pos > threshold
+    grasp_score = _is_properly_grasping(env, robot_cfg, gripper_joint_name)
+    is_grasping = grasp_score > 0.5
+    
+    current_success = is_open & is_grasping
+
+    # Record first-time success step
+    new_success = current_success & ~env._already_succeeded_buf
+    env._success_step_buf[new_success] = env.episode_length_buf[new_success].float()
+    env._already_succeeded_buf |= current_success
+
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        # Determine who succeeded vs who failed
+        successful_resets = env.reset_buf & env._already_succeeded_buf
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # SUCCESS RATE: (Number of successful resets / Total resets)
+        # We MUST log this every time any env resets to get a true average
+        success_rate = successful_resets[reset_ids].float().mean().item()
+        env.extras["log"]["Metric/Success_Rate"] = success_rate
+
+        # TIME TO SUCCESS: 
+        # Only log if there was at least one success in the resetting batch
+        if successful_resets.any():
+            avg_time_steps = env._success_step_buf[successful_resets].mean().item()
+            env.extras["log"]["Metric/Time_to_Success_Seconds"] = avg_time_steps * env.step_dt
+            
+        # Reset internal buffers for the next episode
+        env._success_step_buf[reset_ids] = 0.0
+        env._already_succeeded_buf[reset_ids] = False
+
+    return torch.zeros(env.num_envs, device=env.device)
