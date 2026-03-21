@@ -83,17 +83,15 @@ def gripper_cooldown_state(env: ManagerBasedRLEnv, action_term_name: str = "grip
     # Add a dimension so it concatenates properly in the observation vector
     return (current_timers / max_steps).unsqueeze(-1)
 
-def ee_to_hinge_in_ee_frame(env: ManagerBasedRLEnv, hinge_cfg: SceneEntityCfg) -> torch.Tensor:
+def ee_to_hinge_in_ee_frame(env: ManagerBasedRLEnv, hinge_frame_name: str = "hinge_origin") -> torch.Tensor:
     """
     Returns the 3D vector pointing from the End Effector to the Hinge Origin, 
     expressed entirely in the EE's local coordinate frame.
     Output shape: [num_envs, 3]
     """
-    door_asset = env.scene[hinge_cfg.name]
-    
-    # 1. Get positions in the world frame
+    # 1. Get positions in the world frame directly from the FrameTransformers
     ee_pos_w = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
-    hinge_pos_w = door_asset.data.body_pos_w[:, hinge_cfg.body_ids[0], :]
+    hinge_pos_w = env.scene[hinge_frame_name].data.target_pos_w[..., 0, :]
     
     # 2. Get EE orientation in the world frame
     ee_quat_w = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
@@ -107,16 +105,14 @@ def ee_to_hinge_in_ee_frame(env: ManagerBasedRLEnv, hinge_cfg: SceneEntityCfg) -
     
     return ee_to_hinge_ee
 
-def hinge_axis_in_ee_frame(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) -> torch.Tensor:
+def hinge_axis_in_ee_frame(env: ManagerBasedRLEnv, hinge_frame_name: str = "hinge_origin") -> torch.Tensor:
     """
     Returns the hinge's opening axis (Z-axis of the hinge) 
     expressed in the EE's local frame.
     Output shape: [num_envs, 3]
     """
-    door = env.scene[door_cfg.name]
-    
-    # 1. Get orientations in the world frame
-    hinge_quat_w = door.data.body_quat_w[:, door_cfg.body_ids[0]]
+    # 1. Get orientations in the world frame directly from the FrameTransformers
+    hinge_quat_w = env.scene[hinge_frame_name].data.target_quat_w[..., 0, :]
     ee_quat_w = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
     
     # 2. Calculate the relative rotation from EE to Hinge
@@ -131,7 +127,7 @@ def hinge_axis_in_ee_frame(env: ManagerBasedRLEnv, door_cfg: SceneEntityCfg) -> 
     hinge_axis_ee = math_utils.quat_apply(rot_ee_to_hinge, local_z_axis)
     
     return hinge_axis_ee
-
+    
 def door_position(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Returns the current joint position (angle) of the door's hinge.
     Output shape: [num_envs, 1]
