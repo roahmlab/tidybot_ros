@@ -126,6 +126,16 @@ Then run the container and setup the environment inside the container:
 
 # --------------------------Inside the container-------------------------- #
 
+# Install ROS dependencies (first time only)
+rosdep update
+rosdep install --from-paths src --ignore-src -r -y --skip-keys \
+  "arrow parquet warehouse_ros_mongo ament_python glog joint_state_publisher \
+  joint_state_publisher_gui opencv opencv4 threadpoolctl setuptools numpy \
+  libgoogle-glog-dev flask flask_socketio phoenix6 \
+  libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+  moveit_resources_fanuc_moveit_config moveit_py \
+  moveit_resources_panda_moveit_config"
+
 # Install the canivore-usb inside the container
 sudo apt update && sudo apt install canivore-usb -y
 

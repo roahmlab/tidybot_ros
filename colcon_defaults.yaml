@@ -1,0 +1,4 @@
+build:
+  symlink-install: true
+  cmake-args:
+    - -DPython3_EXECUTABLE=/usr/bin/python3
