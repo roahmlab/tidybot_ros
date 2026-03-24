@@ -245,7 +245,7 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "friction_distribution_params": (0.1, 2.0), 
+            "friction_distribution_params": (1, 1), 
             "operation": "scale",
             "distribution": "uniform",
         },
@@ -257,8 +257,30 @@ class EventCfg:
         mode="reset",
         params={
             "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
-            "damping_distribution_params": (0.5, 2.0),
+            "damping_distribution_params": (1, 1),
             "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_cabinet_mass = EventTerm(
+        func=standard_mdp.randomize_rigid_body_mass,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+            "mass_distribution_params": (1, 1),
+            "operation": "scale",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_cabinet_stiffness = EventTerm(
+        func=standard_mdp.randomize_actuator_gains,
+        mode="reset",
+        params={
+            "asset_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+            "stiffness_distribution_params": (5.0, 5.0),
+            "operation": "add", 
             "distribution": "uniform",
         },
     )
@@ -340,10 +362,47 @@ class RewardsCfg:
         },
     )
 
+    track_energy_used = RewTerm(
+        func=custom_mdp.log_cumulative_mechanical_work,
+        weight=1e-10, # Keeps it purely diagnostic
+        params={"asset_cfg": SceneEntityCfg("robot")},
+    )
+
+    track_squared_torque_effort = RewTerm(
+        func=custom_mdp.log_squared_torque_effort,
+        weight=1e-10,
+        params={
+            "asset_cfg": SceneEntityCfg(
+                "robot", joint_names=["joint_[1-7]"]
+            )
+        }
+    )
+
+    track_success_time = RewTerm(
+        func=custom_mdp.track_and_log_time_to_success,
+        weight=1e-10,
+        params={
+            "threshold": 0.25, 
+            "drawer_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint",
+        }
+    )
+
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
     time_out = DoneTerm(func=standard_mdp.time_out, time_out=True)
+    success = DoneTerm(
+        func=custom_mdp.success_at_timeout,
+        time_out=True,
+        params={
+            "threshold": 0.25, 
+            "drawer_cfg": SceneEntityCfg("cabinet", joint_names=["drawer_top_joint"]),
+            "robot_cfg": SceneEntityCfg("robot"),
+            "gripper_joint_name": "hande_left_finger_joint",
+        }
+    )
 
 ##
 # Environment configuration

@@ -199,6 +199,7 @@ CABINET_CFG = ArticulationCfg(
             stiffness=0.0,
             damping=1.0,      # Viscous resistance (force scales with velocity)
             friction=1.0,     # Coulomb friction (constant resistance force in Newtons)
+            effort_limit=1.0,
         ),
     },
 )
@@ -237,14 +238,14 @@ RECONSTRUCTED_OVEN = ArticulationCfg(
         articulation_props=sim_utils.ArticulationRootPropertiesCfg(fix_root_link=True),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(1.0, 0.0, 0.7),
-        rot=(1.0, 0.0, 0.0, 0.0),
+        pos=(1.1, 0.0, 0.6),
+        rot=(0.0, 0.0, 0.0, 1.0),
         joint_pos={"HingeJoint": 0.0}, 
     ),
     actuators={
         "hinge": ImplicitActuatorCfg(
             joint_names_expr=["HingeJoint"],
-            stiffness=24.0,
+            stiffness=7.0,
             damping=1.0, 
             friction=0.05,
             effort_limit=5.0,

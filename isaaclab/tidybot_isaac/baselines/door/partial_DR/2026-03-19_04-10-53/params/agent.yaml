@@ -1,0 +1,55 @@
+seed: 42
+device: cuda:0
+num_steps_per_env: 256
+max_iterations: 2000
+empirical_normalization: {}
+obs_groups: {}
+clip_actions: null
+check_for_nan: true
+save_interval: 50
+experiment_name: tidybot_door
+run_name: ''
+logger: tensorboard
+neptune_project: isaaclab
+wandb_project: isaaclab
+resume: false
+load_run: .*
+load_checkpoint: model_.*.pt
+class_name: OnPolicyRunner
+actor: {}
+critic: {}
+algorithm:
+  class_name: PPO
+  num_learning_epochs: 5
+  num_mini_batches: 32
+  learning_rate: 0.0004
+  schedule: adaptive
+  gamma: 0.99
+  lam: 0.95
+  entropy_coef: 0.001
+  desired_kl: 0.01
+  max_grad_norm: 1.0
+  optimizer: adam
+  value_loss_coef: 1.0
+  use_clipped_value_loss: true
+  clip_param: 0.2
+  normalize_advantage_per_mini_batch: false
+  share_cnn_encoders: false
+  rnd_cfg: null
+  symmetry_cfg: null
+policy:
+  class_name: ActorCritic
+  init_noise_std: 0.5
+  noise_std_type: scalar
+  state_dependent_std: false
+  actor_obs_normalization: true
+  critic_obs_normalization: true
+  actor_hidden_dims:
+  - 256
+  - 128
+  - 64
+  critic_hidden_dims:
+  - 256
+  - 128
+  - 64
+  activation: elu

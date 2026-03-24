@@ -73,8 +73,8 @@ def align_ee_handle(
     dot_x = torch.sum(ee_x * handle_y, dim=-1)
 
     # Reward only starts to matter when alignment is > 0.8 
-    align_z = torch.clamp(dot_z, min=0.0)**7
-    align_x = torch.abs(dot_x)**7 # allows 180-degree roll symmetry on X/Y
+    align_z = torch.clamp(dot_z, min=0.0)**4
+    align_x = torch.abs(dot_x)**4 # allows 180-degree roll symmetry on X/Y
 
     total_alignment = align_z * align_x
     
@@ -98,9 +98,10 @@ def grasp_handle(
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
     
     # Is the handle physically between the fingers?
-    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.015).float()  # Pinch Axis
+    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.0075).float()  # Pinch Axis
     is_inserted = (torch.abs(local_handle_pos[:, 2]) < 0.01).float()   # Insertion Axis
-    ready_to_close = is_centered * is_inserted
+    is_centered_y = (torch.abs(local_handle_pos[:, 1]) < 0.015).float() # Elevation Axis
+    ready_to_close = is_centered * is_inserted * is_centered_y
     
     # Gripper State Calculations
     gripper_joint_idx = robot.find_joints(gripper_joint_name)[0][0]
@@ -141,7 +142,7 @@ def _is_properly_grasping(
     # Local Position Check (Using X for pinch and Z for insertion)
     vec_to_handle = handle_pos - ee_tcp_pos
     local_handle_pos = quat_apply_inverse(ee_tcp_quat, vec_to_handle)
-    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.015).float()  # Pinch Axis
+    is_centered = (torch.abs(local_handle_pos[:, 0]) < 0.0075).float()  # Pinch Axis
     is_inserted = (torch.abs(local_handle_pos[:, 2]) < 0.01).float()   # Insertion Axis
 
     vec_x = VEC_X.to(env.device).expand(env.num_envs, 3)

@@ -68,7 +68,6 @@ if args_cli.headless:
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
-
 if args_cli.headless:
     # Clean up: Remove the flags so Hydra doesn't crash when the RL loop starts
     for arg in kit_args:
@@ -78,6 +77,7 @@ if args_cli.headless:
 
 import os
 import time
+import csv
 
 import gymnasium as gym
 import torch
@@ -102,7 +102,6 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 
 import tidybot_isaac.tasks  # noqa: F401
 
-
 @hydra_task_config(args_cli.task, args_cli.agent)
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlBaseRunnerCfg):
     """Play with RSL-RL agent."""
@@ -115,7 +114,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
 
     # set the environment seed
-    # note: certain randomizations occur in the environment initialization so we set the seed here
     env_cfg.seed = agent_cfg.seed
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
 
@@ -161,7 +159,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = RslRlVecEnvWrapper(env, clip_actions=agent_cfg.clip_actions)
 
     print(f"[INFO]: Loading model checkpoint from: {resume_path}")
-    # load previously trained model
     if agent_cfg.class_name == "OnPolicyRunner":
         runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=None, device=agent_cfg.device)
     elif agent_cfg.class_name == "DistillationRunner":
@@ -170,19 +167,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         raise ValueError(f"Unsupported runner class: {agent_cfg.class_name}")
     runner.load(resume_path)
 
-    # obtain the trained policy for inference
     policy = runner.get_inference_policy(device=env.unwrapped.device)
 
-    # extract the neural network module
-    # we do this in a try-except to maintain backwards compatibility.
     try:
-        # version 2.3 onwards
         policy_nn = runner.alg.policy
     except AttributeError:
-        # version 2.2 and below
         policy_nn = runner.alg.actor_critic
 
-    # extract the normalizer
     if hasattr(policy_nn, "actor_obs_normalizer"):
         normalizer = policy_nn.actor_obs_normalizer
     elif hasattr(policy_nn, "student_obs_normalizer"):
@@ -190,52 +181,81 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         normalizer = None
 
-    # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
     export_policy_as_jit(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.pt")
     export_policy_as_onnx(policy_nn, normalizer=normalizer, path=export_model_dir, filename="policy.onnx")
 
     dt = env.unwrapped.step_dt
+    
+    # --- CSV LOGGING SETUP ---
+    csv_filepath = "sim_rollout_log.csv"
+    csv_file = open(csv_filepath, mode='w', newline='')
+    csv_writer = csv.writer(csv_file)
+    header = [f'obs_{i}' for i in range(40)] + [f'action_{i}' for i in range(8)]
+    csv_writer.writerow(header)
+    print(f"[INFO] Logging simulation observations for Env 0 to {csv_filepath}")
+    # -------------------------
 
-    # reset environment
     obs = env.get_observations()
     timestep = 0
-    # simulate environment
-    while simulation_app.is_running():
-        start_time = time.time()
-        # run everything in inference mode
-        with torch.inference_mode():
-            # agent stepping
-            actions = policy(obs)
-            # env stepping
-            obs, _, dones, _ = env.step(actions)
 
-            actual_dt = time.time() - start_time
-            target_dt = env.unwrapped.step_dt
-            rt_factor = target_dt / actual_dt
-            print(f"Timescale: {rt_factor:.2f}x | " 
-                f"Target: {target_dt*1000:.1f}ms | "
-                f"Actual: {actual_dt*1000:.1f}ms", end="\r")
+    try:
+        while simulation_app.is_running():
+            start_time = time.time()
+            with torch.inference_mode():
+                actions = policy(obs)
+                
+                # --- FOOLPROOF TENSOR EXTRACTION ---
+                # Checks if it has dict properties, bypassing strict isinstance checks
+                if hasattr(obs, "keys") and "policy" in obs:
+                    _obs_tensor = obs["policy"]
+                elif isinstance(obs, dict) and "policy" in obs:
+                    _obs_tensor = obs["policy"]
+                else:
+                    _obs_tensor = obs
+                
+                # Slice out Environment 0
+                obs_env0 = _obs_tensor[0] if _obs_tensor.ndim > 1 else _obs_tensor
+                act_env0 = actions[0] if actions.ndim > 1 else actions
+                
+                # Convert explicitly to flat python lists to guarantee normal CSV formatting
+                obs_list = obs_env0.detach().cpu().flatten().tolist()
+                act_list = act_env0.detach().cpu().flatten().tolist()
+                
+                # Write to CSV
+                csv_writer.writerow(obs_list + act_list)
+                # -----------------------------------
+                
+                # Step environment forward
+                obs, _, dones, _ = env.step(actions)
 
-            # reset recurrent states for episodes that have terminated
-            policy_nn.reset(dones)
-        if args_cli.video:
-            timestep += 1
-            # Exit the play loop after recording one video
-            if timestep == args_cli.video_length:
-                break
+                if "episode" in env.unwrapped.extras:
+                    if "Metric/Total_Energy" in env.unwrapped.extras["episode"]:
+                        val = env.unwrapped.extras["episode"]["Metric/Total_Energy"]
+                        print(f"DEBUG: Energy Value: {val:.2f} Joules")
+                        
+                actual_dt = time.time() - start_time
+                target_dt = env.unwrapped.step_dt
+                rt_factor = target_dt / actual_dt
 
-        # time delay for real-time evaluation
-        sleep_time = dt - (time.time() - start_time)
-        if args_cli.real_time and sleep_time > 0:
-            time.sleep(sleep_time)
+                policy_nn.reset(dones)
+                
+            if args_cli.video:
+                timestep += 1
+                if timestep == args_cli.video_length:
+                    break
 
-    # close the simulator
-    env.close()
+            sleep_time = dt - (time.time() - start_time)
+            if args_cli.real_time and sleep_time > 0:
+                time.sleep(sleep_time)
 
+    except KeyboardInterrupt:
+        print("\n[INFO] Playback interrupted. Saving log file safely.")
+    finally:
+        # Guarantee the file writes out properly upon closing or crashing
+        csv_file.close()
+        env.close()
 
 if __name__ == "__main__":
-    # run the main function
     main()
-    # close sim app
     simulation_app.close()

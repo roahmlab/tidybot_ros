@@ -61,3 +61,54 @@ def gripper_open_amount(
     normalized_pos = (raw_pos - open_pos) / (close_pos - open_pos)
     
     return torch.clamp(normalized_pos, min=0.0, max=1.0)
+
+def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Tracks total mechanical work per episode and logs it to TensorBoard."""
+    if not hasattr(env, "_episode_energy_buf"):
+        env._episode_energy_buf = torch.zeros(env.num_envs, device=env.device)
+
+    robot = env.scene[asset_cfg.name]
+    
+    # torques * velocities = Power
+    power = torch.sum(torch.abs(robot.data.applied_torque * robot.data.joint_vel), dim=-1)
+    env._episode_energy_buf += power * env.step_dt
+
+    # When environments reset, calculate the mean and ship to extras
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # Log the average energy of all resetting environments
+        env.extras["log"]["Metric/Total_Energy"] = torch.mean(env._episode_energy_buf[reset_ids]).item()
+
+        # Wipe the buffer for the new episode
+        env._episode_energy_buf[reset_ids] = 0.0
+
+    # Weight of 1e-8 ensures this runs every step
+    return torch.zeros(env.num_envs, device=env.device)
+
+def log_squared_torque_effort(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Tracks squared joint torque to expose wasted isometric pulling effort for specific joints."""
+    if not hasattr(env, "_episode_effort_buf"):
+        env._episode_effort_buf = torch.zeros(env.num_envs, device=env.device)
+
+    robot = env.scene[asset_cfg.name]
+    joint_ids = asset_cfg.joint_ids
+    arm_torques = robot.data.applied_torque[:, joint_ids]
+    
+    effort = torch.sum(torch.square(arm_torques), dim=-1)
+    env._episode_effort_buf += effort * env.step_dt
+
+    if env.reset_buf.any():
+        reset_ids = env.reset_buf.nonzero(as_tuple=True)[0]
+        
+        if "log" not in env.extras:
+            env.extras["log"] = {}
+
+        # Log the average wasted effort of all resetting environments
+        env.extras["log"]["Metric/Wasted_Motor_Effort"] = torch.mean(env._episode_effort_buf[reset_ids]).item()
+        env._episode_effort_buf[reset_ids] = 0.0
+
+    return torch.zeros(env.num_envs, device=env.device)

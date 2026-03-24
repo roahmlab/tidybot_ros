@@ -10,6 +10,7 @@ import torch
 from isaaclab.assets import Articulation
 from isaaclab.managers import SceneEntityCfg
 import isaaclab.utils.math as math_utils
+from isaaclab.utils.math import quat_conjugate, quat_mul, quat_apply
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -19,26 +20,35 @@ if TYPE_CHECKING:
 # ==========================================
 
 def rel_ee_handle_transform(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Returns the relative translation (3D) and rotation (4D quat) from EE to handle.
-    Output shape: [num_envs, 7]
+    """Returns the relative translation and directional vectors (X, Z) from EE to handle.
+    Everything is expressed in the End Effector's local frame for translation invariance.
+    Output shape: [num_envs, 9] (3 for pos, 3 for X vec, 3 for Z vec)
     """
-    # Get positions
+    # Get world positions
     ee_pos = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
     handle_pos = env.scene["handle_frame"].data.target_pos_w[..., 0, :]
     
-    # Get orientations
+    # Get world orientations
     ee_quat = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
     handle_quat = env.scene["handle_frame"].data.target_quat_w[..., 0, :]
     
-    # Relative translation (World frame difference)
-    pos_error = handle_pos - ee_pos
+    # 1. Relative Position (in EE Local Frame)
+    pos_error_world = handle_pos - ee_pos
+    ee_quat_inv = quat_conjugate(ee_quat)
+    pos_error_local = quat_apply(ee_quat_inv, pos_error_world)
     
-    # Relative rotation (q_rel = q_ee_inv * q_handle)
-    ee_quat_inv = math_utils.quat_conjugate(ee_quat)
-    rot_error = math_utils.quat_mul(ee_quat_inv, handle_quat)
+    # 2. Relative Rotation (Quat from EE to Handle)
+    rot_error = quat_mul(ee_quat_inv, handle_quat)
     
-    # Concatenate into a single tensor: [x, y, z, qw, qx, qy, qz]
-    return torch.cat([pos_error, rot_error], dim=-1)
+    # 3. Handle's Local X and Z axes expressed in EE Frame
+    x_axis = torch.zeros_like(pos_error_world); x_axis[..., 0] = 1.0
+    z_axis = torch.zeros_like(pos_error_world); z_axis[..., 2] = 1.0
+    
+    handle_x_in_ee = quat_apply(rot_error, x_axis)
+    handle_z_in_ee = quat_apply(rot_error, z_axis)
+    
+    # Concatenate: [local_x, local_y, local_z, x_x, x_y, x_z, z_x, z_y, z_z]
+    return torch.cat([pos_error_local, handle_x_in_ee, handle_z_in_ee], dim=-1)
 
 def gripper_open_amount(
     env: ManagerBasedRLEnv,
@@ -73,74 +83,59 @@ def gripper_cooldown_state(env: ManagerBasedRLEnv, action_term_name: str = "grip
     # Add a dimension so it concatenates properly in the observation vector
     return (current_timers / max_steps).unsqueeze(-1)
 
-def hinge_origin(env, door_cfg) -> torch.Tensor:
+def ee_to_hinge_in_ee_frame(env: ManagerBasedRLEnv, hinge_frame_name: str = "hinge_origin") -> torch.Tensor:
     """
-    Returns the exact hinge origin and opening axis in the environment-local frame.
-    Outputs a 6D tensor: [origin_x, origin_y, origin_z, axis_x, axis_y, axis_z]
+    Returns the 3D vector pointing from the End Effector to the Hinge Origin, 
+    expressed entirely in the EE's local coordinate frame.
+    Output shape: [num_envs, 3]
     """
-    door = env.scene[door_cfg.name]
+    # 1. Get positions in the world frame directly from the FrameTransformers
+    ee_pos_w = env.scene["ee_frame"].data.target_pos_w[..., 0, :]
+    hinge_pos_w = env.scene[hinge_frame_name].data.target_pos_w[..., 0, :]
     
-    # Get the world position/orientation of the tracked HingeSite body
-    hinge_pos_w = door.data.body_pos_w[:, door_cfg.body_ids[0]]
-    hinge_quat_w = door.data.body_quat_w[:, door_cfg.body_ids[0]]
+    # 2. Get EE orientation in the world frame
+    ee_quat_w = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
     
-    # Convert the position to the Environment-Local frame
-    hinge_pos_env = hinge_pos_w - env.scene.env_origins
+    # 3. Calculate the vector from EE to Hinge in the World Frame
+    ee_to_hinge_w = hinge_pos_w - ee_pos_w
     
-    # Opening Axis
-    local_z_axis = torch.zeros((env.num_envs, 3), device=env.device)
-    local_z_axis[:, 2] = 1.0
+    # 4. Rotate the world vector into the EE Local Frame
+    ee_quat_inv = math_utils.quat_conjugate(ee_quat_w)
+    ee_to_hinge_ee = math_utils.quat_apply(ee_quat_inv, ee_to_hinge_w)
     
-    # Rotate the local Z axis into the world frame based on the hinge site's orientation
-    hinge_axis = math_utils.quat_apply(hinge_quat_w, local_z_axis)
-    
-    return torch.cat([hinge_pos_env, hinge_axis], dim=-1)
+    return ee_to_hinge_ee
 
-def handle_initial_position(
-    env: ManagerBasedRLEnv, 
-    handle_cfg: SceneEntityCfg,
-    hinge_cfg: SceneEntityCfg
-) -> torch.Tensor:
+def hinge_axis_in_ee_frame(env: ManagerBasedRLEnv, hinge_frame_name: str = "hinge_origin") -> torch.Tensor:
     """
-    Calculates the exact 'closed' position of the handle by pivoting the current 
-    handle position backwards around the true hinge origin by the joint angle (-theta).
-    Returns the coordinates in the environment-local frame.
+    Returns the hinge's opening axis (Z-axis of the hinge) 
+    expressed in the EE's local frame.
+    Output shape: [num_envs, 3]
     """
-    door = env.scene[handle_cfg.name]
+    # 1. Get orientations in the world frame directly from the FrameTransformers
+    hinge_quat_w = env.scene[hinge_frame_name].data.target_quat_w[..., 0, :]
+    ee_quat_w = env.scene["ee_frame"].data.target_quat_w[..., 0, :]
     
-    # Get exact World Positions for Handle and HingeOrigin
-    handle_idx = handle_cfg.body_ids[0]
-    hinge_idx = hinge_cfg.body_ids[0]
+    # 2. Calculate the relative rotation from EE to Hinge
+    ee_quat_inv = math_utils.quat_conjugate(ee_quat_w)
+    rot_ee_to_hinge = math_utils.quat_mul(ee_quat_inv, hinge_quat_w)
     
-    handle_pos_w = door.data.body_pos_w[:, handle_idx, :]   # Shape: (num_envs, 3)
-    hinge_pos_w = door.data.body_pos_w[:, hinge_idx, :]     # Shape: (num_envs, 3)
-    
-    # Get current Joint angle (theta)
-    theta = door.data.joint_pos[:, 0]  # Shape: (num_envs,)
-    
-    # Determine the Hinge Axis in the World Frame
-    # The hinge rotates around the Z-axis.
-    # We rotate the local Z-axis [0, 0, 1] by the door's root quaternion 
-    # in case the door itself is rotated (e.g., yaw randomization).
+    # 3. Define the hinge's local opening axis (Assuming Z-axis is the hinge pin)
     local_z_axis = torch.zeros((env.num_envs, 3), device=env.device)
     local_z_axis[:, 2] = 1.0
-    axis_w = math_utils.quat_apply(door.data.root_quat_w, local_z_axis)
     
-    # Perform the geometrically perfect reverse rotation
-    # Vector from the actual hinge pin to the current handle
-    v_current = handle_pos_w - hinge_pos_w
+    # 4. Apply the relative rotation to map the hinge's axis into the EE frame
+    hinge_axis_ee = math_utils.quat_apply(rot_ee_to_hinge, local_z_axis)
     
-    # Create reverse rotation (-theta) around the derived Z-axis
-    q_rot_reverse = math_utils.quat_from_angle_axis(-theta, axis_w)
-    v_initial = math_utils.quat_apply(q_rot_reverse, v_current)
+    return hinge_axis_ee
     
-    # Translate back to world frame using the HINGE as the origin point
-    handle_initial_pos_w = hinge_pos_w + v_initial
+def door_position(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
+    """Returns the current joint position (angle) of the door's hinge.
+    Output shape: [num_envs, 1]
+    """
+    door_asset = env.scene[asset_cfg.name]
+    joint_pos = door_asset.data.joint_pos[:, asset_cfg.joint_ids]
     
-    # Convert to Environment-Local Frame
-    handle_initial_pos_env = handle_initial_pos_w - env.scene.env_origins
-    
-    return handle_initial_pos_env
+    return joint_pos
 
 def log_cumulative_mechanical_work(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg) -> torch.Tensor:
     """Tracks total mechanical work per episode and logs it to TensorBoard."""
