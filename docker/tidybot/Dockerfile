@@ -101,6 +101,7 @@ RUN apt-get update && apt-get install -y \
         ros-${ROS_DISTRO}-diagnostic-msgs \
         ros-${ROS_DISTRO}-statistics-msgs \
         ros-${ROS_DISTRO}-backward-ros \
+        ros-${ROS_DISTRO}-rmw-cyclonedds-cpp \
         ros-${ROS_DISTRO}-simulation-interfaces && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
@@ -155,10 +156,20 @@ RUN bash /home/${USER_NAME}/tidybot_platform/src/external/OrbbecSDK_ROS2/orbbec_
 # Initialize rosdep as root, then switch to user for build
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && (rosdep init || true)
 
+# Install Miniforge (conda) for VLA environment management
+RUN curl -fsSL -o /tmp/Miniforge3.sh \
+        "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh" && \
+    bash /tmp/Miniforge3.sh -b -p /home/${USER_NAME}/miniforge3 && \
+    rm /tmp/Miniforge3.sh && \
+    /home/${USER_NAME}/miniforge3/bin/conda clean -afy
+
 # Ensure ownership for the workspace
 RUN chown -R ${USER_NAME}:${USER_NAME} /home/${USER_NAME}
 
 USER ${USER_NAME}
+
+# Initialize conda for the user
+RUN /home/${USER_NAME}/miniforge3/bin/conda init bash
 
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
     rosdep update && \

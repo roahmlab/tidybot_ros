@@ -52,12 +52,6 @@ def generate_launch_description():
         parameters=[{"record": False}],
     )
 
-    remote_teleop = Node(
-        package="tidybot_policy",
-        executable="remote_policy_vla",
-        name="openvla_node",
-        output="screen",
-    )
 
     state_controller = Node(
         package="tidybot_policy",
@@ -91,7 +85,6 @@ def generate_launch_description():
     return LaunchDescription([
         sim_mode_arg,
         phone_teleop_server,
-        remote_teleop,
         state_controller,
         moveit_ee_pose_ik,
         move_group_launch

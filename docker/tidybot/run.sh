@@ -76,15 +76,41 @@ else
   DOCKER_OPTIONS+="-e LIBGL_ALWAYS_SOFTWARE=${LIBGL_ALWAYS_SOFTWARE:-0} "
 fi
 
-# ROS 2 DDS configuration (must match Isaac Sim container for cross-container communication)
+# Parse dds argument from command line (e.g., dds=cyclone)
+DDS_MODE="fastdds"
+for arg in "$@"; do
+  case "$arg" in
+    dds=cyclone) DDS_MODE="cyclone" ;;
+  esac
+done
+
+# ROS 2 DDS configuration
 DOCKER_OPTIONS+="-e ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0} "
-DOCKER_OPTIONS+="-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp "
-DOCKER_OPTIONS+="-e FASTRTPS_DEFAULT_PROFILES_FILE=/fastdds.xml "
-DOCKER_OPTIONS+="-v $DOCKER_DIR/fastdds.xml:/fastdds.xml:ro "
+if [ "$DDS_MODE" == "cyclone" ]; then
+  echo "✔ Using CycloneDDS for cross-machine communication."
+  CYCLONEDDS_XML="${CYCLONEDDS_XML:-$DOCKER_DIR/cyclonedds.xml}"
+  DOCKER_OPTIONS+="-e RMW_IMPLEMENTATION=rmw_cyclonedds_cpp "
+  DOCKER_OPTIONS+="-e CYCLONEDDS_URI=/cyclonedds.xml "
+  DOCKER_OPTIONS+="-v $CYCLONEDDS_XML:/cyclonedds.xml:ro "
+else
+  # FastDDS (default, must match Isaac Sim container for cross-container communication)
+  DOCKER_OPTIONS+="-e RMW_IMPLEMENTATION=rmw_fastrtps_cpp "
+  DOCKER_OPTIONS+="-e FASTRTPS_DEFAULT_PROFILES_FILE=/fastdds.xml "
+  DOCKER_OPTIONS+="-v $DOCKER_DIR/fastdds.xml:/fastdds.xml:ro "
+fi
 
 echo $CONTAINER_NAME
 
-if [ ${1:-""} == "restart" ]; then 
+# Filter out dds= args for the action parsing below
+ACTION=""
+for arg in "$@"; do
+  case "$arg" in
+    dds=*) ;;          # skip dds args
+    *) ACTION="$arg" ;; # keep the last non-dds arg as the action
+  esac
+done
+
+if [ "${ACTION:-""}" == "restart" ]; then 
   echo "Restarting Container"
   docker rm -f $CONTAINER_NAME
   docker run $DOCKER_OPTIONS $IMAGE_TAG /bin/bash

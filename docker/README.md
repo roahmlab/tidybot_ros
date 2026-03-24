@@ -7,7 +7,7 @@ This directory contains Docker configurations for running the TidyBot++ ROS 2 pl
 ```
 docker/
 ├── tidybot/                  # TidyBot platform container
-│   ├── Dockerfile            # Ubuntu 24.04 + ROS 2 Jazzy + workspace
+│   ├── Dockerfile            # Ubuntu 24.04 + ROS 2 Jazzy + Miniforge + workspace
 │   ├── build.sh              # Build the TidyBot image
 │   ├── run.sh                # Run the TidyBot container
 │   └── entrypoint.sh         # Container entrypoint script
@@ -18,7 +18,9 @@ docker/
 │   ├── run.sh                # Run the Isaac Sim container
 │   └── entrypoint.sh         # Container entrypoint script
 │
-├── fastdds.xml               # Shared DDS config for cross-container ROS 2
+├── fastdds.xml               # DDS config for local cross-container ROS 2
+├── cyclonedds_local.xml      # CycloneDDS config for robot side (cross-machine)
+├── cyclonedds_server.xml     # CycloneDDS config for GPU server side (cross-machine)
 └── README.md                 # This file
 ```
 
@@ -59,7 +61,8 @@ docker pull nvcr.io/nvidia/isaac-sim:5.1.0
 | Script | Description |
 |--------|-------------|
 | `build.sh` | Build the TidyBot platform Docker image with ROS 2 Jazzy |
-| `run.sh restart` | Stop existing container and start fresh |
+| `run.sh restart` | Stop existing container and start fresh (FastDDS) |
+| `run.sh restart dds=cyclone` | Start fresh with CycloneDDS (for cross-machine VLA) |
 | `run.sh` | Start or attach to existing container |
 
 ### Isaac Sim Container (`docker/isaac-sim-ros2/`)
@@ -109,6 +112,35 @@ Both containers are configured to communicate via ROS 2 DDS using the shared `fa
 | ROS_DOMAIN_ID | `0` (configurable via environment) |
 | RMW_IMPLEMENTATION | `rmw_fastrtps_cpp` |
 | DDS Config | `docker/fastdds.xml` |
+
+## 🌐 Cross-Machine Communication (CycloneDDS)
+
+For communication between the robot and a remote GPU server (e.g., for VLA inference), use **CycloneDDS** instead of FastDDS. FastDDS fragments published images during cross-machine transport, leading to corrupted data.
+
+### Configuration Files
+
+| File | Machine | Notes |
+|------|---------|-------|
+| `cyclonedds_local.xml` | Robot (onboard PC) | Fill in robot IP and GPU server IP |
+| `cyclonedds_server.xml` | GPU server | Auto-determines network interface |
+
+### Usage
+
+Pass `dds=cyclone` to `run.sh` and specify the config file via `CYCLONEDDS_XML`:
+
+```bash
+# Robot side
+CYCLONEDDS_XML=docker/cyclonedds_local.xml ROS_DOMAIN_ID=1 \
+    ./docker/tidybot/run.sh restart dds=cyclone
+
+# GPU server side
+CYCLONEDDS_XML=docker/cyclonedds_server.xml ROS_DOMAIN_ID=1 \
+    ./docker/tidybot/run.sh restart dds=cyclone
+```
+
+Both machines must use the **same `ROS_DOMAIN_ID`**. If `CYCLONEDDS_XML` is not set, it defaults to `docker/cyclonedds.xml`.
+
+For full VLA deployment instructions, see [`src/external/openvla/README.md`](../src/external/openvla/README.md).
 
 ## 🛠️ Troubleshooting
 
