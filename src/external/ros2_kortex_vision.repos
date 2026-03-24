@@ -1,4 +1,5 @@
-ros2_kortex_vision:
+repositories:
+  ros2_kortex_vision:
     type: git
     url: https://github.com/Kinovarobotics/ros2_kortex_vision.git
     version: ros2

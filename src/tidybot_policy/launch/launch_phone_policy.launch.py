@@ -30,7 +30,7 @@ def generate_launch_description():
 
     cameras = DeclareLaunchArgument(
         "cameras",
-        default_value='["base","arm"]',
+        default_value='["base","arm", "ext"]',
         description="Comma-separated list (YAML) of cameras to record (base, arm, ext)"
     )
 
