@@ -56,3 +56,7 @@ Thumbs.db
 
 # Ignore Isaac Sim workspace
 isaac_sim_workspace/
+
+# Ignore Isaac Lab RL training artifacts
+isaaclab/tidybot_isaac/logs/
+isaaclab/tidybot_isaac/outputs/
