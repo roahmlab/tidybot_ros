@@ -19,8 +19,8 @@ docker/
 │   └── entrypoint.sh         # Container entrypoint script
 │
 ├── fastdds.xml               # DDS config for local cross-container ROS 2
-├── cyclonedds_local.xml      # CycloneDDS config for robot side (cross-machine)
-├── cyclonedds_server.xml     # CycloneDDS config for GPU server side (cross-machine)
+├── cyclonedds.xml            # CycloneDDS config for cross-machine ROS 2
+├── diagnose_dds.sh           # DDS connectivity diagnostic script
 └── README.md                 # This file
 ```
 
@@ -117,28 +117,39 @@ Both containers are configured to communicate via ROS 2 DDS using the shared `fa
 
 For communication between the robot and a remote GPU server (e.g., for VLA inference), use **CycloneDDS** instead of FastDDS. FastDDS fragments published images during cross-machine transport, leading to corrupted data.
 
-### Configuration Files
+### Configuration
 
-| File | Machine | Notes |
-|------|---------|-------|
-| `cyclonedds_local.xml` | Robot (onboard PC) | Fill in robot IP and GPU server IP |
-| `cyclonedds_server.xml` | GPU server | Auto-determines network interface |
+Edit `docker/cyclonedds.xml` on each machine:
+
+**Client side (robot / laptop):**
+```xml
+<NetworkInterface address="<CLIENT_IP>"/>   <!-- This machine's IP -->
+<Peer address="<SERVER_IP>"/>               <!-- Remote machine's IP -->
+```
+
+**Server side (GPU server):**
+```xml
+<NetworkInterface address="<SERVER_IP>"/>   <!-- This machine's IP -->
+<Peer address="<CLIENT_IP>"/>               <!-- Remote machine's IP -->
+```
+
+Both sides **must** use the same `Domain Id` and `MaxMessageSize`.
 
 ### Usage
 
-Pass `dds=cyclone` to `run.sh` and specify the config file via `CYCLONEDDS_XML`:
+Pass `dds=cyclone` to `run.sh`:
 
 ```bash
-# Robot side
-CYCLONEDDS_XML=docker/cyclonedds_local.xml ROS_DOMAIN_ID=1 \
-    ./docker/tidybot/run.sh restart dds=cyclone
+# Client side (robot / laptop)
+./docker/tidybot/run.sh restart dds=cyclone
 
-# GPU server side
-CYCLONEDDS_XML=docker/cyclonedds_server.xml ROS_DOMAIN_ID=1 \
-    ./docker/tidybot/run.sh restart dds=cyclone
+# Server side (GPU server) — outside Docker
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI=$(realpath docker/cyclonedds.xml)
+export ROS_DOMAIN_ID=0
 ```
 
-Both machines must use the **same `ROS_DOMAIN_ID`**. If `CYCLONEDDS_XML` is not set, it defaults to `docker/cyclonedds.xml`.
+If `CYCLONEDDS_XML` is not set, `run.sh` defaults to `docker/cyclonedds.xml`.
 
 For full VLA deployment instructions, see [`src/external/openvla/README.md`](../src/external/openvla/README.md).
 
@@ -196,6 +207,84 @@ chmod -R 777 ~/docker/isaac-sim/
 2. Check that `isaacsim.ros2.bridge` extension is enabled (Window > Extensions)
 3. Verify the ActionGraph is properly configured
 4. Check the Isaac Sim console for errors
+
+### CycloneDDS Cross-Machine Connection Not Working
+
+Use the diagnostic script to check both machines:
+
+```bash
+bash docker/diagnose_dds.sh <PEER_IP>
+```
+
+#### 1. Verify UDP connectivity in both directions
+
+DDS requires **bidirectional UDP**. Test with:
+
+```bash
+# On machine A (listen):
+python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.bind(('0.0.0.0', 7400))
+s.settimeout(10)
+print('Listening on UDP 7400...')
+try:
+    data, addr = s.recvfrom(1024)
+    print(f'SUCCESS: Received from {addr}')
+except socket.timeout:
+    print('FAIL: No packet received')
+"
+
+# On machine B (send):
+python3 -c "
+import socket
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+s.sendto(b'hello', ('<MACHINE_A_IP>', 7400))
+print('Sent')
+"
+```
+
+Test **both directions** (swap A and B). If one direction fails, the firewall on the receiving machine is blocking inbound UDP.
+
+#### 2. Open the local firewall
+
+If `ufw` is active, it will block inbound UDP by default:
+
+```bash
+# Check firewall status
+sudo ufw status
+
+# Allow UDP from the peer
+sudo ufw allow proto udp from <PEER_IP>
+```
+
+#### 3. Common configuration mistakes
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| Domain ID mismatch | No topics discovered | Ensure `Domain Id` in XML matches `ROS_DOMAIN_ID` env var on both sides |
+| Wrong NetworkInterface | CycloneDDS binds to wrong interface | Set `address=` to an IP that exists on this machine (`ip a` to check) |
+| Missing peer | No discovery | Each side's `<Peer>` must point to the **other** machine's IP |
+| MaxMessageSize mismatch | Image corruption | Use `65500B` on both sides |
+| `RMW_IMPLEMENTATION` not set | Uses default FastDDS | Must be `rmw_cyclonedds_cpp` on both sides |
+
+#### 4. VPN-specific issues
+
+When connecting through a VPN (e.g., Cisco AnyConnect):
+
+- Use the **VPN tunnel IP** (from `cscotun0`) as the NetworkInterface address, not the WiFi IP
+- The VPN IP is **dynamic** — update `cyclonedds.xml` on both sides after each VPN reconnect
+
+#### 5. Quick end-to-end ROS 2 test
+
+```bash
+# Server:
+ros2 run demo_nodes_cpp talker
+
+# Client:
+ros2 run demo_nodes_cpp listener
+# Should print: "I heard: [Hello World: X]"
+```
 
 ---
 
