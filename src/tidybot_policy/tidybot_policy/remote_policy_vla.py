@@ -25,6 +25,12 @@ import os
 class OpenVLANode(Node):
     def __init__(self):
         super().__init__('openvla_node')
+
+        # Declare ROS parameters
+        self.declare_parameter('merged_ckpt', '')
+        self.declare_parameter('adapter_ckpt', '')
+        self.declare_parameter('instruction', 'pick up the object')
+
         self.bridge = CvBridge()
         self.latest_image = None
         self.latest_action = np.zeros(7)
@@ -57,25 +63,52 @@ class OpenVLANode(Node):
         self.publisher_thread.daemon = True
         self.publisher_thread.start()
 
-        # Load processor and VLA
-        self.processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
-        base_model = AutoModelForVision2Seq.from_pretrained(
-            "openvla/openvla-7b",
-            # attn_implementation="flash_attention_2",  
-            torch_dtype=torch.bfloat16,
-            low_cpu_mem_usage=True,
-            trust_remote_code=True
-        ).to("cuda:0")
+        # Resolve checkpoint paths from ROS parameters
+        merged_ckpt = self.get_parameter('merged_ckpt').get_parameter_value().string_value
+        adapter_ckpt = self.get_parameter('adapter_ckpt').get_parameter_value().string_value
 
-        self.vla = PeftModel.from_pretrained(
-            base_model,
-            "...",  # Absolute path to peft model
-        ).to("cuda:0")
+        if not merged_ckpt and not adapter_ckpt:
+            self.get_logger().fatal('Must provide either merged_ckpt or adapter_ckpt')
+            raise RuntimeError('No checkpoint path provided')
 
-        # Absolute path to tensorflow dataset statistics
-        with open("...", "r") as f:
-            stats = json.load(f)
-        self.vla.config.norm_stats["tidybot_vla"] = stats
+        if merged_ckpt:
+            if adapter_ckpt:
+                self.get_logger().warn('Both merged_ckpt and adapter_ckpt provided; ignoring adapter')
+            # Load fully merged checkpoint directly
+            self.get_logger().info(f'Loading merged checkpoint from {merged_ckpt}')
+            self.processor = AutoProcessor.from_pretrained(merged_ckpt, trust_remote_code=True)
+            self.vla = AutoModelForVision2Seq.from_pretrained(
+                merged_ckpt,
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True
+            ).to("cuda:0")
+            ckpt_dir = merged_ckpt
+        else:
+            # Load base model + LoRA adapter
+            self.get_logger().info(f'Loading base model + adapter from {adapter_ckpt}')
+            self.processor = AutoProcessor.from_pretrained("openvla/openvla-7b", trust_remote_code=True)
+            base_model = AutoModelForVision2Seq.from_pretrained(
+                "openvla/openvla-7b",
+                torch_dtype=torch.bfloat16,
+                low_cpu_mem_usage=True,
+                trust_remote_code=True
+            ).to("cuda:0")
+            self.vla = PeftModel.from_pretrained(
+                base_model,
+                adapter_ckpt,
+            ).to("cuda:0")
+            ckpt_dir = adapter_ckpt
+
+        # Load dataset statistics from checkpoint directory
+        stats_path = os.path.join(ckpt_dir, 'dataset_statistics.json')
+        if os.path.exists(stats_path):
+            with open(stats_path, 'r') as f:
+                stats = json.load(f)
+            self.vla.config.norm_stats['tidybot_vla'] = stats
+            self.get_logger().info(f'Loaded dataset statistics from {stats_path}')
+        else:
+            self.get_logger().warn(f'No dataset_statistics.json found at {stats_path}')
 
     def image_callback(self, msg: CompressedImage):
         # Store latest image
@@ -98,7 +131,8 @@ class OpenVLANode(Node):
             pil_image = PILImage.fromarray(self.latest_image)
             
             # Prepare input prompt
-            prompt = "In: What action should the robot take to pick up the black cube?\nOut:"
+            instruction = self.get_parameter('instruction').get_parameter_value().string_value
+            prompt = f"In: What action should the robot take to {instruction}?\nOut:"
 
             # Tokenize input
             inputs = self.processor(prompt, pil_image, return_tensors="pt").to("cuda:0", dtype=torch.bfloat16)

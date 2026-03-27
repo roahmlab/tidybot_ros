@@ -102,14 +102,24 @@ fi
 
 echo $CONTAINER_NAME
 
-# Filter out dds= args for the action parsing below
+# Filter out dds= and -v args for the action parsing below
 ACTION=""
+EXTRA_VOLUMES=""
+SKIP_NEXT=false
 for arg in "$@"; do
+  if $SKIP_NEXT; then
+    # Resolve ~ to $HOME in the mount spec
+    EXTRA_VOLUMES+="-v $(echo $arg | sed "s|~|$HOME|g") "
+    SKIP_NEXT=false
+    continue
+  fi
   case "$arg" in
     dds=*) ;;          # skip dds args
+    -v|--volume) SKIP_NEXT=true ;; # next arg is the volume spec
     *) ACTION="$arg" ;; # keep the last non-dds arg as the action
   esac
 done
+DOCKER_OPTIONS+="$EXTRA_VOLUMES"
 
 if [ "${ACTION:-""}" == "restart" ]; then 
   echo "Restarting Container"

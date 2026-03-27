@@ -4,15 +4,15 @@
   <Domain Id="0">
     <General>
       <Interfaces>
-        <NetworkInterface address="35.7.44.144"/>
+        <NetworkInterface address="[IP_ADDRESS]"/>
         <!-- Client IP -->
       </Interfaces>
-      <AllowMulticast>false</AllowMulticast>
-      <MaxMessageSize>65500B</MaxMessageSize>
+      <AllowMulticast>true</AllowMulticast>
+      <MaxMessageSize>1300B</MaxMessageSize>
     </General>
     <Discovery>
       <Peers>
-        <Peer address="141.212.77.155"/>
+        <Peer address="[IP_ADDRESS]"/>
         <!-- Server IP -->
       </Peers>
     </Discovery>
