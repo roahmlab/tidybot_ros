@@ -52,17 +52,6 @@ class OpenVLANode(Node):
         # Publisher of inferred action
         self.action_pub = self.create_publisher(Float64MultiArray, '/tidybot/arm/delta_commands', 10)
 
-        # Run inference at fixed 5 Hz, publish action at 15hz
-        self._inference_thread_running = True
-        self.inference_thread = threading.Thread(target=self.inference_loop)
-        self.inference_thread.daemon = True
-        self.inference_thread.start()
-
-        self._publishing_thread_running = True
-        self.publisher_thread = threading.Thread(target=self.publish_loop)
-        self.publisher_thread.daemon = True
-        self.publisher_thread.start()
-
         # Resolve checkpoint paths from ROS parameters
         merged_ckpt = self.get_parameter('merged_ckpt').get_parameter_value().string_value
         adapter_ckpt = self.get_parameter('adapter_ckpt').get_parameter_value().string_value
@@ -105,10 +94,26 @@ class OpenVLANode(Node):
         if os.path.exists(stats_path):
             with open(stats_path, 'r') as f:
                 stats = json.load(f)
+            # The JSON may be wrapped as {"tidybot_vla": {"action": ...}} or just {"action": ...}
+            if 'tidybot_vla' in stats:
+                stats = stats['tidybot_vla']
             self.vla.config.norm_stats['tidybot_vla'] = stats
             self.get_logger().info(f'Loaded dataset statistics from {stats_path}')
         else:
             self.get_logger().warn(f'No dataset_statistics.json found at {stats_path}')
+
+        # Start threads AFTER model is loaded
+        self._inference_thread_running = True
+        self.inference_thread = threading.Thread(target=self.inference_loop)
+        self.inference_thread.daemon = True
+        self.inference_thread.start()
+
+        self._publishing_thread_running = True
+        self.publisher_thread = threading.Thread(target=self.publish_loop)
+        self.publisher_thread.daemon = True
+        self.publisher_thread.start()
+
+        self.get_logger().info('Model loaded and threads started')
 
     def image_callback(self, msg: CompressedImage):
         # Store latest image
@@ -117,37 +122,51 @@ class OpenVLANode(Node):
         self.latest_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         self.get_logger().info(f"Received image")
 
+        # DEBUG: save image once per second to check for corruption
+        now = time.time()
+        if not hasattr(self, '_last_save_time') or now - self._last_save_time >= 1.0:
+            self._last_save_time = now
+            debug_dir = '/tmp/vla_debug'
+            os.makedirs(debug_dir, exist_ok=True)
+            fname = os.path.join(debug_dir, f'{int(now)}.png')
+            cv2.imwrite(fname, image)
+            self.get_logger().info(f'DEBUG: saved image to {fname}')
+
     def inference_loop(self):
         rate_hz = 5.0
         interval = 1.0 / rate_hz
         while self._inference_thread_running and rclpy.ok():
-            if self.latest_image is None:
-                time.sleep(0.1)
-                continue
+            try:
+                if self.latest_image is None:
+                    time.sleep(0.1)
+                    continue
 
-            self.get_logger().info(f"Running inference")
+                self.get_logger().info(f"Running inference")
 
-            # Convert latest image to PIL
-            pil_image = PILImage.fromarray(self.latest_image)
-            
-            # Prepare input prompt
-            instruction = self.get_parameter('instruction').get_parameter_value().string_value
-            prompt = f"In: What action should the robot take to {instruction}?\nOut:"
+                # Convert latest image to PIL
+                pil_image = PILImage.fromarray(self.latest_image)
+                
+                # Prepare input prompt
+                instruction = self.get_parameter('instruction').get_parameter_value().string_value
+                prompt = f"In: What action should the robot take to {instruction}?\nOut:"
 
-            # Tokenize input
-            inputs = self.processor(prompt, pil_image, return_tensors="pt").to("cuda:0", dtype=torch.bfloat16)
+                # Tokenize input
+                inputs = self.processor(prompt, pil_image, return_tensors="pt").to("cuda:0", dtype=torch.bfloat16)
 
-            # Predict action
-            with torch.no_grad():
-                action = self.vla.predict_action(**inputs, unnorm_key="tidybot_vla", do_sample=False)
-            with self.action_lock:
-                self.latest_action = action
+                # Predict action
+                with torch.no_grad():
+                    action = self.vla.predict_action(**inputs, unnorm_key="tidybot_vla", do_sample=False)
+                with self.action_lock:
+                    self.latest_action = action
 
-            # log_path = os.path.join(os.path.expanduser("~"), "actions_log.txt")
-            # with open(log_path, "a") as f:
-            #     f.write(" ".join(map(str, action.tolist())) + "\n")
+                self.get_logger().info(f'Inferred action: {action}')
 
-            time.sleep(interval)
+                time.sleep(interval)
+            except Exception as e:
+                self.get_logger().error(f'Inference error: {e}', throttle_duration_sec=5.0)
+                import traceback
+                self.get_logger().error(traceback.format_exc(), throttle_duration_sec=5.0)
+                time.sleep(1.0)
 
     def publish_loop(self):
         rate_hz = 15.0

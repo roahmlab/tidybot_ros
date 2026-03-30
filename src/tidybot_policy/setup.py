@@ -35,6 +35,7 @@ setup(
             'reset_env = tidybot_policy.reset_env:main',
             'remote_policy_diffusion = tidybot_policy.remote_policy_diffusion:main',
             'remote_policy_vla = tidybot_policy.remote_policy_vla:main',
+            'zmq_bridge_vla = tidybot_policy.zmq_bridge_vla:main',
             'gamepad_policy = tidybot_policy.gamepad_policy:main',
         ],
     },
